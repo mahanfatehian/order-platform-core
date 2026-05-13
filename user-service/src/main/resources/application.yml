@@ -31,3 +31,12 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.flywaydb: INFO
+
+app:
+  security:
+    jwt:
+      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      public-paths:
+        - /swagger-ui/**
+        - /v3/api-docs/**
+      expiration: 3600000

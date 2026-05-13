@@ -1,0 +1,12 @@
+server:
+  port: 8081
+
+app:
+  security:
+    jwt:
+      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      expiration: 3600000
+      public-paths:
+        - /api/auth/login
+        - /swagger-ui/**
+        - /v3/api-docs/**

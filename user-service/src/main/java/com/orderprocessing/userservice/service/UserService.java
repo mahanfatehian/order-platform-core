@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -45,7 +45,7 @@ public class UserService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .enabled(true)
-                .roles(Set.of(defaultRole))
+                .roles(Collections.singleton(defaultRole))
                 .build();
 
         return mapToResponse(userRepository.save(user));
@@ -55,7 +55,7 @@ public class UserService {
         return userRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     public UserResponse getById(UUID id) {
@@ -83,7 +83,7 @@ public class UserService {
             user.setEmail(request.getEmail());
         }
 
-        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
 

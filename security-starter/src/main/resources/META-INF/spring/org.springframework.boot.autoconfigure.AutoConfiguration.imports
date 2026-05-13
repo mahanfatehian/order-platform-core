@@ -1,0 +1,2 @@
+com.orderprocessing.security.config.SecurityAutoConfiguration
+com.orderprocessing.security.config.OpenApiAutoConfiguration
