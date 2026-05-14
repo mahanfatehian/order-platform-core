@@ -6,6 +6,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +28,22 @@ public class JwtAuthoritiesConverter implements Converter<Jwt, Set<GrantedAuthor
         List<String> permissions = jwt.getClaimAsStringList("authorities");
         if (permissions != null) {
             permissions.stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .forEach(authorities::add);
+        }
+
+        Object scope = jwt.getClaims().get("scope");
+        if (scope instanceof String ) {
+            String scopeStr = (String) scope ;
+            for (String item : scopeStr.split(" ")) {
+                if (!item.isEmpty()) {
+                    authorities.add(new SimpleGrantedAuthority(item));
+                }
+            }
+        } else if (scope instanceof Collection<?> ) {
+            Collection<?> collection = (Collection<?>) scope ;
+            collection.stream()
+                    .map(String::valueOf)
                     .map(SimpleGrantedAuthority::new)
                     .forEach(authorities::add);
         }

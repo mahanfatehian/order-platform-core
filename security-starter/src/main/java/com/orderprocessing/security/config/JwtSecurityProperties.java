@@ -15,14 +15,12 @@ public class JwtSecurityProperties {
     private List<String> publicPaths = new ArrayList<>();
 
     public JwtSecurityProperties() {
-
         publicPaths.add("/swagger-ui.html");
         publicPaths.add("/swagger-ui/**");
         publicPaths.add("/v3/api-docs/**");
         publicPaths.add("/actuator/health");
-
-        publicPaths.add("/api/v1/auth/login");
-        publicPaths.add("/api/v1/auth/logout");
+        publicPaths.add("/api/auth/login");
+        publicPaths.add("/api/auth/logout");
     }
 
     public String getSecret() {

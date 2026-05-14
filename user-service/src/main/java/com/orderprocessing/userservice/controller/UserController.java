@@ -43,7 +43,7 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     @GetMapping("/{id}")
-    public UserResponse getUserById(@PathVariable UUID id) {
+    public UserResponse getUserById(@PathVariable("id") UUID id) {
         return userService.getById(id);
     }
 
@@ -64,7 +64,7 @@ public class UserController {
             @ApiResponse(responseCode = "409", description = "Username or email already exists")
     })
     @PutMapping("/{id}")
-    public UserResponse updateUser(@PathVariable UUID id,
+    public UserResponse updateUser(@PathVariable("id") UUID id,
                                    @Valid @RequestBody UpdateUserRequest request) {
         return userService.update(id, request);
     }
@@ -76,7 +76,7 @@ public class UserController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteUser(@PathVariable UUID id) {
+    public void deleteUser(@PathVariable("id") UUID id) {
         userService.delete(id);
     }
 }

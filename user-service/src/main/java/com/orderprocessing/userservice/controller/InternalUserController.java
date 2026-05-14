@@ -13,12 +13,12 @@ public class InternalUserController {
     private final UserQueryService userQueryService;
 
     @GetMapping("/username/{username}")
-    public InternalUserResponse getByUsername(@PathVariable String username) {
+    public InternalUserResponse getByUsername(@PathVariable("username") String username) {
         return userQueryService.getByUsername(username);
     }
 
     @GetMapping("/search")
-    public InternalUserResponse getByUsernameOrEmail(@RequestParam String value) {
+    public InternalUserResponse getByUsernameOrEmail(@RequestParam("value") String value) {
         return userQueryService.getByUsernameOrEmail(value);
     }
 }

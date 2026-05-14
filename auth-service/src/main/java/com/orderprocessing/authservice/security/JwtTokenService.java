@@ -41,7 +41,7 @@ public class JwtTokenService {
                 .claim("authorities", authorities)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(secretKey)
+                .signWith(secretKey, Jwts.SIG.HS384)
                 .compact();
     }
 }

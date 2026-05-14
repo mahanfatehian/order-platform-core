@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -33,10 +34,13 @@ public class SecurityAutoConfiguration {
     public JwtDecoder jwtDecoder(JwtSecurityProperties properties) {
         SecretKeySpec secretKey = new SecretKeySpec(
                 properties.getSecret().getBytes(StandardCharsets.UTF_8),
-                "HmacSHA256"
+                "HmacSHA384"
         );
 
-        return NimbusJwtDecoder.withSecretKey(secretKey).build();
+        return NimbusJwtDecoder
+                .withSecretKey(secretKey)
+                .macAlgorithm(MacAlgorithm.HS384)
+                .build();
     }
 
     @Bean
