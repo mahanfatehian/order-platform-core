@@ -33,7 +33,7 @@ insert into users (
           'c1111111-1111-1111-1111-111111111111',
           'johndoe',
           'john.doe@example.com',
-          '$2a$10$replace_with_real_bcrypt_hash',
+          '$2a$10$sukq5t4rYyULEUU1FWKMye1JSKtb4yz5Mv3f6prdbx0QuHXdzQoYm',
           true,
           true,
           'John',
@@ -43,13 +43,13 @@ insert into users (
       ),
       (
           'c2222222-2222-2222-2222-222222222222',
-          'admin.smith',
-          'admin.smith@example.com',
-          '$2a$10$replace_with_real_bcrypt_hash',
+          'admin',
+          'admin@example.com',
+          '$2a$10$4GCNnD4Yr8NGUnfpu5vQ8urLeZ0F4jCOOmKgL77MD5qFeD1YNAZj6',
           true,
           true,
           'Admin',
-          'Smith',
+          '',
           now(),
           now()
       )

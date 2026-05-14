@@ -37,12 +37,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
-
-
-target/
 .idea/
-.vscode/
-*.iml
 
 .env
 .env.*
@@ -50,5 +45,3 @@ target/
 
 logs/
 *.log
-
-.DS_Store
