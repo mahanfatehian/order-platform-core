@@ -1,11 +1,11 @@
 package com.orderprocessing.authservice.client;
 
-import com.orderprocessing.authservice.client.dto.UserResponse;
+import com.orderprocessing.authservice.client.dto.InternalAuthenticateRequest;
+import com.orderprocessing.authservice.client.dto.InternalAuthenticatedUserResponse;
 import com.orderprocessing.authservice.config.FeignInternalAuthConfig;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(
         name = "user-service",
@@ -14,9 +14,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 )
 public interface UserServiceClient {
 
-    @GetMapping("/api/users/internal/username/{username}")
-    UserResponse getByUsername(@PathVariable("username") String username);
-
-    @GetMapping("/api/users/internal/search")
-    UserResponse getByUsernameOrEmail(@RequestParam("value") String value);
+    @PostMapping("/api/users/internal/authenticate")
+    InternalAuthenticatedUserResponse authenticate(@RequestBody InternalAuthenticateRequest request);
 }

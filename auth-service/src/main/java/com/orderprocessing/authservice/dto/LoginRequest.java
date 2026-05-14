@@ -1,12 +1,16 @@
 package com.orderprocessing.authservice.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
-@Setter
 @Getter
+@Setter
 public class LoginRequest {
-    private String username;
-    private String password;
 
+    @NotBlank
+    private String username;
+
+    @NotBlank
+    private String password;
 }

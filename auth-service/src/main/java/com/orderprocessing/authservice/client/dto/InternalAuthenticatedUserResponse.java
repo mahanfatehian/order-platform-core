@@ -1,22 +1,22 @@
-package com.orderprocessing.userservice.dto;
+package com.orderprocessing.authservice.client.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InternalUserResponse {
+public class InternalAuthenticatedUserResponse {
     private UUID id;
     private String username;
     private String email;
-    private String passwordHash;
-    private List<String> roles;
-    private boolean enabled;
+    private Set<String> roles;
 }

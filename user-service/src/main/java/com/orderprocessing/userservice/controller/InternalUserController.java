@@ -1,7 +1,9 @@
 package com.orderprocessing.userservice.controller;
 
-import com.orderprocessing.userservice.dto.InternalUserResponse;
-import com.orderprocessing.userservice.service.UserQueryService;
+import com.orderprocessing.userservice.dto.InternalAuthenticateRequest;
+import com.orderprocessing.userservice.dto.InternalAuthenticatedUserResponse;
+import com.orderprocessing.userservice.service.InternalAuthenticationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,15 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class InternalUserController {
 
-    private final UserQueryService userQueryService;
+    private final InternalAuthenticationService internalAuthenticationService;
 
-    @GetMapping("/username/{username}")
-    public InternalUserResponse getByUsername(@PathVariable("username") String username) {
-        return userQueryService.getByUsername(username);
+    @PostMapping("/authenticate")
+    public InternalAuthenticatedUserResponse authenticate(@Valid @RequestBody InternalAuthenticateRequest request) {
+        return internalAuthenticationService.authenticate(request);
     }
 
-    @GetMapping("/search")
-    public InternalUserResponse getByUsernameOrEmail(@RequestParam("value") String value) {
-        return userQueryService.getByUsernameOrEmail(value);
-    }
 }

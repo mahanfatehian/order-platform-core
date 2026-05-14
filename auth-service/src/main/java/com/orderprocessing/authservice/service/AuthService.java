@@ -1,36 +1,46 @@
 package com.orderprocessing.authservice.service;
 
+import com.orderprocessing.authservice.client.UserServiceClient;
+import com.orderprocessing.authservice.client.dto.InternalAuthenticateRequest;
+import com.orderprocessing.authservice.client.dto.InternalAuthenticatedUserResponse;
 import com.orderprocessing.authservice.dto.LoginRequest;
 import com.orderprocessing.authservice.dto.LoginResponse;
 import com.orderprocessing.authservice.security.JwtTokenService;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import feign.FeignException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    private final AuthenticationManager authenticationManager;
+    private final UserServiceClient userServiceClient;
     private final JwtTokenService jwtTokenService;
 
-    public AuthService(AuthenticationManager authenticationManager, JwtTokenService jwtTokenService) {
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenService = jwtTokenService;
-    }
-
     public LoginResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(),
-                        request.getPassword()
-                )
-        );
+        try {
+            InternalAuthenticatedUserResponse user = userServiceClient.authenticate(
+                    InternalAuthenticateRequest.builder()
+                            .username(request.getUsername())
+                            .password(request.getPassword())
+                            .build()
+            );
 
-        String token = jwtTokenService.generateToken(
-                (org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal()
-        );
+            String token = jwtTokenService.generateToken(
+                    user.getUsername(),
+                    user.getRoles()
+            );
 
-        return new LoginResponse(token);
+            return LoginResponse.builder()
+                    .token(token)
+                    .username(user.getUsername())
+                    .email(user.getEmail())
+                    .roles(user.getRoles())
+                    .build();
+
+        } catch (FeignException.Unauthorized ex) {
+            throw new BadCredentialsException("Invalid username or password");
+        }
     }
 }
