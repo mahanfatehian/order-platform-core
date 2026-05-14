@@ -16,7 +16,7 @@ public class InternalUserResponse {
     private UUID id;
     private String username;
     private String email;
-    private String password;
+    private String passwordHash;
     private List<String> roles;
     private boolean enabled;
 }

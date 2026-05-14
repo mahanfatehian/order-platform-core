@@ -39,7 +39,7 @@ public class UserQueryService {
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .password(user.getPasswordHash())
+                .passwordHash(user.getPasswordHash())
                 .roles(
                         user.getRoles().stream()
                                 .map(RoleEntity::getName)

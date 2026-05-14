@@ -8,6 +8,7 @@ spring:
 services:
   user-service:
     url: http://localhost:8082
+    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
 
 app:
   security:

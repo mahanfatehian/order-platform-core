@@ -40,6 +40,7 @@ app:
       public-paths:
         - /swagger-ui/**
         - /v3/api-docs/**
-        - /api/users/internal/**
         - /swagger-ui.html
       expiration: 3600000
+    internal:
+      api-key: ${USER_SERVICE_INTERNAL_API_KEY:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
