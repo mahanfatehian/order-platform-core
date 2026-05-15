@@ -5,13 +5,18 @@ import com.orderprocessing.security.service.TokenBlacklistService;
 import com.orderprocessing.security.web.RestAccessDeniedHandler;
 import com.orderprocessing.security.web.RestAuthenticationEntryPoint;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -29,20 +34,27 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import jakarta.servlet.Filter;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @AutoConfiguration
+@AutoConfigureAfter(RedisAutoConfiguration.class)   // ensure Redis is ready before we use it
 @EnableMethodSecurity
 @EnableConfigurationProperties(JwtSecurityProperties.class)
 public class SecurityAutoConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
+
     @Bean
     @ConditionalOnMissingBean(TokenBlacklistService.class)
-    @ConditionalOnBean(StringRedisTemplate.class)
-    public TokenBlacklistService tokenBlacklistService(StringRedisTemplate stringRedisTemplate) {
-        return new RedisTokenBlacklistService(stringRedisTemplate);
+    @ConditionalOnBean(RedisConnectionFactory.class)
+    public TokenBlacklistService tokenBlacklistService(RedisConnectionFactory connectionFactory) {
+        StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
+        redisTemplate.afterPropertiesSet();
+        log.info("TokenBlacklistService initialised with Redis");
+        return new RedisTokenBlacklistService(redisTemplate);
     }
 
     @Bean
@@ -51,12 +63,10 @@ public class SecurityAutoConfiguration {
             JwtSecurityProperties properties,
             ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider
     ) {
-        // Key derived exactly as in auth-service (HS384 for a 59-byte secret)
         SecretKey key = Keys.hmacShaKeyFor(
                 properties.getSecret().getBytes(StandardCharsets.UTF_8)
         );
 
-        // Map JCA algorithm name (e.g., "HmacSHA384") to Spring Security MacAlgorithm (e.g., HS384)
         MacAlgorithm macAlgorithm = MacAlgorithm.valueOf(key.getAlgorithm().replace("HmacSHA", "HS"));
         NimbusJwtDecoder delegate = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(macAlgorithm)
@@ -67,6 +77,7 @@ public class SecurityAutoConfiguration {
 
             TokenBlacklistService tokenBlacklistService = tokenBlacklistServiceProvider.getIfAvailable();
             if (tokenBlacklistService == null) {
+                log.warn("No TokenBlacklistService available – blacklist check skipped");
                 return jwt;
             }
 
@@ -75,9 +86,11 @@ public class SecurityAutoConfiguration {
 
             if (jti != null) {
                 if ("access".equals(type) && tokenBlacklistService.isAccessTokenBlacklisted(jti)) {
+                    log.info("Access token revoked: jti={}", jti);
                     throw new JwtException("Access token has been revoked");
                 }
                 if ("refresh".equals(type) && tokenBlacklistService.isRefreshTokenBlacklisted(jti)) {
+                    log.info("Refresh token revoked: jti={}", jti);
                     throw new JwtException("Refresh token has been revoked");
                 }
             }
@@ -115,7 +128,6 @@ public class SecurityAutoConfiguration {
                         .accessDeniedHandler(new RestAccessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated()
                 )

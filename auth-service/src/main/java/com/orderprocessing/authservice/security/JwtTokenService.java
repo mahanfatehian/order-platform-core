@@ -40,7 +40,11 @@ public class JwtTokenService {
                 .compact();
     }
 
-    public String generateRefreshToken(String username) {
+    /**
+     * Generate a refresh token that carries the JTI and expiration of the
+     * access token it was originally issued together with.
+     */
+    public String generateRefreshToken(String username, String accessJti, Instant accessExpiresAt) {
         Instant now = Instant.now();
         Instant expiresAt = now.plusMillis(properties.getRefreshExpiration());
         String jti = UUID.randomUUID().toString();
@@ -49,6 +53,8 @@ public class JwtTokenService {
                 .subject(username)
                 .id(jti)
                 .claim("type", "refresh")
+                .claim("accessJti", accessJti)          // <-- new claim
+                .claim("accessExp", accessExpiresAt.toString())  // <-- store as ISO string
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
@@ -86,5 +92,20 @@ public class JwtTokenService {
 
     public boolean isAccessToken(String token) {
         return "access".equals(extractType(token));
+    }
+
+    /**
+     * Extract the JTI of the access token that was embedded in the refresh token.
+     */
+    public String extractAccessJti(String refreshToken) {
+        return parse(refreshToken).get("accessJti", String.class);
+    }
+
+    /**
+     * Extract the expiration of the access token that was embedded in the refresh token.
+     */
+    public Instant extractAccessExpiration(String refreshToken) {
+        String expStr = parse(refreshToken).get("accessExp", String.class);
+        return expStr != null ? Instant.parse(expStr) : null;
     }
 }
