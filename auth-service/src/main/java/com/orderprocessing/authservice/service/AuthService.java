@@ -43,14 +43,11 @@ public class AuthService {
 
         Set<String> roles = user.getRoles();
 
-        // 1. Generate access token
         String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), roles);
 
-        // 2. Extract its JTI and expiration
         String accessJti = jwtTokenService.extractJti(accessToken);
         Instant accessExpiresAt = jwtTokenService.extractExpiration(accessToken);
 
-        // 3. Generate refresh token that knows which access token it replaces
         String refreshToken = jwtTokenService.generateRefreshToken(user.getUsername(), accessJti, accessExpiresAt);
 
         return new LoginResponse(accessToken, refreshToken);
@@ -64,12 +61,18 @@ public class AuthService {
             throw new RuntimeException("Invalid refresh token type");
         }
 
+        // Check version
+        if (!jwtTokenService.isTokenVersionValid(refreshToken)) {
+            log.warn("Refresh token rejected - version mismatch");
+            throw new RuntimeException("Refresh token has been revoked (version mismatch)");
+        }
+
         String refreshJti = jwtTokenService.extractJti(refreshToken);
         if (tokenBlacklistService.isRefreshTokenBlacklisted(refreshJti)) {
             throw new RuntimeException("Refresh token has been revoked");
         }
 
-        // --- Blacklist the old access token associated with this refresh token ---
+        // Blacklist the old access token associated with this refresh token
         String oldAccessJti = jwtTokenService.extractAccessJti(refreshToken);
         Instant oldAccessExp = jwtTokenService.extractAccessExpiration(refreshToken);
         if (oldAccessJti != null && oldAccessExp != null) {
@@ -77,13 +80,13 @@ public class AuthService {
             tokenBlacklistService.blacklistAccessToken(oldAccessJti, oldAccessExp);
         }
 
-        // Blacklist the refresh token itself (one‑time use)
+        // Blacklist the refresh token itself
         String username = jwtTokenService.extractUsername(refreshToken);
         Claims claims = jwtTokenService.parse(refreshToken);
         Instant refreshExpiresAt = claims.getExpiration().toInstant();
         tokenBlacklistService.blacklistRefreshToken(refreshJti, refreshExpiresAt);
 
-        // --- Issue new tokens ---
+        // Issue new tokens
         String newAccessToken = jwtTokenService.generateAccessToken(username, Collections.emptySet());
         String newAccessJti = jwtTokenService.extractJti(newAccessToken);
         Instant newAccessExp = jwtTokenService.extractExpiration(newAccessToken);
@@ -106,11 +109,15 @@ public class AuthService {
 
         String accessJti = jwtTokenService.extractJti(accessToken);
         Instant accessExpiresAt = jwtTokenService.extractExpiration(accessToken);
+        String username = jwtTokenService.extractUsername(accessToken);
 
-        log.info("Logging out access token with jti={}, expiresAt={}", accessJti, accessExpiresAt);
+        log.info("Logging out user {} - access token jti={}", username, accessJti);
 
+        // Blacklist the specific access token
         tokenBlacklistService.blacklistAccessToken(accessJti, accessExpiresAt);
 
-        log.info("Blacklist call completed for jti={}", accessJti);
+        // Invalidate ALL tokens for this user by incrementing the token version
+        jwtTokenService.incrementTokenVersion(username);
+        log.info("Token version incremented for user {}", username);
     }
 }

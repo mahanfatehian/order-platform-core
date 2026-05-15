@@ -40,19 +40,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @AutoConfiguration
-@AutoConfigureAfter(RedisAutoConfiguration.class)   // ensure Redis is ready before we use it
+@AutoConfigureAfter(RedisAutoConfiguration.class)
 @EnableMethodSecurity
 @EnableConfigurationProperties(JwtSecurityProperties.class)
 public class SecurityAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
 
+    // Provide a shared StringRedisTemplate bean
+    @Bean
+    @ConditionalOnMissingBean(StringRedisTemplate.class)
+    @ConditionalOnBean(RedisConnectionFactory.class)
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory connectionFactory) {
+        StringRedisTemplate template = new StringRedisTemplate(connectionFactory);
+        template.afterPropertiesSet();
+        return template;
+    }
+
     @Bean
     @ConditionalOnMissingBean(TokenBlacklistService.class)
-    @ConditionalOnBean(RedisConnectionFactory.class)
-    public TokenBlacklistService tokenBlacklistService(RedisConnectionFactory connectionFactory) {
-        StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
-        redisTemplate.afterPropertiesSet();
+    @ConditionalOnBean(StringRedisTemplate.class)
+    public TokenBlacklistService tokenBlacklistService(StringRedisTemplate redisTemplate) {
         log.info("TokenBlacklistService initialised with Redis");
         return new RedisTokenBlacklistService(redisTemplate);
     }
@@ -61,7 +69,8 @@ public class SecurityAutoConfiguration {
     @ConditionalOnMissingBean(JwtDecoder.class)
     public JwtDecoder jwtDecoder(
             JwtSecurityProperties properties,
-            ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider
+            ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
+            StringRedisTemplate redisTemplate
     ) {
         SecretKey key = Keys.hmacShaKeyFor(
                 properties.getSecret().getBytes(StandardCharsets.UTF_8)
@@ -75,25 +84,39 @@ public class SecurityAutoConfiguration {
         return token -> {
             Jwt jwt = delegate.decode(token);
 
+            // 1. Check blacklist (access tokens)
             TokenBlacklistService tokenBlacklistService = tokenBlacklistServiceProvider.getIfAvailable();
-            if (tokenBlacklistService == null) {
-                log.warn("No TokenBlacklistService available – blacklist check skipped");
-                return jwt;
-            }
-
-            String type = jwt.getClaimAsString("type");
-            String jti = jwt.getId();
-
-            if (jti != null) {
-                if ("access".equals(type) && tokenBlacklistService.isAccessTokenBlacklisted(jti)) {
-                    log.info("Access token revoked: jti={}", jti);
-                    throw new JwtException("Access token has been revoked");
-                }
-                if ("refresh".equals(type) && tokenBlacklistService.isRefreshTokenBlacklisted(jti)) {
-                    log.info("Refresh token revoked: jti={}", jti);
-                    throw new JwtException("Refresh token has been revoked");
+            if (tokenBlacklistService != null) {
+                String type = jwt.getClaimAsString("type");
+                String jti = jwt.getId();
+                if (jti != null) {
+                    if ("access".equals(type) && tokenBlacklistService.isAccessTokenBlacklisted(jti)) {
+                        log.warn("Access token revoked (blacklist): jti={}", jti);
+                        throw new JwtException("Access token has been revoked");
+                    }
+                    if ("refresh".equals(type) && tokenBlacklistService.isRefreshTokenBlacklisted(jti)) {
+                        log.warn("Refresh token revoked (blacklist): jti={}", jti);
+                        throw new JwtException("Refresh token has been revoked");
+                    }
                 }
             }
+
+            // 2. Check token version (for user‑wide revocation)
+            String subject = jwt.getSubject();
+            Long tokenVersion = jwt.getClaim("tokenVersion");
+            if (subject != null && tokenVersion != null) {
+                String versionKey = "user:token-version:" + subject;
+                String currentVersionStr = redisTemplate.opsForValue().get(versionKey);
+                if (currentVersionStr != null) {
+                    long currentVersion = Long.parseLong(currentVersionStr);
+                    if (tokenVersion != currentVersion) {
+                        log.warn("Token version mismatch for user {}: token has {}, current is {}",
+                                subject, tokenVersion, currentVersion);
+                        throw new JwtException("Token has been revoked (version mismatch)");
+                    }
+                }
+            }
+
             return jwt;
         };
     }
@@ -128,6 +151,7 @@ public class SecurityAutoConfiguration {
                         .accessDeniedHandler(new RestAccessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated()
                 )
