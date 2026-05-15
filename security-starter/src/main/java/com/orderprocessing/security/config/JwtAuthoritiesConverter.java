@@ -6,15 +6,12 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-public class JwtAuthoritiesConverter implements Converter<Jwt, Set<GrantedAuthority>> {
+public class JwtAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
     @Override
-    public Set<GrantedAuthority> convert(@NonNull Jwt jwt) {
+    public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
         Set<GrantedAuthority> authorities = new HashSet<>();
 
         List<String> roles = jwt.getClaimAsStringList("roles");
@@ -33,15 +30,15 @@ public class JwtAuthoritiesConverter implements Converter<Jwt, Set<GrantedAuthor
         }
 
         Object scope = jwt.getClaims().get("scope");
-        if (scope instanceof String ) {
-            String scopeStr = (String) scope ;
+        if (scope instanceof String) {
+            String scopeStr = (String) scope;
             for (String item : scopeStr.split(" ")) {
                 if (!item.isEmpty()) {
                     authorities.add(new SimpleGrantedAuthority(item));
                 }
             }
-        } else if (scope instanceof Collection<?> ) {
-            Collection<?> collection = (Collection<?>) scope ;
+        } else if (scope instanceof Collection<?>) {
+            Collection<?> collection = (Collection<?>) scope;
             collection.stream()
                     .map(String::valueOf)
                     .map(SimpleGrantedAuthority::new)

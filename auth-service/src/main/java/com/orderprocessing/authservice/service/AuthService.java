@@ -6,41 +6,92 @@ import com.orderprocessing.authservice.client.dto.InternalAuthenticatedUserRespo
 import com.orderprocessing.authservice.dto.LoginRequest;
 import com.orderprocessing.authservice.dto.LoginResponse;
 import com.orderprocessing.authservice.security.JwtTokenService;
-import feign.FeignException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
+import com.orderprocessing.security.service.TokenBlacklistService;
+import io.jsonwebtoken.Claims;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.stereotype.Service;
 
-@Service
-@RequiredArgsConstructor
-public class AuthService {
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
+@Service
+public class AuthService {
     private final UserServiceClient userServiceClient;
     private final JwtTokenService jwtTokenService;
+    private final TokenBlacklistService tokenBlacklistService;
+
+    public AuthService(UserServiceClient userServiceClient, AuthenticationManager authenticationManager,
+                       JwtTokenService jwtTokenService,
+                       TokenBlacklistService tokenBlacklistService) {
+        this.userServiceClient = userServiceClient;
+        this.jwtTokenService = jwtTokenService;
+        this.tokenBlacklistService = tokenBlacklistService;
+    }
 
     public LoginResponse login(LoginRequest request) {
-        try {
-            InternalAuthenticatedUserResponse user = userServiceClient.authenticate(
-                    InternalAuthenticateRequest.builder()
-                            .username(request.getUsername())
-                            .password(request.getPassword())
-                            .build()
-            );
 
-            String token = jwtTokenService.generateToken(
-                    user.getUsername(),
-                    user.getRoles()
-            );
+        InternalAuthenticatedUserResponse user =
+                userServiceClient.authenticate(
+                        new InternalAuthenticateRequest(
+                                request.getUsername(),
+                                request.getPassword()
+                        )
+                );
 
-            return LoginResponse.builder()
-                    .token(token)
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .roles(user.getRoles())
-                    .build();
+        Set<String> roles = user.getRoles();
 
-        } catch (FeignException.Unauthorized ex) {
-            throw new BadCredentialsException("Invalid username or password");
+        String accessToken =
+                jwtTokenService.generateAccessToken(user.getUsername(), roles);
+
+        String refreshToken =
+                jwtTokenService.generateRefreshToken(user.getUsername());
+
+        return new LoginResponse(accessToken, refreshToken);
+    }
+
+    public LoginResponse refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            throw new RuntimeException("Refresh token is required");
         }
+
+        if (!jwtTokenService.isRefreshToken(refreshToken)) {
+            throw new RuntimeException("Invalid refresh token type");
+        }
+
+        String refreshJti = jwtTokenService.extractJti(refreshToken);
+        if (tokenBlacklistService.isRefreshTokenBlacklisted(refreshJti)) {
+            throw new RuntimeException("Refresh token has been revoked");
+        }
+
+        String username = jwtTokenService.extractUsername(refreshToken);
+
+        Claims claims = jwtTokenService.parse(refreshToken);
+        Instant refreshExpiresAt = claims.getExpiration().toInstant();
+
+        tokenBlacklistService.blacklistRefreshToken(refreshJti, refreshExpiresAt);
+
+        String newAccessToken = jwtTokenService.generateAccessToken(username, Collections.emptySet());
+        String newRefreshToken = jwtTokenService.generateRefreshToken(username);
+
+        return new LoginResponse(newAccessToken, newRefreshToken);
+    }
+
+    public void logout(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Missing or invalid Authorization header");
+        }
+
+        String accessToken = authorizationHeader.substring(7);
+
+        if (!jwtTokenService.isAccessToken(accessToken)) {
+            throw new RuntimeException("Invalid access token type");
+        }
+
+        String accessJti = jwtTokenService.extractJti(accessToken);
+        Instant accessExpiresAt = jwtTokenService.extractExpiration(accessToken);
+
+        tokenBlacklistService.blacklistAccessToken(accessJti, accessExpiresAt);
     }
 }

@@ -4,7 +4,10 @@ server:
 spring:
   application:
     name: user-service
-
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   datasource:
     url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:postgresdb1234}
     username: ${DB_USERNAME:postgres_user1234}

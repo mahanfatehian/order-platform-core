@@ -8,19 +8,25 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app.security.jwt")
 public class JwtSecurityProperties {
 
-    private String secret;
-
-    private long expiration = 3600000;
-
     private List<String> publicPaths = new ArrayList<>();
+    private String secret = "defaultsecretdefaultsecretdefaultsecret12";
+    private long expiration = 86400000; // 24h access token
+    private long refreshExpiration = 604800000; // 7 days refresh token
 
     public JwtSecurityProperties() {
-        publicPaths.add("/swagger-ui.html");
-        publicPaths.add("/swagger-ui/**");
-        publicPaths.add("/v3/api-docs/**");
-        publicPaths.add("/actuator/health");
-        publicPaths.add("/api/auth/login");
-        publicPaths.add("/api/auth/logout");
+        this.publicPaths.add("/swagger-ui.html");
+        this.publicPaths.add("/swagger-ui/**");
+        this.publicPaths.add("/v3/api-docs/**");
+        this.publicPaths.add("/api/auth/login");
+        this.publicPaths.add("/api/auth/refresh");
+    }
+
+    public List<String> getPublicPaths() {
+        return publicPaths;
+    }
+
+    public void setPublicPaths(List<String> publicPaths) {
+        this.publicPaths = publicPaths;
     }
 
     public String getSecret() {
@@ -39,11 +45,11 @@ public class JwtSecurityProperties {
         this.expiration = expiration;
     }
 
-    public List<String> getPublicPaths() {
-        return publicPaths;
+    public long getRefreshExpiration() {
+        return refreshExpiration;
     }
 
-    public void setPublicPaths(List<String> publicPaths) {
-        this.publicPaths = publicPaths;
+    public void setRefreshExpiration(long refreshExpiration) {
+        this.refreshExpiration = refreshExpiration;
     }
 }

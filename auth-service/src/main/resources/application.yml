@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: auth-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 services:
   user-service:
@@ -15,6 +19,14 @@ app:
     jwt:
       secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
       expiration: 86400000
+      public-paths:
+        - /api/auth/login
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html
+        - /actuator/health
+        - /api/auth/refresh
+        - /api/auth/logout
 
 logging:
   level:
