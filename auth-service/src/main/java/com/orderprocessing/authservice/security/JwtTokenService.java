@@ -60,7 +60,7 @@ public class JwtTokenService {
         return tokenVersion == currentVersion;
     }
 
-    public String generateAccessToken(String username, Set<String> roles) {
+    public String generateAccessToken(String username, Set<String> roles, UUID userId) {
         long version = getTokenVersion(username);
         Instant now = Instant.now();
         Instant expiresAt = now.plusMillis(properties.getExpiration());
@@ -72,13 +72,14 @@ public class JwtTokenService {
                 .claim("roles", roles)
                 .claim("type", "access")
                 .claim("tokenVersion", version)
+                .claim("userId", userId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
                 .compact();
     }
 
-    public String generateRefreshToken(String username, String accessJti, Instant accessExpiresAt) {
+    public String generateRefreshToken(String username, String accessJti, Instant accessExpiresAt, UUID userId) {
         long version = getTokenVersion(username);
         Instant now = Instant.now();
         Instant expiresAt = now.plusMillis(properties.getRefreshExpiration());
@@ -91,6 +92,7 @@ public class JwtTokenService {
                 .claim("accessJti", accessJti)
                 .claim("accessExp", accessExpiresAt.toString())
                 .claim("tokenVersion", version)
+                .claim("userId", userId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
@@ -107,6 +109,10 @@ public class JwtTokenService {
 
     public String extractUsername(String token) {
         return parse(token).getSubject();
+    }
+
+    public UUID extractUserId(String token) {
+        return parse(token).get("userId", UUID.class);
     }
 
     public String extractJti(String token) {
