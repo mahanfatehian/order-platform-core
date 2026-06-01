@@ -3,11 +3,15 @@ package com.orderprocessing.orderservice.service;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.model.OrderItem;
 import com.orderprocessing.orderservice.repository.OrderRepository;
-import com.orderprocessing.storeservice.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.OrderPlacedEvent; 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;            
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.math.BigDecimal;
+import java.util.List;                                       
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -22,7 +26,6 @@ public class OrderService {
         this.orderRepository = orderRepository;
         this.kafkaTemplate = kafkaTemplate;
     }
-
     @Transactional
     public Order createOrder(UUID userId, List<OrderItem> items) {
         // Create order
@@ -31,10 +34,10 @@ public class OrderService {
         order.setUserId(userId);
         order.setStatus(Order.Status.PENDING);
         
-        // Calculate total amount (in a real system this would come from product service)
-        double totalAmount = items.stream()
-                .mapToDouble(item -> item.getUnitPrice() * item.getQuantity())
-                .sum();
+        // Calculate total amount using BigDecimal (matches numeric in DB)
+        BigDecimal totalAmount = items.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setTotalAmount(totalAmount);
         
         // Set timestamps
@@ -92,7 +95,14 @@ public class OrderService {
         // In a real system, we would also send an OrderCancelled event to Kafka
     }
 
+
+    @Transactional
+    public void saveOrder(Order order) {
+        orderRepository.save(order);
+    }    
+
     private boolean canCancelOrder(Order.Status status) {
         return status == Order.Status.PENDING || status == Order.Status.CONFIRMED;
     }
+
 }

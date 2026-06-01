@@ -5,7 +5,7 @@ import com.orderprocessing.storeservice.model.Product;
 import com.orderprocessing.storeservice.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -53,13 +53,12 @@ public class StoreController {
         productService.deleteProduct(id);
     }
 
-    // DTO conversion methods
     private ProductDTO convertToDTO(Product product) {
         ProductDTO dto = new ProductDTO();
         dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
-        dto.setPrice(product.getPrice());
+        dto.setPrice(product.getPrice());          // BigDecimal now
         dto.setCategory(product.getCategory().toString());
         dto.setCreatedAt(product.getCreatedAt());
         dto.setUpdatedAt(product.getUpdatedAt());
@@ -71,7 +70,7 @@ public class StoreController {
         product.setId(dto.getId());
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
-        product.setPrice(dto.getPrice());
+        product.setPrice(dto.getPrice());          // BigDecimal now
         product.setCategory(Product.Category.valueOf(dto.getCategory()));
         return product;
     }

@@ -1,16 +1,16 @@
 package com.orderprocessing.orderservice.kafka;
 
-import com.orderprocessing.storeservice.event.StockInsufficientEvent;
-import com.orderprocessing.storeservice.event.StockReservedEvent;
-import com.orderprocessing.common.events.OrderConfirmedEvent;
-import com.orderprocessing.common.events.OrderFailedEvent;
+import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
+import com.orderprocessing.kafkacommon.event.StockReservedEvent;
+import com.orderprocessing.kafkacommon.event.OrderConfirmedEvent;
+import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.model.OrderItem;
 import com.orderprocessing.orderservice.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
-
+import java.time.Instant;
 import java.util.UUID;
 
 @Service

@@ -1,8 +1,8 @@
 package com.orderprocessing.storeservice.kafka;
 
-import com.orderprocessing.common.events.OrderPlacedEvent;
-import com.orderprocessing.common.events.StockInsufficientEvent;
-import com.orderprocessing.common.events.StockReservedEvent;
+import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
+import com.orderprocessing.kafkacommon.event.StockReservedEvent;
+import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.storeservice.service.InventoryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

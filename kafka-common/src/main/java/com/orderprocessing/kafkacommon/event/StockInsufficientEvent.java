@@ -1,4 +1,4 @@
-package com.orderprocessing.storeservice.event;
+package com.orderprocessing.kafkacommon.event;
 
 import java.util.UUID;
 

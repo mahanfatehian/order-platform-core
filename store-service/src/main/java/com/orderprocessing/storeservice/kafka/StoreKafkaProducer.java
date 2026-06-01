@@ -1,7 +1,7 @@
 package com.orderprocessing.storeservice.kafka;
 
-import com.orderprocessing.storeservice.event.StockInsufficientEvent;
-import com.orderprocessing.storeservice.event.StockReservedEvent;
+import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
+import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;

@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.orderprocessing</groupId>
         <artifactId>order-processing-platform</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
     
     <artifactId>store-service</artifactId>
@@ -28,7 +28,7 @@
         <dependency>
             <groupId>com.orderprocessing</groupId>
             <artifactId>security-starter</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0</version>
         </dependency>
         
         <!-- Database -->
@@ -46,26 +46,40 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        <!-- Kafka Common Module -->
         <dependency>
             <groupId>com.orderprocessing</groupId>
-            <artifactId>common-kafka</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <artifactId>kafka-common</artifactId>
+            <version>1.0.0</version>
         </dependency>
+
         <dependency>
-            <groupId>com.orderprocessing</groupId>
-            <artifactId>common-events</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
         
-        <!-- Other -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
+
+        <!-- Other -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
     </dependencies>
+
+
+    <build>
+    <plugins>
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <!-- version is managed by parent if you add pluginManagement there,
+                 otherwise specify version explicitly -->
+        </plugin>
+    </plugins>
+    </build>
 </project>

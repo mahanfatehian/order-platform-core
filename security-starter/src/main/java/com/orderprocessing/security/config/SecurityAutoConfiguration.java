@@ -133,8 +133,7 @@ public class SecurityAutoConfiguration {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtSecurityProperties properties,
-            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
-            ObjectProvider<List<Filter>> securityFilters
+            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter
     ) throws Exception {
 
         String[] publicPaths = properties.getPublicPaths().toArray(new String[0]);
@@ -150,20 +149,12 @@ public class SecurityAutoConfiguration {
                         .accessDeniedHandler(new RestAccessDeniedHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-//                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
-
-        List<Filter> filters = securityFilters.getIfAvailable();
-        if (filters != null) {
-            for (Filter filter : filters) {
-                http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
-            }
-        }
 
         return http.build();
     }

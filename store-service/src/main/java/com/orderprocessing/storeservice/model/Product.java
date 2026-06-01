@@ -2,10 +2,11 @@ package com.orderprocessing.storeservice.model;
 
 import java.util.UUID;
 import java.time.Instant;
-
+import java.math.BigDecimal;
 import jakarta.persistence.*;
 import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "products")
 public class Product {
@@ -25,7 +26,7 @@ public class Product {
     private String description;
 
     @Column(name = "price", nullable = false)
-    private double price;
+    private BigDecimal price;
 
     @Column(name = "category", nullable = false)
     @Enumerated(EnumType.STRING)

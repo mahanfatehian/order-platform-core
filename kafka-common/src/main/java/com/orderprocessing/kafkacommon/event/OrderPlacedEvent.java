@@ -1,4 +1,4 @@
-package com.orderprocessing.common.events;
+package com.orderprocessing.kafkacommon.event;
 
 import java.util.UUID;
 import java.util.Map;

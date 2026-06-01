@@ -3,7 +3,7 @@ package com.orderprocessing.orderservice.model;
 import java.util.UUID;
 import java.time.Instant;
 import java.util.List;
-
+import java.math.BigDecimal;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -28,7 +28,7 @@ public class Order {
     private Status status;
 
     @Column(name = "total_amount", nullable = false)
-    private double totalAmount;
+    private BigDecimal totalAmount;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

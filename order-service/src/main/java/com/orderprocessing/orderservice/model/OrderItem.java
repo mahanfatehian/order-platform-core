@@ -5,7 +5,7 @@ import java.time.Instant;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
+import java.math.BigDecimal;
 @Entity
 @Table(name = "order_items")
 @Data
@@ -26,7 +26,7 @@ public class OrderItem {
     private String productName;
 
     @Column(name = "unit_price", nullable = false)
-    private double unitPrice;
+    private BigDecimal unitPrice;
 
     @Column(name = "quantity", nullable = false)
     private int quantity;

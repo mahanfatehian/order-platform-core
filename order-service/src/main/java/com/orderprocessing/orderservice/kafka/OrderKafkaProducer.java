@@ -1,7 +1,7 @@
 package com.orderprocessing.orderservice.kafka;
 
-import com.orderprocessing.orderservice.event.OrderFailedEvent;
-import com.orderprocessing.orderservice.event.OrderConfirmedEvent;
+import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
+import com.orderprocessing.kafkacommon.event.OrderConfirmedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
