@@ -11,7 +11,7 @@
     </parent>
     
     <artifactId>store-service</artifactId>
-    <name>Order Processing Platform - Store Service</name>
+    <name>store-service</name>
     
     <dependencies>
         <!-- Spring Boot -->

@@ -11,7 +11,7 @@
     </parent>
     
     <artifactId>kafka-common</artifactId>
-    <name>Order Processing Platform - Kafka Common</name>
+    <name>kafka-common</name>
     
     <dependencies>
         <!-- Kafka dependencies -->
