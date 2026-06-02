@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: ${AUTH_SERVICE_PORT:8081}
 
 spring:
   application:
@@ -11,22 +11,18 @@ spring:
       password: ${REDIS_PASSWORD:}
       database: 0
       timeout: 3000ms
-
-      # Lettuce connection pool
       lettuce:
         pool:
           enabled: true
-          max-active: ${REDIS_POOL_MAX_ACTIVE:20}
-          max-idle: ${REDIS_POOL_MAX_IDLE:10}
-          min-idle: ${REDIS_POOL_MIN_IDLE:5}
-          max-wait: ${REDIS_POOL_MAX_WAIT:2000}
-          time-between-eviction-runs: 60000ms
-        shutdown-timeout: 200ms
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 2000
 
 services:
   user-service:
-    url: http://localhost:8082
-    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+    url: http://localhost:${USER_SERVICE_PORT:8082}
+    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY:UserInternalKey_SuperSecret_123456}
 
 app:
   security:
@@ -35,12 +31,11 @@ app:
       expiration: 86400000
       public-paths:
         - /api/auth/login
-        - /v3/api-docs/**
-        - /swagger-ui/**
-        - /swagger-ui.html
-        - /actuator/health
         - /api/auth/refresh
         - /api/auth/logout
+        - /swagger-ui/**
+        - /v3/api-docs/**
+        - /swagger-ui.html
 
 logging:
   level:

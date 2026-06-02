@@ -1,5 +1,5 @@
 server:
-  port: 8084   # or any free port
+  port: ${ORDER_SERVICE_PORT:8084}
 
 spring:
   application:
@@ -8,22 +8,20 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   datasource:
-    # Use a SEPARATE database for orders – create 'orderdb' first (see step 2)
-    url: jdbc:postgresql://localhost:5432/orderdb
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/orderdb
     username: ${DB_USERNAME:postgres_user1234}
     password: ${DB_PASSWORD:passwordpostgres1234}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: OrderServiceHikariPool
-      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
-      minimum-idle: ${HIKARI_MIN_IDLE:5}
-      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:30000}
-      idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
-      max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
-      auto-commit: true
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
       leak-detection-threshold: 60000
-
   jpa:
     hibernate:
       ddl-auto: validate
@@ -31,11 +29,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
   flyway:
     enabled: true
     locations: classpath:db/migration
-
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -48,23 +44,27 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
+services:
+  store-service:
+    url: http://localhost:${STORE_SERVICE_PORT:8083}
+    internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY:StoreInternalKey_SuperSecret_987654}
+
+outbox:
+  polling:
+    interval: 5000
+
+app:
+  security:
+    jwt:
+      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      expiration: 3600000
+      public-paths:
+        - /swagger-ui/**
+        - /v3/api-docs/**
+        - /swagger-ui.html
 
 logging:
   level:
     org.hibernate.SQL: DEBUG
     org.flywaydb: INFO
     org.springframework.security: DEBUG
-
-app:
-  security:
-    jwt:
-      # Must match exactly the secret used in auth-service
-      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
-      public-paths:
-        - /swagger-ui/**
-        - /v3/api-docs/**
-        - /swagger-ui.html
-      expiration: 3600000

@@ -7,6 +7,7 @@ import com.orderprocessing.storeservice.service.InventoryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -53,5 +54,18 @@ public class InventoryController {
         dto.setReservedQuantity(inventory.getReservedQuantity());
         dto.setLastUpdated(inventory.getLastUpdated());
         return dto;
+    }
+
+
+    @PostMapping("/reserve-batch")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reserveBatch(@RequestBody Map<UUID, Integer> items) {
+        inventoryService.reserveBatch(items);
+    }
+
+    @PostMapping("/release-batch")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void releaseBatch(@RequestBody Map<UUID, Integer> items) {
+        inventoryService.releaseBatch(items);
     }
 }

@@ -5,6 +5,7 @@ import com.orderprocessing.storeservice.repository.InventoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -53,6 +54,20 @@ public class InventoryService {
             return inventoryRepository.save(inventory);
         } else {
             throw new RuntimeException("Cannot release more inventory than is reserved for product ID: " + productId);
+        }
+    }
+
+    @Transactional
+    public void reserveBatch(Map<UUID, Integer> items) {
+        for (Map.Entry<UUID, Integer> entry : items.entrySet()) {
+            reserveInventory(entry.getKey(), entry.getValue());
+        }
+    }
+
+    @Transactional
+    public void releaseBatch(Map<UUID, Integer> items) {
+        for (Map.Entry<UUID, Integer> entry : items.entrySet()) {
+            releaseInventory(entry.getKey(), entry.getValue());
         }
     }
 }

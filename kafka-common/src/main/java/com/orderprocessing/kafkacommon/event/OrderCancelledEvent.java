@@ -4,9 +4,8 @@ import java.util.UUID;
 import lombok.Data;
 
 @Data
-public class OrderFailedEvent {
+public class OrderCancelledEvent {
     private UUID orderId;
-    private Map<UUID, Integer> items; // Added for compensation
-    private boolean success;
+    private Map<UUID, Integer> items;
     private String reason;
 }
