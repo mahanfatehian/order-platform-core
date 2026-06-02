@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -43,12 +44,12 @@ public class AuthService {
 
         Set<String> roles = user.getRoles();
 
-        String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), roles);
+        String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), roles, user.getId());
 
         String accessJti = jwtTokenService.extractJti(accessToken);
         Instant accessExpiresAt = jwtTokenService.extractExpiration(accessToken);
 
-        String refreshToken = jwtTokenService.generateRefreshToken(user.getUsername(), accessJti, accessExpiresAt);
+        String refreshToken = jwtTokenService.generateRefreshToken(user.getUsername(), accessJti, accessExpiresAt, user.getId());
 
         return new LoginResponse(accessToken, refreshToken);
     }
@@ -87,13 +88,17 @@ public class AuthService {
         tokenBlacklistService.blacklistRefreshToken(refreshJti, refreshExpiresAt);
 
         // Issue new tokens
-        String newAccessToken = jwtTokenService.generateAccessToken(username, Collections.emptySet());
+        String newAccessToken = jwtTokenService.generateAccessToken(username, Collections.emptySet(), extractUserIdFromRefreshToken(refreshToken));
         String newAccessJti = jwtTokenService.extractJti(newAccessToken);
         Instant newAccessExp = jwtTokenService.extractExpiration(newAccessToken);
 
-        String newRefreshToken = jwtTokenService.generateRefreshToken(username, newAccessJti, newAccessExp);
+        String newRefreshToken = jwtTokenService.generateRefreshToken(username, newAccessJti, newAccessExp, extractUserIdFromRefreshToken(refreshToken));
 
         return new LoginResponse(newAccessToken, newRefreshToken);
+    }
+
+    private UUID extractUserIdFromRefreshToken(String refreshToken) {
+        return jwtTokenService.extractUserId(refreshToken);
     }
 
     public void logout(String authorizationHeader) {
