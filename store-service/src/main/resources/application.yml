@@ -61,3 +61,14 @@ logging:
     org.hibernate.SQL: DEBUG
     org.flywaydb: INFO
     org.springframework.security: DEBUG
+
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true
+  api-docs:
+    path: /v3/api-docs
+  default-produces-media-type: application/json

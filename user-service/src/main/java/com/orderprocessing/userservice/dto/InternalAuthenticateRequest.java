@@ -1,5 +1,7 @@
 package com.orderprocessing.userservice.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,7 +13,14 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(description = "Internal request payload for authenticating a user (consumed by Auth Service)")
 public class InternalAuthenticateRequest {
+
+    @NotBlank(message = "Username is required")
+    @Schema(description = "The username of the user", example = "johndoe")
     private String username;
+
+    @NotBlank(message = "Password is required")
+    @Schema(description = "The raw password of the user", example = "password123")
     private String password;
 }
