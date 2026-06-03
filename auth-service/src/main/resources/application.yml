@@ -1,7 +1,9 @@
 server:
   port: ${AUTH_SERVICE_PORT:8081}
-
+  shutdown: graceful
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: auth-service
   data:
@@ -21,7 +23,7 @@ spring:
 
 services:
   user-service:
-    url: http://localhost:${USER_SERVICE_PORT:8082}
+    url: http://user-service:${USER_SERVICE_PORT:8082}
     internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY:UserInternalKey_SuperSecret_123456}
 
 app:
@@ -42,6 +44,17 @@ logging:
     org.springframework.security: DEBUG
     com.orderprocessing.authservice.client.UserServiceClient: DEBUG
 
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    healthcheck:
+      enabled: true # Ensures Eureka only routes to healthy instances
+  instance:
+    prefer-ip-address: true # Crucial for Docker/multi-instance environments
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}} # Unique ID per instance
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
 
 springdoc:
   swagger-ui:
