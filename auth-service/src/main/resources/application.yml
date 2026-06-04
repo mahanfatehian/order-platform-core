@@ -29,7 +29,7 @@ services:
 app:
   security:
     jwt:
-      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
       expiration: 86400000
       public-paths:
         - /api/auth/login

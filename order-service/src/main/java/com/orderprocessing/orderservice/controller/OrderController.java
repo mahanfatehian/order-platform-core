@@ -1,7 +1,6 @@
 package com.orderprocessing.orderservice.controller;
 
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
-import com.orderprocessing.orderservice.dto.OrderItemRequest;
 import com.orderprocessing.orderservice.dto.OrderItemResponse;
 import com.orderprocessing.orderservice.dto.OrderResponse;
 import com.orderprocessing.orderservice.model.Order;
@@ -15,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +32,35 @@ import java.util.stream.Collectors;
 public class OrderController {
 
     private final OrderService orderService;
+
+
+    @Operation(summary = "Get all orders", description = "Retrieves a list of all orders in the system.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Orders retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<OrderResponse> getAllOrders() {
+        return orderService.getAllOrders().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Operation(summary = "Get my orders", description = "Retrieves all orders placed by the currently authenticated user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Orders retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    @GetMapping("/my-orders")
+    public List<OrderResponse> getMyOrders(@AuthenticationPrincipal Jwt jwt) {
+        // Extract userId from the JWT claims (set by AuthService)
+        UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
+
+        return orderService.getOrdersByUserId(userId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
     @Operation(summary = "Place a new order", description = "Synchronously reserves inventory and creates an order with PENDING status.")
     @ApiResponses({

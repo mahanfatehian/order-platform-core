@@ -1,0 +1,72 @@
+server:
+  port: ${GATEWAY_SERVICE_PORT:8080}
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true # Allows routing via service ID (e.g., /USER-SERVICE/**)
+          lower-case-service-id: true
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+        - id: store-service
+          uri: lb://store-service
+          predicates:
+            - Path=/api/store/**
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/orders/**
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+      public-paths:
+        - /api/auth/login
+        - /api/auth/refresh
+        - /actuator/**
+        # Standard Swagger paths
+        - /swagger-ui/**
+        - /v3/api-docs/**
+        - /swagger-ui.html
+        # ADD THESE: Discovery Locator Swagger paths (Service ID prefix)
+        - /auth-service/swagger-ui/**
+        - /auth-service/v3/api-docs/**
+        - /auth-service/swagger-ui.html
+        - /user-service/swagger-ui/**
+        - /user-service/v3/api-docs/**
+        - /user-service/swagger-ui.html
+        - /store-service/swagger-ui/**
+        - /store-service/v3/api-docs/**
+        - /store-service/swagger-ui.html
+        - /order-service/swagger-ui/**
+        - /order-service/v3/api-docs/**
+        - /order-service/swagger-ui.html
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: DEBUG
