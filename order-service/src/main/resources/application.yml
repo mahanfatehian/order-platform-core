@@ -2,6 +2,8 @@ server:
   port: ${ORDER_SERVICE_PORT:8084}
   shutdown: graceful
 spring:
+  mvc:
+    throw-exception-if-no-handler-found: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
   application:
@@ -58,7 +60,7 @@ outbox:
 app:
   security:
     jwt:
-      secret: mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
       expiration: 3600000
       public-paths:
         - /swagger-ui/**

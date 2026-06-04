@@ -143,6 +143,23 @@ services:
     deploy:
       replicas: 3
 
+  gateway-service:
+    build: ./gateway-service
+    container_name: order-platform-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_HOST=discovery-service
+      - EUREKA_PORT=8761
+      - JWT_SECRET=mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+    depends_on:
+      - discovery-service
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
 volumes:
   postgres_data:
   redis_data:

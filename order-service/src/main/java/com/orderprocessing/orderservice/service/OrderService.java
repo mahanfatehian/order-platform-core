@@ -39,6 +39,14 @@ public class OrderService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true)
+    public List<Order> getAllOrders() {
+        return orderRepository.findAllWithItems();
+    }
+    @Transactional(readOnly = true)
+    public List<Order> getOrdersByUserId(UUID userId) {
+        return orderRepository.findAllByUserIdWithItems(userId);
+    }
     @Transactional
     public Order createOrder(UUID userId, List<OrderItem> items) {
         // 1. Build the order entity
