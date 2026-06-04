@@ -9,7 +9,6 @@ import java.util.UUID;
 
 @FeignClient(
         name = "store-service",
-        url = "${services.store-service.url}",
         configuration = StoreServiceFeignConfig.class
 )
 public interface StoreServiceClient {

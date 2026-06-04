@@ -1,5 +1,13 @@
-version: '3.9'
 services:
+  discovery-service:
+    build: ./discovery-service
+    container_name: order-platform-discovery
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    networks:
+      - backend
+
   postgres:
     image: postgres:16
     container_name: order-platform-postgres
@@ -22,7 +30,7 @@ services:
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command: [ "redis-server", "--appendonly", "yes" ]
     volumes:
       - redis_data:/data
     networks:
@@ -46,16 +54,94 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - backend
+
+  user-service:
+    build: ./user-service
+    restart: unless-stopped
+    # Ports removed: Internal communication only, prevents host port conflicts when scaling
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/userdb
+      - REDIS_HOST=redis
+      - EUREKA_HOST=discovery-service
+      - EUREKA_PORT=8761
+    depends_on:
+      - postgres
+      - redis
+      - discovery-service
+    networks:
+      - backend
+    deploy:
+      replicas: 3
+
+  auth-service:
+    build: ./auth-service
+    restart: unless-stopped
+    # Ports removed: Internal communication only
+    environment:
+      - REDIS_HOST=redis
+      - EUREKA_HOST=discovery-service
+      - EUREKA_PORT=8761
+    depends_on:
+      - redis
+      - discovery-service
+      - user-service
+    networks:
+      - backend
+    deploy:
+      replicas: 3
+
+  store-service:
+    build: ./store-service
+    restart: unless-stopped
+    # Ports removed: Internal communication only
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/storedb
+      - REDIS_HOST=redis
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - EUREKA_HOST=discovery-service
+      - EUREKA_PORT=8761
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - discovery-service
+    networks:
+      - backend
+    deploy:
+      replicas: 3
+
+  order-service:
+    build: ./order-service
+    restart: unless-stopped
+    # Ports removed: Internal communication only
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orderdb
+      - REDIS_HOST=redis
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - EUREKA_HOST=discovery-service
+      - EUREKA_PORT=8761
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - discovery-service
+      - store-service
+    networks:
+      - backend
+    deploy:
+      replicas: 3
 
 volumes:
   postgres_data:

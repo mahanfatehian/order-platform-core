@@ -1,7 +1,9 @@
 server:
   port: ${ORDER_SERVICE_PORT:8084}
-
+  shutdown: graceful
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: order-service
   data:
@@ -46,7 +48,7 @@ spring:
 
 services:
   store-service:
-    url: http://localhost:${STORE_SERVICE_PORT:8083}
+    url: http://store-service:${STORE_SERVICE_PORT:8083}
     internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY:StoreInternalKey_SuperSecret_987654}
 
 outbox:
@@ -69,6 +71,17 @@ logging:
     org.flywaydb: INFO
     org.springframework.security: DEBUG
 
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    healthcheck:
+      enabled: true # Ensures Eureka only routes to healthy instances
+  instance:
+    prefer-ip-address: true # Crucial for Docker/multi-instance environments
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}} # Unique ID per instance
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
 
 springdoc:
   swagger-ui:
