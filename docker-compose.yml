@@ -153,8 +153,12 @@ services:
       - EUREKA_HOST=discovery-service
       - EUREKA_PORT=8761
       - JWT_SECRET=mySuperUltraSecureSecretKeyThatMustBeLongEnough123456
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
     depends_on:
       - discovery-service
+      - redis  # Added redis to ensure gateway waits for it
     networks:
       - backend
     deploy:

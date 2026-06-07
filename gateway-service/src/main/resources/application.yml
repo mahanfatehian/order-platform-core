@@ -4,29 +4,65 @@ server:
 spring:
   application:
     name: gateway-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   cloud:
     gateway:
       discovery:
         locator:
-          enabled: true # Allows routing via service ID (e.g., /USER-SERVICE/**)
+          enabled: true
           lower-case-service-id: true
       routes:
         - id: auth-service
           uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10      # Tokens added per second
+                redis-rate-limiter.burstCapacity: 20      # Maximum tokens allowed in a burst
+                redis-rate-limiter.requestedTokens: 1     # Tokens consumed per request
+                key-resolver: "#{@userKeyResolver}"       # References the bean created in Step 2
+
         - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/api/users/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+
         - id: store-service
           uri: lb://store-service
           predicates:
             - Path=/api/store/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+
         - id: order-service
           uri: lb://order-service
           predicates:
             - Path=/api/orders/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
 app:
   security:
@@ -36,11 +72,9 @@ app:
         - /api/auth/login
         - /api/auth/refresh
         - /actuator/**
-        # Standard Swagger paths
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
-        # ADD THESE: Discovery Locator Swagger paths (Service ID prefix)
         - /auth-service/swagger-ui/**
         - /auth-service/v3/api-docs/**
         - /auth-service/swagger-ui.html
