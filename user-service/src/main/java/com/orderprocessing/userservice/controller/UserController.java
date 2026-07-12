@@ -1,82 +1,61 @@
 package com.orderprocessing.userservice.controller;
 
+import com.orderprocessing.userservice.dto.ChangePasswordRequest;
 import com.orderprocessing.userservice.dto.CreateUserRequest;
-import com.orderprocessing.userservice.dto.UpdateUserRequest;
+import com.orderprocessing.userservice.dto.UpdateProfileRequest;
 import com.orderprocessing.userservice.dto.UserResponse;
 import com.orderprocessing.userservice.service.UserService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@Tag(name = "Users", description = "User management endpoints")
 public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "Create a new user", description = "Creates a new user with the default ROLE_USER role")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "User created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request payload"),
-            @ApiResponse(responseCode = "409", description = "Username or email already exists"),
-            @ApiResponse(responseCode = "404", description = "Default role not found")
-    })
-    @PostMapping
+    @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse createUser(@Valid @RequestBody CreateUserRequest request) {
-        return userService.create(request);
+    public UserResponse register(@Valid @RequestBody CreateUserRequest request) {
+        return userService.register(request);
     }
 
-    @Operation(summary = "Get user by ID", description = "Returns a single user by UUID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User found"),
-            @ApiResponse(responseCode = "404", description = "User not found")
-    })
-    @GetMapping("/{id}")
-    public UserResponse getUserById(@PathVariable("id") UUID id) {
-        return userService.getById(id);
+    @GetMapping("/me")
+    public UserResponse getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        return userService.getCurrent(userId(jwt));
     }
 
-    @Operation(summary = "Get all users", description = "Returns all users")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Users retrieved successfully")
-    })
-    @GetMapping
-    public List<UserResponse> getAllUsers() {
-        return userService.getAll();
+    @PatchMapping("/me")
+    public UserResponse updateCurrentUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        return userService.updateCurrent(userId(jwt), request);
     }
 
-    @Operation(summary = "Update user", description = "Updates an existing user by UUID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User updated successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request payload"),
-            @ApiResponse(responseCode = "404", description = "User not found"),
-            @ApiResponse(responseCode = "409", description = "Username or email already exists")
-    })
-    @PutMapping("/{id}")
-    public UserResponse updateUser(@PathVariable("id") UUID id,
-                                   @Valid @RequestBody UpdateUserRequest request) {
-        return userService.update(id, request);
-    }
-
-    @Operation(summary = "Delete user", description = "Deletes a user by UUID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "User deleted successfully"),
-            @ApiResponse(responseCode = "404", description = "User not found")
-    })
-    @DeleteMapping("/{id}")
+    @PostMapping("/me/change-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteUser(@PathVariable("id") UUID id) {
-        userService.delete(id);
+    public void changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        userService.changePassword(userId(jwt), request);
+    }
+
+    private UUID userId(Jwt jwt) {
+        return UUID.fromString(jwt.getClaimAsString("userId"));
     }
 }

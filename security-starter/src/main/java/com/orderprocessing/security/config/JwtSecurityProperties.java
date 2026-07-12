@@ -1,16 +1,25 @@
 package com.orderprocessing.security.config;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @ConfigurationProperties(prefix = "app.security.jwt")
+@Validated
 public class JwtSecurityProperties {
 
     private List<String> publicPaths = new ArrayList<>();
-    private String secret = "defaultsecretdefaultsecretdefaultsecret12";
-    private long expiration = 86400000; // 24h access token
+    @NotBlank(message = "JWT secret is required")
+    @Size(min = 32, message = "JWT secret must contain at least 32 characters")
+    private String secret;
+    @Positive
+    private long expiration = 3600000; // 1 hour access token
+    @Positive
     private long refreshExpiration = 604800000; // 7 days refresh token
 
     public JwtSecurityProperties() {

@@ -15,8 +15,8 @@ spring:
       password: ${REDIS_PASSWORD:}
   datasource:
     url: jdbc:postgresql://localhost:${DB_PORT:5432}/orderdb
-    username: ${DB_USERNAME:postgres_user1234}
-    password: ${DB_PASSWORD:passwordpostgres1234}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: OrderServiceHikariPool
@@ -37,35 +37,57 @@ spring:
     enabled: true
     locations: classpath:db/migration
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: order-service
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: com.orderprocessing.kafkacommon.event
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  cloud:
+    openfeign:
+      client:
+        config:
+          store-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+            logger-level: basic
 
 services:
   store-service:
     url: http://store-service:${STORE_SERVICE_PORT:8083}
-    internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY:StoreInternalKey_SuperSecret_987654}
+    internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
 
 outbox:
   polling:
-    interval: 5000
+    interval: ${ORDER_OUTBOX_POLL_INTERVAL:1000}
+  batch-size: ${ORDER_OUTBOX_BATCH_SIZE:50}
+  max-attempts: ${ORDER_OUTBOX_MAX_ATTEMPTS:5}
 
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+      secret: ${JWT_SECRET}
       expiration: 3600000
       public-paths:
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
+        - /actuator/health
+        - /actuator/health/**
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
 
 logging:
   level:

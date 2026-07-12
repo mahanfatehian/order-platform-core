@@ -4,9 +4,11 @@ import java.util.UUID;
 import java.time.Instant;
 import java.math.BigDecimal;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "products")
 public class Product {
@@ -25,12 +27,18 @@ public class Product {
     @Column(name = "description")
     private String description;
 
-    @Column(name = "price", nullable = false)
+    @Column(name = "sku", length = 100)
+    private String sku;
+
+    @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
     @Column(name = "category", nullable = false)
     @Enumerated(EnumType.STRING)
     private Category category;
+
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

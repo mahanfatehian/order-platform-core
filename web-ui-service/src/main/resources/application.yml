@@ -1,0 +1,80 @@
+server:
+  port: ${WEB_UI_SERVICE_PORT:8085}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        name: ORDER_PLATFORM_SESSION
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    whitelabel:
+      enabled: false
+
+spring:
+  application:
+    name: web-ui-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 2s
+  session:
+    redis:
+      namespace: order-platform:web-ui:session
+      flush-mode: on_save
+  thymeleaf:
+    cache: ${THYMELEAF_CACHE:false}
+
+app:
+  services:
+    auth-url: ${AUTH_SERVICE_URL:http://auth-service:8081}
+    user-url: ${USER_SERVICE_URL:http://user-service:8082}
+    store-url: ${STORE_SERVICE_URL:http://store-service:8083}
+    order-url: ${ORDER_SERVICE_URL:http://order-service:8084}
+    store-internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
+    connect-timeout: 2s
+    read-timeout: 5s
+  security:
+    jwt-secret: ${JWT_SECRET}
+    refresh-skew: 45s
+  cart:
+    maximum-quantity: ${CART_MAXIMUM_QUANTITY:99}
+  features:
+    registration-enabled: ${REGISTRATION_ENABLED:true}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}/eureka/
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+  level:
+    org.springframework.security: INFO

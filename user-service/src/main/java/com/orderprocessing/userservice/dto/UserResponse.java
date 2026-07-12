@@ -33,6 +33,9 @@ public class UserResponse {
     @Schema(description = "Whether the user is enabled", example = "true")
     private boolean enabled;
 
+    @Schema(description = "Whether the account is not locked", example = "true")
+    private boolean accountNonLocked;
+
     @Schema(description = "Creation timestamp")
     private OffsetDateTime createdAt;
 

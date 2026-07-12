@@ -1,5 +1,6 @@
 package com.orderprocessing.userservice.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.security.config.JwtSecurityProperties;
 import com.orderprocessing.security.web.RestAccessDeniedHandler;
 import com.orderprocessing.security.web.RestAuthenticationEntryPoint;
@@ -17,6 +18,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.preauth.AbstractPreAuthenticatedProcessingFilter;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableMethodSecurity
@@ -24,8 +26,11 @@ import org.springframework.security.web.authentication.preauth.AbstractPreAuthen
 public class UserServiceSecurityConfig {
 
     @Bean
-    public InternalApiKeyFilter internalApiKeyFilter(InternalSecurityProperties properties) {
-        return new InternalApiKeyFilter(properties);
+    public InternalApiKeyFilter internalApiKeyFilter(
+            InternalSecurityProperties properties,
+            ObjectMapper objectMapper
+    ) {
+        return new InternalApiKeyFilter(properties, objectMapper);
     }
 
     @Bean
@@ -76,6 +81,8 @@ public class UserServiceSecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(publicPaths).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
+                        .requestMatchers("/api/users/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

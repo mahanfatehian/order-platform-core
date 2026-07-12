@@ -1,0 +1,5 @@
+<div th:fragment="flash" xmlns:th="http://www.thymeleaf.org" class="flash-stack" aria-live="polite">
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i><span th:text="${success}">Success</span><button class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>
+    <div th:if="${warning}" class="alert alert-warning alert-dismissible fade show" role="status"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><span th:text="${warning}">Warning</span><button class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-x-circle" aria-hidden="true"></i><span th:text="${error}">Error</span><button class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>
+</div>

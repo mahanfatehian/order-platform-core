@@ -1,0 +1,14 @@
+.git
+.agents
+.codex
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+**/target
+**/*.iml
+*.log
+.tmp*
+**/__pycache__
+README*.html

@@ -1,0 +1,25 @@
+<header th:fragment="navbar" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+        class="topbar">
+    <div class="topbar__inner">
+        <button sec:authorize="isAuthenticated()" class="btn icon-button d-lg-none" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#appSidebar" aria-label="Open navigation">
+            <i class="bi bi-list" aria-hidden="true"></i>
+        </button>
+        <a class="brand" th:href="${currentUser == null} ? @{/login} : @{/app}">
+            <span class="brand__mark" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span>Order<span class="brand__quiet">/flow</span></span>
+        </a>
+        <nav class="topbar__actions" aria-label="Account">
+            <a sec:authorize="isAuthenticated()" class="cart-link" th:href="@{/app/cart}">
+                <i class="bi bi-bag" aria-hidden="true"></i><span>Cart</span>
+                <span class="cart-count" th:text="${cartCount}">0</span>
+            </a>
+            <a sec:authorize="isAuthenticated()" class="avatar-link" th:href="@{/app/profile}"
+               th:attr="aria-label=${currentUser == null ? 'Profile' : 'Profile for ' + currentUser.username()}">
+                <span class="avatar" th:text="${currentUser == null ? 'U' : #strings.toUpperCase(#strings.substring(currentUser.username(),0,1))}">U</span>
+                <span class="d-none d-sm-inline" th:text="${currentUser == null ? 'Account' : currentUser.username()}">username</span>
+            </a>
+            <a sec:authorize="isAnonymous()" class="btn btn-sm btn-outline-primary" th:href="@{/login}">Sign in</a>
+        </nav>
+    </div>
+</header>

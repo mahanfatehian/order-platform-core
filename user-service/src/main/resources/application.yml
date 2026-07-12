@@ -14,9 +14,9 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
   datasource:
-    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:userdb}
-    username: ${DB_USERNAME:postgres_user1234}
-    password: ${DB_PASSWORD:passwordpostgres1234}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:userdb}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: UserServiceHikariPool
@@ -40,20 +40,23 @@ spring:
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+      secret: ${JWT_SECRET}
       expiration: 3600000
       public-paths:
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
+        - /api/users/register
+        - /actuator/health
+        - /actuator/health/**
     internal:
-      api-key: ${USER_SERVICE_INTERNAL_API_KEY:UserInternalKey_SuperSecret_123456}
+      api-key: ${USER_SERVICE_INTERNAL_API_KEY}
 
 logging:
   level:
     org.hibernate.SQL: DEBUG
     org.flywaydb: INFO
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
 
 eureka:
   client:
@@ -76,3 +79,13 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   default-produces-media-type: application/json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

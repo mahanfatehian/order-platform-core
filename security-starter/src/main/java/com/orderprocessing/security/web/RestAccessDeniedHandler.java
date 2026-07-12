@@ -9,10 +9,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -27,13 +23,14 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", 403);
-        body.put("error", "Forbidden");
-        body.put("message", "You do not have permission to access this resource");
-        body.put("path", request.getRequestURI());
-
-        objectMapper.writeValue(response.getOutputStream(), body);
+        String correlationId = CorrelationId.resolve(request);
+        response.setHeader(CorrelationId.HEADER, correlationId);
+        objectMapper.writeValue(response.getOutputStream(), ApiErrorResponse.of(
+                403,
+                "FORBIDDEN",
+                "You do not have permission to access this resource",
+                request.getRequestURI(),
+                correlationId
+        ));
     }
 }

@@ -3,6 +3,7 @@ package com.orderprocessing.orderservice.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.List;
 public class CreateOrderRequest {
 
     @NotEmpty(message = "Order must contain at least one item")
+    @Size(max = 100, message = "An order cannot contain more than 100 products")
     @Valid
     @Schema(description = "List of items to include in the order")
     private List<OrderItemRequest> items;

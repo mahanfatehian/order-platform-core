@@ -2,6 +2,7 @@ package com.orderprocessing.userservice.controller;
 
 import com.orderprocessing.userservice.dto.InternalAuthenticateRequest;
 import com.orderprocessing.userservice.dto.InternalAuthenticatedUserResponse;
+import com.orderprocessing.userservice.dto.InternalUserStateResponse;
 import com.orderprocessing.userservice.service.InternalAuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users/internal")
@@ -30,5 +33,10 @@ public class InternalUserController {
     @PostMapping("/authenticate")
     public InternalAuthenticatedUserResponse authenticate(@Valid @RequestBody InternalAuthenticateRequest request) {
         return internalAuthenticationService.authenticate(request);
+    }
+
+    @GetMapping("/{id}")
+    public InternalUserStateResponse getCurrentState(@PathVariable UUID id) {
+        return internalAuthenticationService.getCurrentState(id);
     }
 }

@@ -22,29 +22,6 @@ public class JwtAuthoritiesConverter implements Converter<Jwt, Collection<Grante
                     .forEach(authorities::add);
         }
 
-        List<String> permissions = jwt.getClaimAsStringList("authorities");
-        if (permissions != null) {
-            permissions.stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .forEach(authorities::add);
-        }
-
-        Object scope = jwt.getClaims().get("scope");
-        if (scope instanceof String) {
-            String scopeStr = (String) scope;
-            for (String item : scopeStr.split(" ")) {
-                if (!item.isEmpty()) {
-                    authorities.add(new SimpleGrantedAuthority(item));
-                }
-            }
-        } else if (scope instanceof Collection<?>) {
-            Collection<?> collection = (Collection<?>) scope;
-            collection.stream()
-                    .map(String::valueOf)
-                    .map(SimpleGrantedAuthority::new)
-                    .forEach(authorities::add);
-        }
-
         return authorities;
     }
 }

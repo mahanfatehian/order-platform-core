@@ -1,0 +1,20 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content" class="auth-page">
+    <div class="auth-panel"><div class="auth-form">
+        <p class="eyebrow">Customer registration</p><h1>Create your account</h1><p class="muted mb-4">Registration always creates a standard customer account.</p>
+        <form th:action="@{/register}" th:object="${registrationForm}" method="post" novalidate>
+            <div th:replace="~{fragments/form-errors :: errors(${registrationForm})}"></div>
+            <div class="row g-3">
+                <div class="col-12"><label class="form-label" for="username">Username</label><input id="username" class="form-control" th:field="*{username}" autocomplete="username" required><div class="field-error" th:errors="*{username}"></div></div>
+                <div class="col-12"><label class="form-label" for="email">Email</label><input id="email" class="form-control" type="email" th:field="*{email}" autocomplete="email" required><div class="field-error" th:errors="*{email}"></div></div>
+                <div class="col-sm-6"><label class="form-label" for="firstName">First name</label><input id="firstName" class="form-control" th:field="*{firstName}" autocomplete="given-name"></div>
+                <div class="col-sm-6"><label class="form-label" for="lastName">Last name</label><input id="lastName" class="form-control" th:field="*{lastName}" autocomplete="family-name"></div>
+                <div class="col-12"><label class="form-label" for="password">Password</label><input id="password" name="password" class="form-control" type="password" autocomplete="new-password" required><div class="form-text">Use at least 8 characters.</div><div class="field-error" th:errors="*{password}"></div></div>
+                <div class="col-12"><label class="form-label" for="confirmPassword">Confirm password</label><input id="confirmPassword" name="confirmPassword" class="form-control" type="password" autocomplete="new-password" required><div class="field-error" th:errors="*{confirmPassword}"></div></div>
+            </div>
+            <button class="btn btn-primary btn-lg w-100 mt-4" type="submit">Create customer account</button>
+        </form>
+        <p class="mt-4 mb-0 text-center muted">Already registered? <a th:href="@{/login}">Sign in</a></p>
+    </div></div>
+    <aside class="auth-aside"><p class="eyebrow text-info">Safe by default</p><h2>Your browser receives a session cookie—never a JWT.</h2><p>Credentials go directly to the server-side BFF. Roles are assigned by policy, not by the registration form.</p></aside>
+</section></html>

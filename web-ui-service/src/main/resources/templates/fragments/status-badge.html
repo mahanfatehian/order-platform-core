@@ -1,0 +1,4 @@
+<span th:fragment="order(status)" xmlns:th="http://www.thymeleaf.org" class="status-badge"
+      th:classappend="| status-badge--${#strings.toLowerCase(status)}|">
+    <span class="status-dot" aria-hidden="true"></span><span th:text="${status}">PENDING</span>
+</span>

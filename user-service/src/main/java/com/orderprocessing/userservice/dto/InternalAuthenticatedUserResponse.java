@@ -29,4 +29,8 @@ public class InternalAuthenticatedUserResponse {
 
     @Schema(description = "Set of roles assigned to the user", example = "[\"ROLE_USER\"]")
     private Set<String> roles;
+
+    private boolean enabled;
+
+    private boolean accountNonLocked;
 }

@@ -4,9 +4,11 @@ import java.util.UUID;
 import java.util.Map;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class OrderPlacedEvent {
+@EqualsAndHashCode(callSuper = true)
+public class OrderPlacedEvent extends DomainEvent {
     private UUID orderId;
     private UUID userId;
     private Map<UUID, Integer> items;

@@ -1,0 +1,4 @@
+<div th:fragment="errors(form)" xmlns:th="http://www.thymeleaf.org" th:if="${#fields.hasAnyErrors()}" class="form-errors" role="alert">
+    <p><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Check the highlighted fields.</p>
+    <ul th:if="${#fields.hasGlobalErrors()}"><li th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</li></ul>
+</div>

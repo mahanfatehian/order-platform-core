@@ -1,0 +1,22 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading"><div><p class="eyebrow">Order workspace</p><h1 th:text="|Welcome back, ${currentUser.username()}|">Welcome back</h1><p>Track the path from product selection to inventory confirmation.</p></div><a class="btn btn-primary" th:href="@{/app/catalog}"><i class="bi bi-box-seam"></i> Browse catalog</a></header>
+    <div class="metric-grid">
+        <article class="metric"><span class="metric__label">Cart units</span><strong class="metric__value" th:text="${cartCount}">0</strong><span class="metric__note">Ready for review</span></article>
+        <article class="metric metric--warning"><span class="metric__label">Orders processing</span><strong class="metric__value" th:text="${pendingOrders ?: '—'}">0</strong><span class="metric__note">Awaiting stock result</span></article>
+        <article class="metric metric--success"><span class="metric__label">Products in stock</span><strong class="metric__value" th:text="${availableProducts ?: '—'}">0</strong><span class="metric__note" th:text="${productsUnavailable} ? 'Store temporarily unavailable' : 'Available now'">Available now</span></article>
+        <article class="metric"><span class="metric__label">Session</span><strong class="metric__value" style="font-size:1.25rem">Protected</strong><span class="metric__note">Redis-backed · HttpOnly</span></article>
+    </div>
+    <div class="row g-3">
+        <div class="col-xl-8"><section class="surface table-responsive"><div class="p-3 d-flex justify-content-between"><h2 class="section-title mb-0">Recent orders</h2><a th:href="@{/app/orders}">View all</a></div>
+            <div th:if="${ordersUnavailable}" class="p-4 muted">Order history is temporarily unavailable. Other workspace actions still work.</div>
+            <table th:if="${!ordersUnavailable and !#lists.isEmpty(recentOrders)}" class="table data-table"><thead><tr><th>Order</th><th>Status</th><th>Total</th><th>Created</th></tr></thead><tbody><tr th:each="order : ${recentOrders}"><td data-label="Order"><a class="mono" th:href="@{/app/orders/{id}(id=${order.id()})}" th:text="${#strings.substring(order.id().toString(),0,8)}">id</a></td><td data-label="Status"><span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span></td><td data-label="Total" class="money" th:text="|$${#numbers.formatDecimal(order.totalAmount(),1,2)}|">$0</td><td data-label="Created" th:text="${#temporals.format(order.createdAt(),'MMM d, HH:mm')}">date</td></tr></tbody></table>
+            <div th:if="${!ordersUnavailable and #lists.isEmpty(recentOrders)}" th:replace="~{fragments/empty-state :: empty('bi-receipt','No orders yet','Your first order will appear here as it moves through inventory confirmation.')}"></div>
+        </section></div>
+        <div class="col-xl-4"><section><h2 class="section-title">Quick paths</h2><div class="quick-grid d-grid">
+            <a class="quick-link surface" th:href="@{/app/catalog}"><span class="quick-link__icon"><i class="bi bi-search"></i></span><span><strong>Find products</strong><small>Search live availability</small></span><i class="bi bi-arrow-right"></i></a>
+            <a class="quick-link surface" th:href="@{/app/cart}"><span class="quick-link__icon"><i class="bi bi-bag"></i></span><span><strong>Review cart</strong><small>Refresh prices before checkout</small></span><i class="bi bi-arrow-right"></i></a>
+            <a class="quick-link surface" th:href="@{/app/profile}"><span class="quick-link__icon"><i class="bi bi-person-gear"></i></span><span><strong>Account</strong><small>Profile and password</small></span><i class="bi bi-arrow-right"></i></a>
+        </div></section></div>
+    </div>
+</section></html>

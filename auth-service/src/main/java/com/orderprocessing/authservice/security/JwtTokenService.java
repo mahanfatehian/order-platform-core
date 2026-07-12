@@ -1,17 +1,21 @@
 package com.orderprocessing.authservice.security;
 
+import com.orderprocessing.authservice.exception.AuthenticationFailedException;
 import com.orderprocessing.security.config.JwtSecurityProperties;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 @Service
@@ -19,129 +23,112 @@ public class JwtTokenService {
 
     private final JwtSecurityProperties properties;
     private final SecretKey secretKey;
-    private final StringRedisTemplate redisTemplate;
+    private final JwtParser parser;
 
-    public JwtTokenService(JwtSecurityProperties properties, StringRedisTemplate redisTemplate) {
+    public JwtTokenService(JwtSecurityProperties properties) {
         this.properties = properties;
-        this.redisTemplate = redisTemplate;
         this.secretKey = Keys.hmacShaKeyFor(properties.getSecret().getBytes(StandardCharsets.UTF_8));
+        this.parser = Jwts.parser().verifyWith(secretKey).build();
     }
 
-    // Get or initialize the token version for a user
-    private long getTokenVersion(String username) {
-        String key = "user:token-version:" + username;
-        String current = redisTemplate.opsForValue().get(key);
-        if (current == null) {
-            redisTemplate.opsForValue().set(key, "1");
-            return 1;
+    public TokenPair generateTokenPair(
+            String username,
+            Set<String> roles,
+            UUID userId,
+            long tokenVersion
+    ) {
+        if (!StringUtils.hasText(username) || userId == null || tokenVersion <= 0) {
+            throw new IllegalArgumentException("Complete current user identity is required for token issuance");
         }
-        return Long.parseLong(current);
-    }
-
-    // Increment token version on logout
-    public void incrementTokenVersion(String username) {
-        String key = "user:token-version:" + username;
-        redisTemplate.opsForValue().increment(key);
-    }
-
-    // Extract the token version claim from any JWT
-    public Long extractTokenVersion(String token) {
-        return parse(token).get("tokenVersion", Long.class);
-    }
-
-    // Check if the token's version matches the current version for its user
-    public boolean isTokenVersionValid(String token) {
-        String username = extractUsername(token);
-        Long tokenVersion = extractTokenVersion(token);
-        if (tokenVersion == null) {
-            return false;
-        }
-        long currentVersion = getTokenVersion(username);
-        return tokenVersion == currentVersion;
-    }
-
-    public String generateAccessToken(String username, Set<String> roles, UUID userId) {
-        long version = getTokenVersion(username);
+        Set<String> currentRoles = roles == null ? Set.of() : Set.copyOf(new TreeSet<>(roles));
         Instant now = Instant.now();
-        Instant expiresAt = now.plusMillis(properties.getExpiration());
-        String jti = UUID.randomUUID().toString();
-
-        return Jwts.builder()
+        Instant accessExpiresAt = now.plusMillis(properties.getExpiration());
+        String accessJti = UUID.randomUUID().toString();
+        String accessToken = Jwts.builder()
                 .subject(username)
-                .id(jti)
-                .claim("roles", roles)
+                .id(accessJti)
+                .claim("roles", currentRoles)
                 .claim("type", "access")
-                .claim("tokenVersion", version)
-                .claim("userId", userId)
+                .claim("tokenVersion", tokenVersion)
+                .claim("userId", userId.toString())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt))
+                .expiration(Date.from(accessExpiresAt))
                 .signWith(secretKey)
                 .compact();
-    }
 
-    public String generateRefreshToken(String username, String accessJti, Instant accessExpiresAt, UUID userId) {
-        long version = getTokenVersion(username);
-        Instant now = Instant.now();
-        Instant expiresAt = now.plusMillis(properties.getRefreshExpiration());
-        String jti = UUID.randomUUID().toString();
-
-        return Jwts.builder()
+        Instant refreshExpiresAt = now.plusMillis(properties.getRefreshExpiration());
+        String refreshToken = Jwts.builder()
                 .subject(username)
-                .id(jti)
+                .id(UUID.randomUUID().toString())
+                .claim("roles", currentRoles)
                 .claim("type", "refresh")
                 .claim("accessJti", accessJti)
                 .claim("accessExp", accessExpiresAt.toString())
-                .claim("tokenVersion", version)
-                .claim("userId", userId)
+                .claim("tokenVersion", tokenVersion)
+                .claim("userId", userId.toString())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt))
+                .expiration(Date.from(refreshExpiresAt))
                 .signWith(secretKey)
                 .compact();
+
+        return new TokenPair(accessToken, refreshToken, accessExpiresAt, refreshExpiresAt);
     }
 
-    public Claims parse(String token) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+    public RefreshTokenClaims parseRefreshToken(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new AuthenticationFailedException("Refresh token is required");
+        }
+        Claims claims = parser.parseSignedClaims(token).getPayload();
+        try {
+            String type = claims.get("type", String.class);
+            String username = claims.getSubject();
+            String jti = claims.getId();
+            String userIdValue = claims.get("userId", String.class);
+            Object versionValue = claims.get("tokenVersion");
+            String accessJti = claims.get("accessJti", String.class);
+            String accessExpiration = claims.get("accessExp", String.class);
+            if (!"refresh".equals(type)
+                    || !StringUtils.hasText(username)
+                    || !StringUtils.hasText(jti)
+                    || !StringUtils.hasText(userIdValue)
+                    || !(versionValue instanceof Number number)
+                    || number.longValue() <= 0
+                    || !StringUtils.hasText(accessJti)
+                    || !StringUtils.hasText(accessExpiration)
+                    || claims.getIssuedAt() == null
+                    || claims.getExpiration() == null) {
+                throw new AuthenticationFailedException("Invalid refresh token");
+            }
+            return new RefreshTokenClaims(
+                    username,
+                    UUID.fromString(userIdValue),
+                    jti,
+                    number.longValue(),
+                    claims.getExpiration().toInstant(),
+                    accessJti,
+                    Instant.parse(accessExpiration)
+            );
+        } catch (IllegalArgumentException | DateTimeParseException exception) {
+            throw new AuthenticationFailedException("Invalid refresh token", exception);
+        }
     }
 
-    public String extractUsername(String token) {
-        return parse(token).getSubject();
+    public record TokenPair(
+            String accessToken,
+            String refreshToken,
+            Instant accessTokenExpiresAt,
+            Instant refreshTokenExpiresAt
+    ) {
     }
 
-    public UUID extractUserId(String token) {
-        return parse(token).get("userId", UUID.class);
-    }
-
-    public String extractJti(String token) {
-        return parse(token).getId();
-    }
-
-    public Instant extractExpiration(String token) {
-        Date expiration = parse(token).getExpiration();
-        return expiration == null ? null : expiration.toInstant();
-    }
-
-    public String extractType(String token) {
-        return parse(token).get("type", String.class);
-    }
-
-    public boolean isRefreshToken(String token) {
-        return "refresh".equals(extractType(token));
-    }
-
-    public boolean isAccessToken(String token) {
-        return "access".equals(extractType(token));
-    }
-
-    public String extractAccessJti(String refreshToken) {
-        return parse(refreshToken).get("accessJti", String.class);
-    }
-
-    public Instant extractAccessExpiration(String refreshToken) {
-        String expStr = parse(refreshToken).get("accessExp", String.class);
-        return expStr != null ? Instant.parse(expStr) : null;
+    public record RefreshTokenClaims(
+            String username,
+            UUID userId,
+            String jti,
+            long tokenVersion,
+            Instant expiresAt,
+            String linkedAccessJti,
+            Instant linkedAccessExpiresAt
+    ) {
     }
 }

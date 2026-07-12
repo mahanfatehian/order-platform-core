@@ -19,4 +19,6 @@ public class InternalAuthenticatedUserResponse {
     private String username;
     private String email;
     private Set<String> roles;
+    private boolean enabled;
+    private boolean accountNonLocked;
 }

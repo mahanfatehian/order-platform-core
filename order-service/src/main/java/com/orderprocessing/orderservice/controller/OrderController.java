@@ -1,139 +1,133 @@
 package com.orderprocessing.orderservice.controller;
 
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
-import com.orderprocessing.orderservice.dto.OrderItemResponse;
 import com.orderprocessing.orderservice.dto.OrderResponse;
+import com.orderprocessing.orderservice.dto.PageResponse;
 import com.orderprocessing.orderservice.model.Order;
-import com.orderprocessing.orderservice.model.OrderItem;
 import com.orderprocessing.orderservice.service.OrderService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
-import java.util.List;
+import java.net.URI;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
-@Tag(name = "Orders", description = "Order management and processing endpoints")
-@SecurityRequirement(name = "bearerAuth") // Applies JWT auth to all endpoints in this controller
+@Validated
 public class OrderController {
-
+    private static final Set<String> SORT_FIELDS = Set.of("createdAt", "updatedAt", "status", "totalAmount");
     private final OrderService orderService;
 
-
-    @Operation(summary = "Get all orders", description = "Retrieves a list of all orders in the system.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Orders retrieved successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public List<OrderResponse> getAllOrders() {
-        return orderService.getAllOrders().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public PageResponse<OrderResponse> getAllOrders(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) Order.Status status,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) UUID orderId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return orderService.getAdminOrders(status, userId, orderId, search, pageRequest(page, size, sort));
     }
 
-    @Operation(summary = "Get my orders", description = "Retrieves all orders placed by the currently authenticated user.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Orders retrieved successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PageResponse<OrderResponse> getAdminOrders(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) Order.Status status,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) UUID orderId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return orderService.getAdminOrders(status, userId, orderId, search, pageRequest(page, size, sort));
+    }
+
     @GetMapping("/my-orders")
-    public List<OrderResponse> getMyOrders(@AuthenticationPrincipal Jwt jwt) {
-        // Extract userId from the JWT claims (set by AuthService)
-        UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
-
-        return orderService.getOrdersByUserId(userId).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public PageResponse<OrderResponse> getMyOrders(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) Order.Status status,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return orderService.getMyOrders(userId(jwt), status, pageRequest(page, size, sort));
     }
 
-    @Operation(summary = "Place a new order", description = "Synchronously reserves inventory and creates an order with PENDING status.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Order created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request payload"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "409", description = "Insufficient inventory for one or more items")
-    })
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderResponse createOrder(@AuthenticationPrincipal Jwt jwt,
-                                     @Valid @RequestBody CreateOrderRequest request) {
-
-        // Extract userId from the JWT claims (set by AuthService)
-        UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
-
-        // Map DTOs to Entities
-        List<OrderItem> items = request.getItems().stream().map(dto -> {
-            OrderItem item = new OrderItem();
-            item.setId(UUID.randomUUID());
-            item.setProductId(dto.getProductId());
-            item.setProductName(dto.getProductName());
-            item.setUnitPrice(dto.getUnitPrice());
-            item.setQuantity(dto.getQuantity());
-            item.setCreatedAt(Instant.now());
-            item.setUpdatedAt(Instant.now());
-            return item;
-        }).collect(Collectors.toList());
-
-        Order createdOrder = orderService.createOrder(userId, items);
-        return mapToResponse(createdOrder);
+    public ResponseEntity<OrderResponse> createOrder(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateOrderRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        OrderResponse created = orderService.createOrder(userId(jwt), request, idempotencyKey,
+                correlationId(correlationId));
+        return ResponseEntity.created(URI.create("/api/orders/" + created.getId())).body(created);
     }
 
-    @Operation(summary = "Get order by ID", description = "Retrieves a specific order including its items.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Order found"),
-            @ApiResponse(responseCode = "404", description = "Order not found")
-    })
     @GetMapping("/{id}")
-    public OrderResponse getOrderById(@PathVariable UUID id) {
-        return mapToResponse(orderService.getOrderById(id));
+    public OrderResponse getOrder(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                  Authentication authentication) {
+        return orderService.getOrder(id, userId(jwt), isAdmin(authentication));
     }
 
-    @Operation(summary = "Cancel an order", description = "Cancels a PENDING or CONFIRMED order and synchronously releases reserved inventory.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Order cancelled successfully"),
-            @ApiResponse(responseCode = "400", description = "Order cannot be cancelled in its current state"),
-            @ApiResponse(responseCode = "404", description = "Order not found")
-    })
     @PostMapping("/{id}/cancel")
-    public OrderResponse cancelOrder(@PathVariable UUID id) {
-        orderService.cancelOrder(id);
-        return mapToResponse(orderService.getOrderById(id));
+    public OrderResponse cancelOrder(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                     Authentication authentication,
+                                     @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        return orderService.cancelOrder(id, userId(jwt), isAdmin(authentication), correlationId(correlationId));
     }
 
-    private OrderResponse mapToResponse(Order order) {
-        List<OrderItemResponse> itemResponses = order.getItems().stream().map(item ->
-                OrderItemResponse.builder()
-                        .id(item.getId())
-                        .productId(item.getProductId())
-                        .productName(item.getProductName())
-                        .unitPrice(item.getUnitPrice())
-                        .quantity(item.getQuantity())
-                        .build()
-        ).collect(Collectors.toList());
+    @GetMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public OrderResponse getAdminOrder(@PathVariable UUID id) {
+        return orderService.getAdminOrder(id);
+    }
 
-        return OrderResponse.builder()
-                .id(order.getId())
-                .userId(order.getUserId())
-                .status(order.getStatus().name())
-                .totalAmount(order.getTotalAmount())
-                .items(itemResponses)
-                .createdAt(order.getCreatedAt())
-                .build();
+    @PostMapping("/admin/{id}/cancel")
+    @PreAuthorize("hasRole('ADMIN')")
+    public OrderResponse cancelAdminOrder(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                          @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        return orderService.cancelOrder(id, userId(jwt), true, correlationId(correlationId));
+    }
+
+    static PageRequest pageRequest(int page, int size, String sortValue) {
+        String[] parts = sortValue == null ? new String[0] : sortValue.split(",", 2);
+        String property = parts.length == 0 || !SORT_FIELDS.contains(parts[0]) ? "createdAt" : parts[0];
+        Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1])
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return PageRequest.of(page, size, Sort.by(direction, property));
+    }
+
+    private UUID userId(Jwt jwt) {
+        return UUID.fromString(jwt.getClaimAsString("userId"));
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    private String correlationId(String value) {
+        return value == null || value.isBlank() ? UUID.randomUUID().toString() : value;
     }
 }

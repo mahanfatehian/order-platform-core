@@ -1,5 +1,4 @@
 kafka:
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   topics:
     order-events: order.events
     order-events-partitions: 3

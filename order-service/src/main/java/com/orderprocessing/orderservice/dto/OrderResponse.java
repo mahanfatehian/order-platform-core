@@ -31,4 +31,10 @@ public class OrderResponse {
 
     @Schema(description = "Order creation timestamp")
     private Instant createdAt;
+
+    private Instant updatedAt;
+
+    private String failureReason;
+
+    private boolean cancellable;
 }

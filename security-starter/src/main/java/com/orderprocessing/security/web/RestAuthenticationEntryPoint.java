@@ -9,10 +9,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -27,13 +23,14 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", 401);
-        body.put("error", "Unauthorized");
-        body.put("message", "Missing, invalid or expired JWT token");
-        body.put("path", request.getRequestURI());
-
-        objectMapper.writeValue(response.getOutputStream(), body);
+        String correlationId = CorrelationId.resolve(request);
+        response.setHeader(CorrelationId.HEADER, correlationId);
+        objectMapper.writeValue(response.getOutputStream(), ApiErrorResponse.of(
+                401,
+                "AUTHENTICATION_REQUIRED",
+                "Missing, invalid, expired or revoked access token",
+                request.getRequestURI(),
+                correlationId
+        ));
     }
 }

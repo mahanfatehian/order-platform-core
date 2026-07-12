@@ -41,7 +41,16 @@ public class UserEntity {
     private String lastName;
 
     @Column(nullable = false)
-    private boolean enabled;
+    @Builder.Default
+    private boolean enabled = true;
+
+    @Column(name = "account_non_locked", nullable = false)
+    @Builder.Default
+    private boolean accountNonLocked = true;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -63,9 +72,6 @@ public class UserEntity {
         OffsetDateTime now = OffsetDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (!this.enabled) {
-            this.enabled = true;
-        }
     }
 
     @PreUpdate

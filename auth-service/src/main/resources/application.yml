@@ -20,29 +20,38 @@ spring:
           max-idle: 10
           min-idle: 5
           max-wait: 2000
+  cloud:
+    openfeign:
+      client:
+        config:
+          user-service:
+            connectTimeout: 2000
+            readTimeout: 3000
+            loggerLevel: none
 
 services:
   user-service:
-    url: http://user-service:${USER_SERVICE_PORT:8082}
-    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY:UserInternalKey_SuperSecret_123456}
+    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY}
 
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
-      expiration: 86400000
+      secret: ${JWT_SECRET}
+      expiration: 3600000
+      refresh-expiration: 604800000
       public-paths:
         - /api/auth/login
         - /api/auth/refresh
-        - /api/auth/logout
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
+        - /actuator/health
+        - /actuator/health/**
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    com.orderprocessing.authservice.client.UserServiceClient: DEBUG
+    org.springframework.security: INFO
+    com.orderprocessing.authservice.client.UserServiceClient: INFO
 
 eureka:
   client:
@@ -65,3 +74,13 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   default-produces-media-type: application/json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

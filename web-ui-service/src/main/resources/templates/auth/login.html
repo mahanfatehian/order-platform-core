@@ -1,0 +1,23 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content" class="auth-page">
+    <div class="auth-panel"><div class="auth-form">
+        <p class="eyebrow">Customer &amp; operations access</p><h1>Sign in to order/flow</h1>
+        <p class="muted mb-4">Use your account to browse, order, and follow inventory confirmation.</p>
+        <div th:if="${param.logout}" class="alert alert-success" role="status"><i class="bi bi-check-circle"></i> You are signed out.</div>
+        <form th:action="@{/login}" th:object="${loginForm}" method="post" novalidate>
+            <div th:replace="~{fragments/form-errors :: errors(${loginForm})}"></div>
+            <div class="mb-3"><label class="form-label" for="username">Username</label><input id="username" class="form-control form-control-lg" th:field="*{username}" autocomplete="username" autofocus required><div class="field-error" th:errors="*{username}"></div></div>
+            <div class="mb-4"><label class="form-label" for="password">Password</label><input id="password" name="password" class="form-control form-control-lg" type="password" autocomplete="current-password" required><div class="field-error" th:errors="*{password}"></div></div>
+            <button class="btn btn-primary btn-lg w-100" type="submit">Sign in securely</button>
+        </form>
+        <p th:if="${registrationEnabled}" class="mt-4 mb-0 text-center muted">New here? <a th:href="@{/register}">Create a customer account</a></p>
+    </div></div>
+    <aside class="auth-aside" aria-label="Platform workflow">
+        <div class="auth-aside__flow" aria-hidden="true">
+            <div class="flow-row"><i class="bi bi-receipt"></i><span>Order accepted</span><small>PENDING</small></div>
+            <div class="flow-row"><i class="bi bi-boxes"></i><span>Inventory reserved</span><small>KAFKA</small></div>
+            <div class="flow-row"><i class="bi bi-check2-circle"></i><span>Order confirmed</span><small>READY</small></div>
+        </div>
+        <h2>Every order has a visible path.</h2><p>Shop through a server-rendered experience backed by authoritative pricing, durable events, and concurrency-safe inventory.</p>
+    </aside>
+</section></html>

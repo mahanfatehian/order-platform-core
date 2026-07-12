@@ -2,13 +2,14 @@ package com.orderprocessing.security.config;
 
 import com.orderprocessing.security.service.RedisTokenBlacklistService;
 import com.orderprocessing.security.service.TokenBlacklistService;
+import com.orderprocessing.security.service.TokenRevocationService;
+import com.orderprocessing.security.web.CorrelationIdFilter;
 import com.orderprocessing.security.web.RestAccessDeniedHandler;
 import com.orderprocessing.security.web.RestAuthenticationEntryPoint;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.Filter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -29,6 +30,7 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -37,6 +39,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.OptionalLong;
+import java.util.UUID;
 
 @AutoConfiguration
 @AutoConfigureAfter(RedisAutoConfiguration.class)
@@ -59,17 +63,22 @@ public class SecurityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(TokenBlacklistService.class)
     @ConditionalOnBean(StringRedisTemplate.class)
-    public TokenBlacklistService tokenBlacklistService(StringRedisTemplate redisTemplate) {
-        log.info("TokenBlacklistService initialised with Redis");
+    public TokenRevocationService tokenBlacklistService(StringRedisTemplate redisTemplate) {
+        log.info("TokenRevocationService initialised with Redis");
         return new RedisTokenBlacklistService(redisTemplate);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(CorrelationIdFilter.class)
+    public CorrelationIdFilter correlationIdFilter() {
+        return new CorrelationIdFilter();
     }
 
     @Bean
     @ConditionalOnMissingBean(JwtDecoder.class)
     public JwtDecoder jwtDecoder(
             JwtSecurityProperties properties,
-            ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
-            StringRedisTemplate redisTemplate
+            TokenRevocationService tokenRevocationService
     ) {
         SecretKey key = Keys.hmacShaKeyFor(
                 properties.getSecret().getBytes(StandardCharsets.UTF_8)
@@ -79,44 +88,29 @@ public class SecurityAutoConfiguration {
         NimbusJwtDecoder delegate = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(macAlgorithm)
                 .build();
+        delegate.setJwtValidator(new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(),
+                new AccessTokenClaimsValidator()
+        ));
 
         return token -> {
             Jwt jwt = delegate.decode(token);
-
-            // 1. Check blacklist (access tokens)
-            TokenBlacklistService tokenBlacklistService = tokenBlacklistServiceProvider.getIfAvailable();
-            if (tokenBlacklistService != null) {
-                String type = jwt.getClaimAsString("type");
-                String jti = jwt.getId();
-                if (jti != null) {
-                    if ("access".equals(type) && tokenBlacklistService.isAccessTokenBlacklisted(jti)) {
-                        log.warn("Access token revoked (blacklist): jti={}", jti);
-                        throw new JwtException("Access token has been revoked");
-                    }
-                    if ("refresh".equals(type) && tokenBlacklistService.isRefreshTokenBlacklisted(jti)) {
-                        log.warn("Refresh token revoked (blacklist): jti={}", jti);
-                        throw new JwtException("Refresh token has been revoked");
-                    }
+            try {
+                UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
+                long tokenVersion = ((Number) jwt.getClaim("tokenVersion")).longValue();
+                if (tokenRevocationService.isAccessTokenBlacklisted(jwt.getId())) {
+                    throw new JwtException("Access token has been revoked");
                 }
-            }
-
-            // 2. Check token version (for user‑wide revocation)
-            String subject = jwt.getSubject();
-            Long tokenVersion = jwt.getClaim("tokenVersion");
-            if (subject != null && tokenVersion != null) {
-                String versionKey = "user:token-version:" + subject;
-                String currentVersionStr = redisTemplate.opsForValue().get(versionKey);
-                if (currentVersionStr != null) {
-                    long currentVersion = Long.parseLong(currentVersionStr);
-                    if (tokenVersion != currentVersion) {
-                        log.warn("Token version mismatch for user {}: token has {}, current is {}",
-                                subject, tokenVersion, currentVersion);
-                        throw new JwtException("Token has been revoked (version mismatch)");
-                    }
+                OptionalLong currentVersion = tokenRevocationService.getTokenVersion(userId);
+                if (currentVersion.isEmpty() || currentVersion.getAsLong() != tokenVersion) {
+                    throw new JwtException("Access token has been revoked");
                 }
+                return jwt;
+            } catch (JwtException exception) {
+                throw exception;
+            } catch (RuntimeException exception) {
+                throw new JwtException("Token revocation state could not be verified", exception);
             }
-
-            return jwt;
         };
     }
 

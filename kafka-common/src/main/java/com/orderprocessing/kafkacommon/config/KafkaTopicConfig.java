@@ -1,5 +1,6 @@
 package com.orderprocessing.kafkacommon.config;
 
+import com.orderprocessing.kafkacommon.KafkaTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -9,7 +10,7 @@ import org.springframework.kafka.config.TopicBuilder;
 @Configuration
 public class KafkaTopicConfig {
 
-    @Value("${kafka.topics.order-events:order.events}")
+    @Value("${kafka.topics.order-events:" + KafkaTopics.ORDER_EVENTS + "}")
     private String orderEventsTopic;
 
     @Value("${kafka.topics.order-events-partitions:3}")
@@ -18,7 +19,7 @@ public class KafkaTopicConfig {
     @Value("${kafka.topics.order-events-replicas:1}")
     private int orderEventsReplicas;
 
-    @Value("${kafka.topics.store-events:store.events}")
+    @Value("${kafka.topics.store-events:" + KafkaTopics.STORE_EVENTS + "}")
     private String storeEventsTopic;
 
     @Value("${kafka.topics.store-events-partitions:3}")
@@ -38,6 +39,22 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic storeEventsTopic() {
         return TopicBuilder.name(storeEventsTopic)
+                .partitions(storeEventsPartitions)
+                .replicas(storeEventsReplicas)
+                .build();
+    }
+
+    @Bean
+    public NewTopic orderEventsDltTopic() {
+        return TopicBuilder.name(KafkaTopics.ORDER_EVENTS_DLT)
+                .partitions(orderEventsPartitions)
+                .replicas(orderEventsReplicas)
+                .build();
+    }
+
+    @Bean
+    public NewTopic storeEventsDltTopic() {
+        return TopicBuilder.name(KafkaTopics.STORE_EVENTS_DLT)
                 .partitions(storeEventsPartitions)
                 .replicas(storeEventsReplicas)
                 .build();

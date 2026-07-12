@@ -1,0 +1,10 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content"><header class="page-heading"><div><p class="eyebrow">Live store data</p><h1>Product catalog</h1><p>Prices and availability come directly from the store service.</p></div></header>
+    <form class="filter-bar surface" method="get" th:action="@{/app/catalog}" hx-get="/app/catalog" hx-target="#product-grid-region" hx-push-url="true" hx-trigger="submit, change delay:250ms from:select, change from:input[type=checkbox]">
+        <label class="visually-hidden" for="catalog-q">Search products</label><input id="catalog-q" class="form-control" type="search" name="q" th:value="${q}" placeholder="Search name or SKU">
+        <select class="form-select" name="sort" aria-label="Sort products"><option value="createdAt,desc" th:selected="${sort == 'createdAt,desc'}">Newest</option><option value="name,asc" th:selected="${sort == 'name,asc'}">Name</option><option value="price,asc" th:selected="${sort == 'price,asc'}">Price: low to high</option><option value="price,desc" th:selected="${sort == 'price,desc'}">Price: high to low</option></select>
+        <label class="form-check d-flex align-items-center gap-2 px-2 mb-0"><input class="form-check-input mt-0" type="checkbox" name="inStock" value="true" th:checked="${inStock}">In stock only</label>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Search</button>
+    </form>
+    <div id="product-grid-region" aria-live="polite" data-service-feedback><div th:replace="~{catalog/_product-grid :: grid}"></div></div>
+</section></html>

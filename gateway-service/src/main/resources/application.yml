@@ -1,7 +1,11 @@
 server:
   port: ${GATEWAY_SERVICE_PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: gateway-service
   data:
@@ -16,6 +20,88 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
+        - id: web-ui-static
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/assets/**,/webjars/**
+
+        - id: web-ui-login
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/login
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: web-ui-registration
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/register
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: web-ui-checkout
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/app/checkout,/app/checkout/**
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 4
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@uiSessionKeyResolver}"
+
+        - id: web-ui-service
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/,/login,/logout,/register,/app/**,/admin/**,/fragments/**,/error,/error/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 30
+                redis-rate-limiter.burstCapacity: 60
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@uiSessionKeyResolver}"
+
+        - id: auth-login
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/login
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: auth-refresh
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/refresh
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
         - id: auth-service
           uri: lb://auth-service
           predicates:
@@ -23,10 +109,23 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10      # Tokens added per second
-                redis-rate-limiter.burstCapacity: 20      # Maximum tokens allowed in a burst
-                redis-rate-limiter.requestedTokens: 1     # Tokens consumed per request
-                key-resolver: "#{@userKeyResolver}"       # References the bean created in Step 2
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+
+        - id: user-registration
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/register
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
         - id: user-service
           uri: lb://user-service
@@ -67,11 +166,24 @@ spring:
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+      secret: ${JWT_SECRET}
       public-paths:
         - /api/auth/login
         - /api/auth/refresh
-        - /actuator/**
+        - /api/users/register
+        - /actuator/health
+        - /actuator/health/**
+        - /
+        - /login
+        - /logout
+        - /register
+        - /app/**
+        - /admin/**
+        - /fragments/**
+        - /assets/**
+        - /webjars/**
+        - /error
+        - /error/**
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
@@ -103,4 +215,14 @@ eureka:
 logging:
   level:
     org.springframework.cloud.gateway: INFO
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

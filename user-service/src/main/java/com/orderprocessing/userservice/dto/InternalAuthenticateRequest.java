@@ -2,6 +2,7 @@ package com.orderprocessing.userservice.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,10 +18,12 @@ import lombok.Setter;
 public class InternalAuthenticateRequest {
 
     @NotBlank(message = "Username is required")
+    @Size(max = 50)
     @Schema(description = "The username of the user", example = "johndoe")
     private String username;
 
     @NotBlank(message = "Password is required")
+    @Size(max = 100)
     @Schema(description = "The raw password of the user", example = "password123")
     private String password;
 }

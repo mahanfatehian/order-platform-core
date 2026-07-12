@@ -1,0 +1,7 @@
+<nav th:fragment="pagination(page, baseUrl)" xmlns:th="http://www.thymeleaf.org" th:if="${page.totalPages() > 1}" aria-label="Pages">
+    <ul class="pagination pagination-sm justify-content-end">
+        <li class="page-item" th:classappend="${!page.hasPrevious()} ? 'disabled'"><a class="page-link" th:href="@{${baseUrl}(page=${page.number()-1})}">Previous</a></li>
+        <li class="page-item disabled"><span class="page-link" th:text="|${page.number()+1} / ${page.totalPages()}|">1 / 1</span></li>
+        <li class="page-item" th:classappend="${!page.hasNext()} ? 'disabled'"><a class="page-link" th:href="@{${baseUrl}(page=${page.number()+1})}">Next</a></li>
+    </ul>
+</nav>

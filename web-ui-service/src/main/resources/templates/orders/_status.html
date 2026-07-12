@@ -1,0 +1,11 @@
+<section id="order-status" th:fragment="status" xmlns:th="http://www.thymeleaf.org" class="surface surface--padded"
+         th:attr="hx-get=${order.pending()} ? @{/app/orders/{id}/status(id=${order.id()})} : null,hx-trigger=${order.pending()} ? 'every 3s' : null,hx-swap=${order.pending()} ? 'outerHTML' : null">
+    <div class="d-flex align-items-center justify-content-between gap-3"><div><p class="eyebrow mb-1">Current state</p><span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span></div><span class="small muted" th:if="${order.pending()}"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Checking every 3 seconds</span></div>
+    <div class="order-rail" aria-label="Order progress">
+        <div class="order-step order-step--done"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Submitted</span></div>
+        <div class="order-step" th:classappend="${order.pending()} ? ' order-step--active' : (${order.status() == 'FAILED'} ? ' order-step--failed' : ' order-step--done')"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Inventory</span></div>
+        <div class="order-step" th:classappend="${order.status() == 'CONFIRMED'} ? ' order-step--done' : (${order.status() == 'CANCELLED'} ? ' order-step--failed' : '')"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Confirmed</span></div>
+        <div class="order-step" th:classappend="${order.terminal()} ? ' order-step--done' : ''"><span class="order-step__node"><i class="bi bi-check"></i></span><span th:text="${order.status() == 'CANCELLED'} ? 'Cancelled' : (${order.status() == 'FAILED'} ? 'Failed' : 'Ready')">Ready</span></div>
+    </div>
+    <div th:if="${order.failureReason() != null}" class="alert alert-danger mb-0"><i class="bi bi-exclamation-circle"></i><span th:text="${order.failureReason()}">Failure reason</span></div>
+</section>

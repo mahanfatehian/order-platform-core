@@ -2,6 +2,7 @@ package com.orderprocessing.storeservice.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
@@ -10,5 +11,6 @@ public class UpdateInventoryDTO {
 
     @Min(value = 0, message = "Quantity cannot be negative")
     @Schema(description = "Quantity to add, reserve, or release", example = "5")
-    private int quantity;
+    @NotNull(message = "Quantity is required")
+    private Integer quantity;
 }

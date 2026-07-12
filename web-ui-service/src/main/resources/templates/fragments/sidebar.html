@@ -1,0 +1,28 @@
+<aside th:fragment="sidebar" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+       id="appSidebar" class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" aria-label="Primary navigation">
+    <div class="offcanvas-header d-lg-none"><span class="fw-semibold">Navigate</span><button class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div>
+    <div class="offcanvas-body d-flex flex-column">
+        <p class="nav-kicker">Workspace</p>
+        <nav class="side-nav">
+            <a th:href="@{/app}"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Overview</a>
+            <a th:href="@{/app/catalog}"><i class="bi bi-box-seam" aria-hidden="true"></i>Catalog</a>
+            <a th:href="@{/app/orders}"><i class="bi bi-receipt" aria-hidden="true"></i>My orders</a>
+            <a th:href="@{/app/cart}"><i class="bi bi-bag" aria-hidden="true"></i>Cart <span class="nav-count" th:text="${cartCount}">0</span></a>
+            <a th:href="@{/app/profile}"><i class="bi bi-person" aria-hidden="true"></i>Profile</a>
+        </nav>
+        <div sec:authorize="hasRole('ADMIN')" class="admin-nav">
+            <p class="nav-kicker">Operations</p>
+            <nav class="side-nav">
+                <a th:href="@{/admin}"><i class="bi bi-command" aria-hidden="true"></i>Admin overview</a>
+                <a th:href="@{/admin/products}"><i class="bi bi-tags" aria-hidden="true"></i>Products</a>
+                <a th:href="@{/admin/inventory}"><i class="bi bi-boxes" aria-hidden="true"></i>Inventory</a>
+                <a th:href="@{/admin/orders}"><i class="bi bi-diagram-3" aria-hidden="true"></i>All orders</a>
+                <a th:href="@{/admin/users}"><i class="bi bi-people" aria-hidden="true"></i>Users</a>
+                <a th:href="@{/admin/system}"><i class="bi bi-activity" aria-hidden="true"></i>System status</a>
+            </nav>
+        </div>
+        <form class="sidebar-logout mt-auto" sec:authorize="isAuthenticated()" th:action="@{/logout}" method="post">
+            <button class="btn btn-sm btn-quiet w-100" type="submit"><i class="bi bi-box-arrow-left" aria-hidden="true"></i> Sign out</button>
+        </form>
+    </div>
+</aside>

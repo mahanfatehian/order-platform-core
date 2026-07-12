@@ -15,8 +15,8 @@ spring:
       password: ${REDIS_PASSWORD:}
   datasource:
     url: jdbc:postgresql://localhost:${DB_PORT:5432}/storedb
-    username: ${DB_USERNAME:postgres_user1234}
-    password: ${DB_PASSWORD:passwordpostgres1234}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: StoreServiceHikariPool
@@ -37,13 +37,13 @@ spring:
     enabled: true
     locations: classpath:db/migration
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: store-service
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: com.orderprocessing.kafkacommon.event
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -51,14 +51,32 @@ spring:
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:mySuperUltraSecureSecretKeyThatMustBeLongEnough123456}
+      secret: ${JWT_SECRET}
       expiration: 3600000
       public-paths:
         - /swagger-ui/**
         - /v3/api-docs/**
         - /swagger-ui.html
+        - /actuator/health
+        - /actuator/health/**
     store-internal:
-      api-key: ${STORE_SERVICE_INTERNAL_API_KEY:StoreInternalKey_SuperSecret_987654}
+      api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
+
+outbox:
+  polling:
+    interval: ${STORE_OUTBOX_POLL_INTERVAL:1000}
+  batch-size: ${STORE_OUTBOX_BATCH_SIZE:50}
+  max-attempts: ${STORE_OUTBOX_MAX_ATTEMPTS:5}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
 
 logging:
   level:
