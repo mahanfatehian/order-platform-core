@@ -1,6 +1,10 @@
 package com.orderprocessing.orderservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orderprocessing.kafkacommon.KafkaTopics;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
+import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
 import com.orderprocessing.orderservice.dto.OrderItemRequest;
@@ -29,6 +33,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -101,6 +108,59 @@ class OrderServiceTest {
         assertThat(response.getStatus()).isEqualTo("CANCELLED");
         verify(orderRepository, never()).save(any());
         verify(outboxRepository, never()).save(any());
+    }
+
+    @Test
+    void advancesOrderThroughHumanLifecycleEvents() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong()))
+                .thenReturn(1);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderPackagedEvent packaged = new OrderPackagedEvent();
+        packaged.setOrderId(order.getId());
+        service.processOrderPackaged(packaged, KafkaTopics.ORDER_EVENTS, 0, 10L);
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PACKAGED);
+
+        OrderShippedEvent shipped = new OrderShippedEvent();
+        shipped.setOrderId(order.getId());
+        service.processOrderShipped(shipped, KafkaTopics.ORDER_EVENTS, 0, 11L);
+        assertThat(order.getStatus()).isEqualTo(Order.Status.SHIPPED);
+
+        OrderDeliveredEvent delivered = new OrderDeliveredEvent();
+        delivered.setOrderId(order.getId());
+        service.processOrderDelivered(delivered, KafkaTopics.ORDER_EVENTS, 0, 12L);
+        assertThat(order.getStatus()).isEqualTo(Order.Status.DELIVERED);
+    }
+
+    @Test
+    void ignoresOutOfOrderHumanLifecycleEvent() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong()))
+                .thenReturn(1);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderShippedEvent shipped = new OrderShippedEvent();
+        shipped.setOrderId(order.getId());
+        service.processOrderShipped(shipped, KafkaTopics.ORDER_EVENTS, 1, 20L);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+    }
+
+    @Test
+    void ignoresDuplicateHumanLifecycleEventBeforeLoadingOrder() {
+        Order order = order(UUID.randomUUID(), Order.Status.CONFIRMED);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong()))
+                .thenReturn(0);
+
+        OrderPackagedEvent packaged = new OrderPackagedEvent();
+        packaged.setOrderId(order.getId());
+        service.processOrderPackaged(packaged, KafkaTopics.ORDER_EVENTS, 2, 30L);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+        verify(orderRepository, never()).findByIdForUpdate(any());
     }
 
     private Order order(UUID owner, Order.Status status) {

@@ -15,7 +15,7 @@ import lombok.Setter;
 public class Order {
 
     public enum Status {
-        PENDING, CONFIRMED, CANCELLED, FAILED
+        PENDING, CONFIRMED, PACKAGED, SHIPPED, DELIVERED, CANCELLED, FAILED
     }
 
     @Id

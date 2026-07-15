@@ -3,7 +3,10 @@ package com.orderprocessing.kafkacommon;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -38,5 +41,44 @@ class KafkaEventRegistryTest {
         assertThatThrownBy(() -> KafkaEventRegistry.deserialize("java.lang.Runtime", "{}", objectMapper))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported Kafka event type");
+    }
+
+    @Test
+    void roundTripsHumanLifecycleEvents() throws Exception {
+        UUID orderId = UUID.randomUUID();
+
+        OrderPackagedEvent packaged = new OrderPackagedEvent();
+        packaged.setOrderId(orderId);
+        packaged.setCorrelationId("package-correlation");
+        OrderPackagedEvent decodedPackaged = (OrderPackagedEvent) roundTrip(packaged);
+        assertThat(decodedPackaged.getOrderId()).isEqualTo(orderId);
+        assertThat(decodedPackaged.getCorrelationId()).isEqualTo("package-correlation");
+
+        OrderShippedEvent shipped = new OrderShippedEvent();
+        shipped.setOrderId(orderId);
+        shipped.setCorrelationId("ship-correlation");
+        OrderShippedEvent decodedShipped = (OrderShippedEvent) roundTrip(shipped);
+        assertThat(decodedShipped.getOrderId()).isEqualTo(orderId);
+        assertThat(decodedShipped.getCorrelationId()).isEqualTo("ship-correlation");
+
+        OrderDeliveredEvent delivered = new OrderDeliveredEvent();
+        delivered.setOrderId(orderId);
+        delivered.setCorrelationId("deliver-correlation");
+        OrderDeliveredEvent decodedDelivered = (OrderDeliveredEvent) roundTrip(delivered);
+        assertThat(decodedDelivered.getOrderId()).isEqualTo(orderId);
+        assertThat(decodedDelivered.getCorrelationId()).isEqualTo("deliver-correlation");
+    }
+
+    private DomainEvent roundTrip(DomainEvent source) throws Exception {
+        String eventType = KafkaEventRegistry.eventType(source);
+        String payload = objectMapper.writeValueAsString(source);
+        DomainEvent decoded = KafkaEventRegistry.deserialize(eventType, payload, objectMapper);
+
+        assertThat(eventType).isEqualTo(source.getClass().getSimpleName());
+        assertThat(decoded).isInstanceOf(source.getClass());
+        assertThat(decoded.getEventId()).isEqualTo(source.getEventId());
+        assertThat(decoded.getOccurredAt()).isEqualTo(source.getOccurredAt());
+        assertThat(decoded.getSchemaVersion()).isEqualTo(source.getSchemaVersion());
+        return decoded;
     }
 }

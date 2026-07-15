@@ -6,7 +6,10 @@ import com.orderprocessing.kafkacommon.KafkaEventRegistry;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
@@ -235,6 +238,39 @@ public class OrderService {
         }
     }
 
+    @Transactional
+    public void processOrderPackaged(OrderPackagedEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset)) {
+            return;
+        }
+        if (event.getOrderId() == null) {
+            throw new IllegalArgumentException("Invalid OrderPackaged event");
+        }
+        transitionOrder(event.getOrderId(), Order.Status.CONFIRMED, Order.Status.PACKAGED);
+    }
+
+    @Transactional
+    public void processOrderShipped(OrderShippedEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset)) {
+            return;
+        }
+        if (event.getOrderId() == null) {
+            throw new IllegalArgumentException("Invalid OrderShipped event");
+        }
+        transitionOrder(event.getOrderId(), Order.Status.PACKAGED, Order.Status.SHIPPED);
+    }
+
+    @Transactional
+    public void processOrderDelivered(OrderDeliveredEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset)) {
+            return;
+        }
+        if (event.getOrderId() == null) {
+            throw new IllegalArgumentException("Invalid OrderDelivered event");
+        }
+        transitionOrder(event.getOrderId(), Order.Status.SHIPPED, Order.Status.DELIVERED);
+    }
+
     private StoreQuoteResponse loadAuthoritativeQuote(Map<UUID, Integer> quantities) {
         StoreQuoteRequest request = new StoreQuoteRequest(quantities.entrySet().stream()
                 .map(e -> new StoreQuoteItemRequest(e.getKey(), e.getValue())).toList());
@@ -316,6 +352,14 @@ public class OrderService {
     private Order lockOrder(UUID id) {
         return orderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+    }
+
+    private void transitionOrder(UUID orderId, Order.Status expectedStatus, Order.Status nextStatus) {
+        Order order = lockOrder(orderId);
+        if (order.getStatus() == expectedStatus) {
+            order.setStatus(nextStatus);
+            order.setUpdatedAt(Instant.now());
+        }
     }
 
     private Order findWithItems(UUID id) {

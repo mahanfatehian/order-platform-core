@@ -5,8 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderConfirmedEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
+import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 
@@ -18,6 +21,9 @@ public final class KafkaEventRegistry {
             OrderPlacedEvent.class.getSimpleName(), OrderPlacedEvent.class,
             OrderCancelledEvent.class.getSimpleName(), OrderCancelledEvent.class,
             OrderConfirmedEvent.class.getSimpleName(), OrderConfirmedEvent.class,
+            OrderPackagedEvent.class.getSimpleName(), OrderPackagedEvent.class,
+            OrderShippedEvent.class.getSimpleName(), OrderShippedEvent.class,
+            OrderDeliveredEvent.class.getSimpleName(), OrderDeliveredEvent.class,
             OrderFailedEvent.class.getSimpleName(), OrderFailedEvent.class,
             StockReservedEvent.class.getSimpleName(), StockReservedEvent.class,
             StockInsufficientEvent.class.getSimpleName(), StockInsufficientEvent.class
