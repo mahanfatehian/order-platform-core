@@ -2,6 +2,8 @@ package com.orderprocessing.storeservice.kafka;
 
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.storeservice.service.InventoryService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,14 @@ public class StoreKafkaConsumer {
         }
         if (event instanceof OrderCancelledEvent cancelled) {
             inventoryService.processOrderCancelled(cancelled, record.topic(), record.partition(), record.offset());
+            return;
+        }
+        if (event instanceof OrderDeliveredEvent delivered) {
+            inventoryService.processOrderDelivered(delivered, record.topic(), record.partition(), record.offset());
+            return;
+        }
+        if (event instanceof OrderFailedEvent failed) {
+            inventoryService.processOrderFailed(failed, record.topic(), record.partition(), record.offset());
             return;
         }
         log.debug("Ignoring order event type not consumed by store-service: {}",

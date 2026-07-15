@@ -36,5 +36,8 @@ public class OrderResponse {
 
     private String failureReason;
 
+    @Schema(description = "Carrier tracking reference, when the shipment has one")
+    private String trackingReference;
+
     private boolean cancellable;
 }

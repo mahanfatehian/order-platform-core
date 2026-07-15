@@ -10,4 +10,8 @@ public class OrderCancelledEvent extends DomainEvent {
     private UUID orderId;
     private Map<UUID, Integer> items;
     private String reason;
+    private UUID actorUserId;
+    private String actorRole;
+    private String fromStatus;
+    private String toStatus;
 }

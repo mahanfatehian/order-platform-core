@@ -40,6 +40,9 @@ public class GlobalModelAdvice {
     @ModelAttribute("registrationEnabled")
     public boolean registrationEnabled() { return properties.getFeatures().isRegistrationEnabled(); }
 
+    @ModelAttribute("demoMode")
+    public boolean demoMode() { return properties.getFeatures().isDemoMode(); }
+
     @ModelAttribute("cartMaximumQuantity")
     public int cartMaximumQuantity() { return properties.getCart().getMaximumQuantity(); }
 }

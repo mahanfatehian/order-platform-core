@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Warehouse handoff</p>
+            <h1>Orders ready to pack</h1>
+            <p>Confirmed inventory is reserved. Pack the oldest order first to keep the queue moving.</p>
+        </div>
+        <a class="btn btn-outline-primary" th:href="@{/admin/warehouse}">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh queue
+        </a>
+    </header>
+
+    <section class="surface queue-lane" aria-labelledby="warehouse-queue-title">
+        <div class="queue-lane__header">
+            <div>
+                <h2 id="warehouse-queue-title">Confirmed orders</h2>
+                <p class="small muted mb-0">Packing moves an order forward and ends its cancellation window.</p>
+            </div>
+            <span class="queue-count" th:text="${orders.totalElements()}">0</span>
+        </div>
+
+        <th:block th:if="${orders.content().isEmpty()}">
+            <div th:replace="~{fragments/empty-state :: empty('bi-box-seam','Packing queue is clear','Newly confirmed orders will appear here automatically.')}"></div>
+        </th:block>
+
+        <article class="queue-card" th:each="order : ${orders.content()}">
+            <div>
+                <div class="queue-card__title">
+                    <strong class="mono" th:text="|Order ${#strings.substring(order.id().toString(),0,8)}|">Order</strong>
+                    <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
+                </div>
+                <div class="queue-card__meta">
+                    <span><i class="bi bi-clock" aria-hidden="true"></i>
+                        <span th:text="${#temporals.format(order.createdAt(),'MMM d, HH:mm')}">Created</span></span>
+                    <span><i class="bi bi-box" aria-hidden="true"></i>
+                        <span th:text="|${order.itemCount()} units|">0 units</span></span>
+                    <span class="money" th:text="|$${#numbers.formatDecimal(order.totalAmount(),1,2)}|">$0</span>
+                </div>
+            </div>
+            <form class="queue-card__action" th:action="@{/admin/warehouse/orders/{id}/pack(id=${order.id()})}"
+                  method="post" data-confirm="Pack this order? The customer will no longer be able to cancel it.">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-box-seam-fill" aria-hidden="true"></i> Pack order
+                </button>
+            </form>
+        </article>
+    </section>
+
+    <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${orders}, ${warehousePagination}, 'Warehouse queue pages')}"></div>
+</section>
+</html>

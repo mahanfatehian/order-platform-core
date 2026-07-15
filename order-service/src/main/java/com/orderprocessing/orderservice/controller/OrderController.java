@@ -2,7 +2,9 @@ package com.orderprocessing.orderservice.controller;
 
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
 import com.orderprocessing.orderservice.dto.OrderResponse;
+import com.orderprocessing.orderservice.dto.OrderStatusHistoryResponse;
 import com.orderprocessing.orderservice.dto.PageResponse;
+import com.orderprocessing.orderservice.dto.ShipOrderRequest;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.service.OrderService;
 import jakarta.validation.Valid;
@@ -27,8 +29,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -62,6 +66,18 @@ public class OrderController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
         return orderService.getAdminOrders(status, userId, orderId, search, pageRequest(page, size, sort));
+    }
+
+    @GetMapping("/fulfillment")
+    @PreAuthorize("hasAnyRole('WAREHOUSE', 'DELIVERY')")
+    public PageResponse<OrderResponse> getFulfillmentOrders(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) Order.Status status,
+            @RequestParam(defaultValue = "createdAt,asc") String sort) {
+        return orderService.getFulfillmentOrders(status, authorities(authentication),
+                pageRequest(page, size, sort));
     }
 
     @GetMapping("/my-orders")
@@ -98,6 +114,42 @@ public class OrderController {
         return orderService.cancelOrder(id, userId(jwt), isAdmin(authentication), correlationId(correlationId));
     }
 
+    @PostMapping("/{id}/pack")
+    @PreAuthorize("hasRole('WAREHOUSE')")
+    public OrderResponse packOrder(@PathVariable UUID id,
+                                   @AuthenticationPrincipal Jwt jwt,
+                                   @RequestHeader(value = "X-Correlation-Id", required = false)
+                                   String correlationId) {
+        return orderService.packOrder(id, userId(jwt), correlationId(correlationId));
+    }
+
+    @PostMapping("/{id}/ship")
+    @PreAuthorize("hasRole('DELIVERY')")
+    public OrderResponse shipOrder(@PathVariable UUID id,
+                                   @AuthenticationPrincipal Jwt jwt,
+                                   @Valid @RequestBody(required = false) ShipOrderRequest request,
+                                   @RequestHeader(value = "X-Correlation-Id", required = false)
+                                   String correlationId) {
+        return orderService.shipOrder(id, userId(jwt), correlationId(correlationId),
+                request == null ? null : request.trackingReference());
+    }
+
+    @PostMapping("/{id}/deliver")
+    @PreAuthorize("hasRole('DELIVERY')")
+    public OrderResponse deliverOrder(@PathVariable UUID id,
+                                      @AuthenticationPrincipal Jwt jwt,
+                                      @RequestHeader(value = "X-Correlation-Id", required = false)
+                                      String correlationId) {
+        return orderService.deliverOrder(id, userId(jwt), correlationId(correlationId));
+    }
+
+    @GetMapping("/{id}/history")
+    public List<OrderStatusHistoryResponse> getOrderHistory(@PathVariable UUID id,
+                                                            @AuthenticationPrincipal Jwt jwt,
+                                                            Authentication authentication) {
+        return orderService.getOrderHistory(id, userId(jwt), canViewAnyOrder(authentication));
+    }
+
     @GetMapping("/admin/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public OrderResponse getAdminOrder(@PathVariable UUID id) {
@@ -125,6 +177,17 @@ public class OrderController {
 
     private boolean isAdmin(Authentication authentication) {
         return authentication.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    private boolean canViewAnyOrder(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(a -> Set.of(
+                "ROLE_ADMIN", "ROLE_WAREHOUSE", "ROLE_DELIVERY").contains(a.getAuthority()));
+    }
+
+    private Set<String> authorities(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private String correlationId(String value) {

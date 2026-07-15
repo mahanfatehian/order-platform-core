@@ -1,23 +1,60 @@
-<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
 <section layout:fragment="content" class="auth-page">
-    <div class="auth-panel"><div class="auth-form">
-        <p class="eyebrow">Customer &amp; operations access</p><h1>Sign in to order/flow</h1>
-        <p class="muted mb-4">Use your account to browse, order, and follow inventory confirmation.</p>
-        <div th:if="${param.logout}" class="alert alert-success" role="status"><i class="bi bi-check-circle"></i> You are signed out.</div>
-        <form th:action="@{/login}" th:object="${loginForm}" method="post" novalidate>
-            <div th:replace="~{fragments/form-errors :: errors(${loginForm})}"></div>
-            <div class="mb-3"><label class="form-label" for="username">Username</label><input id="username" class="form-control form-control-lg" th:field="*{username}" autocomplete="username" autofocus required><div class="field-error" th:errors="*{username}"></div></div>
-            <div class="mb-4"><label class="form-label" for="password">Password</label><input id="password" name="password" class="form-control form-control-lg" type="password" autocomplete="current-password" required><div class="field-error" th:errors="*{password}"></div></div>
-            <button class="btn btn-primary btn-lg w-100" type="submit">Sign in securely</button>
-        </form>
-        <p th:if="${registrationEnabled}" class="mt-4 mb-0 text-center muted">New here? <a th:href="@{/register}">Create a customer account</a></p>
-    </div></div>
-    <aside class="auth-aside" aria-label="Platform workflow">
-        <div class="auth-aside__flow" aria-hidden="true">
-            <div class="flow-row"><i class="bi bi-receipt"></i><span>Order accepted</span><small>PENDING</small></div>
-            <div class="flow-row"><i class="bi bi-boxes"></i><span>Inventory reserved</span><small>KAFKA</small></div>
-            <div class="flow-row"><i class="bi bi-check2-circle"></i><span>Order confirmed</span><small>READY</small></div>
+    <div class="auth-panel">
+        <div class="auth-form">
+            <p class="eyebrow">Customer and operations access</p>
+            <h1>Sign in to order/flow</h1>
+            <p class="muted mb-4">Use a customer, warehouse, delivery, or administrator account to follow the full handoff.</p>
+            <div th:if="${param.logout}" class="alert alert-success" role="status">
+                <i class="bi bi-check-circle" aria-hidden="true"></i> You are signed out.
+            </div>
+            <form th:action="@{/login}" th:object="${loginForm}" method="post" novalidate>
+                <div th:replace="~{fragments/form-errors :: errors(${loginForm})}"></div>
+                <div class="mb-3">
+                    <label class="form-label" for="username">Username</label>
+                    <input id="username" class="form-control form-control-lg" th:field="*{username}"
+                           autocomplete="username" autofocus required>
+                    <div class="field-error" th:errors="*{username}"></div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label" for="password">Password</label>
+                    <input id="password" name="password" class="form-control form-control-lg" type="password"
+                           autocomplete="current-password" required>
+                    <div class="field-error" th:errors="*{password}"></div>
+                </div>
+                <button class="btn btn-primary btn-lg w-100" type="submit">Sign in</button>
+            </form>
+
+            <div class="demo-personas" th:if="${demoMode}">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <strong>Local demo personas</strong><span class="badge text-bg-secondary">dev only</span>
+                </div>
+                <p class="small muted mb-2">Credentials are intentionally public for the local showcase environment.</p>
+                <div class="small d-grid gap-1">
+                    <span><strong>Customer:</strong> <code>johndoe</code> / <code>Customer123!</code></span>
+                    <span><strong>Warehouse:</strong> <code>warehouse_worker</code> / <code>WarehouseDemo2026!</code></span>
+                    <span><strong>Delivery:</strong> <code>delivery_driver</code> / <code>DeliveryDemo2026!</code></span>
+                    <span><strong>Administrator:</strong> <code>admin</code> / <code>Admin123!</code></span>
+                </div>
+            </div>
+
+            <p th:if="${registrationEnabled}" class="mt-4 mb-0 text-center muted">
+                New here? <a th:href="@{/register}">Create a customer account</a>
+            </p>
         </div>
-        <h2>Every order has a visible path.</h2><p>Shop through a server-rendered experience backed by authoritative pricing, durable events, and concurrency-safe inventory.</p>
+    </div>
+    <aside class="auth-aside" aria-label="Order fulfillment workflow">
+        <div class="auth-aside__flow" aria-hidden="true">
+            <div class="flow-row"><i class="bi bi-receipt"></i><span>Order submitted</span><small>PENDING</small></div>
+            <div class="flow-row"><i class="bi bi-check2-square"></i><span>Inventory reserved</span><small>CONFIRMED</small></div>
+            <div class="flow-row"><i class="bi bi-box-seam"></i><span>Warehouse handoff</span><small>PACKAGED</small></div>
+            <div class="flow-row"><i class="bi bi-truck"></i><span>Last-mile transit</span><small>SHIPPED</small></div>
+            <div class="flow-row"><i class="bi bi-house-check"></i><span>Customer delivery</span><small>DELIVERED</small></div>
+        </div>
+        <h2>Every handoff is visible.</h2>
+        <p>Follow one order across authenticated people, transactional state changes, and durable Kafka facts.</p>
     </aside>
-</section></html>
+</section>
+</html>

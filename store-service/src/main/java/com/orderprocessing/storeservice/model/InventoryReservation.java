@@ -17,7 +17,7 @@ import java.util.UUID;
 @Getter
 @Setter
 public class InventoryReservation {
-    public enum Status { RESERVED, RELEASED }
+    public enum Status { RESERVED, RELEASED, CONSUMED }
 
     @Id
     @Column(nullable = false, updatable = false)
@@ -44,4 +44,7 @@ public class InventoryReservation {
 
     @Column(name = "released_at")
     private Instant releasedAt;
+
+    @Column(name = "consumed_at")
+    private Instant consumedAt;
 }

@@ -22,7 +22,7 @@ public class DashboardController {
         try {
             PageResponse<OrderView> orders = client.myOrders(0, 5);
             model.addAttribute("recentOrders", orders.content());
-            model.addAttribute("pendingOrders", orders.content().stream().filter(OrderView::pending).count());
+            model.addAttribute("processingOrders", orders.content().stream().filter(OrderView::inProgress).count());
         } catch (RuntimeException exception) {
             model.addAttribute("recentOrders", List.of());
             model.addAttribute("ordersUnavailable", true);

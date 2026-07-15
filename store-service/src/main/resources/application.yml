@@ -59,6 +59,7 @@ app:
         - /swagger-ui.html
         - /actuator/health
         - /actuator/health/**
+        - /actuator/prometheus
     store-internal:
       api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
 
@@ -67,6 +68,14 @@ outbox:
     interval: ${STORE_OUTBOX_POLL_INTERVAL:1000}
   batch-size: ${STORE_OUTBOX_BATCH_SIZE:50}
   max-attempts: ${STORE_OUTBOX_MAX_ATTEMPTS:5}
+  retry:
+    base-delay: ${STORE_OUTBOX_RETRY_BASE_DELAY:1000}
+    max-delay: ${STORE_OUTBOX_RETRY_MAX_DELAY:60000}
+
+maintenance:
+  outbox-retention: ${STORE_OUTBOX_RETENTION:P30D}
+  inbox-retention: ${STORE_INBOX_RETENTION:P30D}
+  cleanup-cron: ${STORE_EVENT_CLEANUP_CRON:0 30 3 * * *}
 
 management:
   endpoint:
@@ -76,7 +85,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 logging:
   level:

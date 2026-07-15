@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 
 import java.util.UUID;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,5 +41,18 @@ class CartServiceTest {
         service.remove(session, id);
         service.clear(session);
         assertThat(service.get(session).isEmpty()).isTrue();
+    }
+
+    @Test
+    void successfulCheckoutCleanupPreservesConcurrentCartEdits() {
+        MockHttpSession session = new MockHttpSession();
+        UUID id = UUID.randomUUID();
+        service.put(session, id, 2);
+        Map<UUID, Integer> orderedSnapshot = service.checkoutSnapshot(session);
+
+        service.put(session, id, 3);
+        service.removeOrdered(session, orderedSnapshot);
+
+        assertThat(service.get(session).getQuantities()).containsEntry(id, 3);
     }
 }

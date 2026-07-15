@@ -40,7 +40,10 @@ public class AdminController {
 
     @GetMapping("/products")
     public String products(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "") String q, Model model) {
-        model.addAttribute("products", client.adminProducts(Math.max(page, 0), 15, q)); model.addAttribute("q", q);
+        PageResponse<ProductView> products = client.adminProducts(Math.max(page, 0), 15, q);
+        model.addAttribute("products", products); model.addAttribute("q", q);
+        model.addAttribute("productPagination",
+                PaginationLinks.forPage(products, "/admin/products", "page", java.util.Map.of("q", q)));
         return "admin/products/list";
     }
 
@@ -83,7 +86,10 @@ public class AdminController {
 
     @GetMapping("/inventory")
     public String inventory(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "") String q, Model model) {
-        model.addAttribute("inventory", client.inventory(Math.max(page, 0), 20, q)); model.addAttribute("q", q);
+        PageResponse<InventoryView> inventory = client.inventory(Math.max(page, 0), 20, q);
+        model.addAttribute("inventory", inventory); model.addAttribute("q", q);
+        model.addAttribute("inventoryPagination",
+                PaginationLinks.forPage(inventory, "/admin/inventory", "page", java.util.Map.of("q", q)));
         return "admin/inventory/list";
     }
 
@@ -98,21 +104,47 @@ public class AdminController {
     @GetMapping("/orders")
     public String orders(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "") String status,
                          @RequestParam(defaultValue = "") String search, Model model) {
-        model.addAttribute("orders", client.adminOrders(Math.max(page, 0), 20, status, search));
-        model.addAttribute("status", status); model.addAttribute("search", search); return "admin/orders/list";
+        PageResponse<OrderView> orders = client.adminOrders(Math.max(page, 0), 20, status, search);
+        model.addAttribute("orders", orders);
+        model.addAttribute("status", status); model.addAttribute("search", search);
+        java.util.Map<String, Object> filters = new java.util.LinkedHashMap<>();
+        filters.put("status", status); filters.put("search", search);
+        model.addAttribute("adminOrderPagination",
+                PaginationLinks.forPage(orders, "/admin/orders", "page", filters));
+        return "admin/orders/list";
     }
 
     @GetMapping("/orders/{id}")
-    public String order(@PathVariable UUID id, Model model) { model.addAttribute("order", client.order(id)); return "admin/orders/detail"; }
+    public String order(@PathVariable UUID id, Model model) {
+        populateOrderStatusModel(id, model);
+        return "admin/orders/detail";
+    }
+
+    @GetMapping("/orders/{id}/status")
+    public String orderStatus(@PathVariable UUID id, Model model) {
+        populateOrderStatusModel(id, model);
+        return "orders/_status";
+    }
 
     @PostMapping("/orders/{id}/cancel")
     public String cancelOrder(@PathVariable UUID id, RedirectAttributes redirect) {
-        client.cancelOrder(id); redirect.addFlashAttribute("success", "Order cancelled"); return "redirect:/admin/orders/" + id;
+        try {
+            client.cancelOrder(id);
+            redirect.addFlashAttribute("success", "Order cancelled");
+        } catch (com.orderprocessing.webui.exception.BackendClientException exception) {
+            if (exception.getStatus().value() != 409) throw exception;
+            redirect.addFlashAttribute("warning",
+                    "This order has already entered fulfillment and can no longer be cancelled.");
+        }
+        return "redirect:/admin/orders/" + id;
     }
 
     @GetMapping("/users")
     public String users(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "") String search, Model model) {
-        model.addAttribute("users", client.adminUsers(Math.max(page, 0), 20, search)); model.addAttribute("search", search);
+        PageResponse<UserView> users = client.adminUsers(Math.max(page, 0), 20, search);
+        model.addAttribute("users", users); model.addAttribute("search", search);
+        model.addAttribute("userPagination",
+                PaginationLinks.forPage(users, "/admin/users", "page", java.util.Map.of("search", search)));
         return "admin/users/list";
     }
 
@@ -132,6 +164,13 @@ public class AdminController {
 
     @GetMapping("/system")
     public String system(Model model) { model.addAttribute("serviceStatuses", client.serviceHealth()); return "admin/system/index"; }
+
+    private void populateOrderStatusModel(UUID id, Model model) {
+        model.addAttribute("order", client.order(id));
+        model.addAttribute("history", client.orderHistory(id));
+        model.addAttribute("statusEndpoint", "/admin/orders/" + id + "/status");
+        model.addAttribute("cancelEndpoint", "/admin/orders/" + id + "/cancel");
+    }
 
     private static <T> T safe(java.util.function.Supplier<T> supplier, T fallback) {
         try { return supplier.get(); } catch (RuntimeException ignored) { return fallback; }

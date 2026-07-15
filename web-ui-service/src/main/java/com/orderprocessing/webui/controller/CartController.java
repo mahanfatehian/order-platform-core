@@ -54,8 +54,16 @@ public class CartController {
                            BindingResult binding, HttpSession session, Model model,
                            @RequestHeader(value = "HX-Request", required = false) String htmx,
                            RedirectAttributes redirect) {
-        if (binding.hasErrors()) redirect.addFlashAttribute("error", "Enter a valid quantity");
-        else cartService.put(session, productId, form.getQuantity());
+        if (binding.hasErrors()) {
+            if (isHtmx(htmx)) {
+                model.addAttribute("cartError", "Enter a valid quantity");
+                populate(session, model);
+                return "cart/_cart-content";
+            }
+            redirect.addFlashAttribute("error", "Enter a valid quantity");
+        } else {
+            cartService.put(session, productId, form.getQuantity());
+        }
         return result(session, model, htmx);
     }
 

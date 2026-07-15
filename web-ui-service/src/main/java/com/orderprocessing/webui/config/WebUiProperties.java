@@ -69,7 +69,10 @@ public class WebUiProperties {
 
     public static class Features {
         private boolean registrationEnabled = true;
+        private boolean demoMode;
         public boolean isRegistrationEnabled() { return registrationEnabled; }
         public void setRegistrationEnabled(boolean registrationEnabled) { this.registrationEnabled = registrationEnabled; }
+        public boolean isDemoMode() { return demoMode; }
+        public void setDemoMode(boolean demoMode) { this.demoMode = demoMode; }
     }
 }

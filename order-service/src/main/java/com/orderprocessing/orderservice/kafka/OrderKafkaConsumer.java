@@ -36,6 +36,9 @@ public class OrderKafkaConsumer {
 
     @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "order-service")
     public void handleOrderEvent(ConsumerRecord<String, Object> record) {
+        // These are the service's own past-tense facts. Routing them through the
+        // inbox provides retry-safe acknowledgement only; OrderService never
+        // treats Kafka messages as authorization to perform a human action.
         Object event = record.value();
         if (event instanceof OrderPackagedEvent packaged) {
             orderService.processOrderPackaged(packaged, record.topic(), record.partition(), record.offset());

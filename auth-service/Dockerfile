@@ -1,7 +1,8 @@
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY . .
-RUN mvn -B -ntp -pl auth-service -am clean package -DskipTests
+ARG MAVEN_TEST_ARGS=-DskipTests
+RUN mvn -B -ntp -pl auth-service -am clean package ${MAVEN_TEST_ARGS}
 
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update \

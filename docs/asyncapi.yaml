@@ -1,0 +1,575 @@
+asyncapi: '2.6.0'
+id: 'urn:com:orderprocessing:order-platform:kafka'
+info:
+  title: Order Processing Platform Kafka API
+  version: '1.0.0'
+  description: |
+    Implemented Kafka contracts for the order/inventory saga. Human fulfillment
+    actions are authenticated HTTP commands; the past-tense messages on these
+    channels report changes already committed by the owning service.
+defaultContentType: application/json
+tags:
+  - name: order-lifecycle
+    description: Order aggregate and human-fulfillment facts.
+  - name: inventory
+    description: Inventory reservation-result facts.
+
+servers:
+  localDocker:
+    url: kafka:29092
+    protocol: kafka
+    description: Kafka listener on the private Docker Compose network.
+
+channels:
+  order.events:
+    description: Past-tense order facts published from the order-service transactional outbox.
+    x-producer: order-service
+    x-consumers:
+      - store-service
+      - order-service
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    publish:
+      operationId: publishOrderFacts
+      summary: Publish committed order facts
+      tags:
+        - name: order-lifecycle
+      description: |
+        Records use orderId as the Kafka key. store-service handles placed,
+        cancelled, failed, and delivered facts. order-service observes packaged,
+        shipped, and delivered facts for inbox acknowledgement only.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/OrderPlacedEvent'
+          - $ref: '#/components/messages/OrderCancelledEvent'
+          - $ref: '#/components/messages/OrderFailedEvent'
+          - $ref: '#/components/messages/OrderPackagedEvent'
+          - $ref: '#/components/messages/OrderShippedEvent'
+          - $ref: '#/components/messages/OrderDeliveredEvent'
+
+  store.events:
+    description: Inventory reservation results published from the store-service transactional outbox.
+    x-producer: store-service
+    x-consumers:
+      - order-service
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    publish:
+      operationId: publishStoreFacts
+      summary: Publish committed stock reservation results
+      tags:
+        - name: inventory
+      description: Records use orderId as the Kafka key.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/StockReservedEvent'
+          - $ref: '#/components/messages/StockInsufficientEvent'
+
+  order.events.dlt:
+    description: |
+      Dead-letter destination for order.events records that still fail after
+      the configured consumer retries. The original payload is retained and
+      Spring Kafka adds failure/origin metadata as record headers. No
+      in-repository listener automatically replays this topic.
+    x-producer: spring-kafka-dead-letter-recoverer
+    x-current-consumer: none
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    subscribe:
+      operationId: inspectOrderEventsDeadLetters
+      summary: Inspect exhausted order-event records
+      tags:
+        - name: order-lifecycle
+      description: Operator-facing contract only; the repository has no DLT consumer.
+      message:
+        $ref: '#/components/messages/OrderEventsDeadLetter'
+
+  store.events.dlt:
+    description: |
+      Dead-letter destination for store.events records that still fail after
+      the configured consumer retries. The original payload is retained and
+      Spring Kafka adds failure/origin metadata as record headers. No
+      in-repository listener automatically replays this topic.
+    x-producer: spring-kafka-dead-letter-recoverer
+    x-current-consumer: none
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    subscribe:
+      operationId: inspectStoreEventsDeadLetters
+      summary: Inspect exhausted store-event records
+      tags:
+        - name: inventory
+      description: Operator-facing contract only; the repository has no DLT consumer.
+      message:
+        $ref: '#/components/messages/StoreEventsDeadLetter'
+
+components:
+  messages:
+    OrderPlacedEvent:
+      name: OrderPlacedEvent
+      messageId: OrderPlacedEvent
+      title: Order placed
+      summary: An order and its immutable item snapshot were committed as PENDING.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderPlacedEventPayload'
+
+    OrderCancelledEvent:
+      name: OrderCancelledEvent
+      messageId: OrderCancelledEvent
+      title: Order cancelled
+      summary: An eligible PENDING or CONFIRMED order was committed as CANCELLED.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderCancelledEventPayload'
+
+    OrderPackagedEvent:
+      name: OrderPackagedEvent
+      messageId: OrderPackagedEvent
+      title: Order packaged
+      summary: A warehouse operator committed CONFIRMED to PACKAGED.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderPackagedEventPayload'
+
+    OrderShippedEvent:
+      name: OrderShippedEvent
+      messageId: OrderShippedEvent
+      title: Order shipped
+      summary: A delivery operator committed PACKAGED to SHIPPED.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderShippedEventPayload'
+
+    OrderDeliveredEvent:
+      name: OrderDeliveredEvent
+      messageId: OrderDeliveredEvent
+      title: Order delivered
+      summary: A delivery operator committed SHIPPED to DELIVERED.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderDeliveredEventPayload'
+
+    StockReservedEvent:
+      name: StockReservedEvent
+      messageId: StockReservedEvent
+      title: Stock reserved
+      summary: Store inventory was reserved for every item in an order.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/StockReservedEventPayload'
+
+    StockInsufficientEvent:
+      name: StockInsufficientEvent
+      messageId: StockInsufficientEvent
+      title: Stock insufficient
+      summary: Store inventory could not reserve the complete order.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/StockInsufficientEventPayload'
+
+    OrderConfirmedEvent:
+      name: OrderConfirmedEvent
+      messageId: OrderConfirmedEvent
+      title: Order confirmed (registered compatibility contract)
+      summary: Deserializable through KafkaEventRegistry but not emitted or consumed by the current saga.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderConfirmedEventPayload'
+      x-registry-status: compatibility-only
+
+    OrderFailedEvent:
+      name: OrderFailedEvent
+      messageId: OrderFailedEvent
+      title: Pending order reconciled as failed
+      summary: A timed-out inventory handshake was committed as FAILED and active reservations must be released.
+      contentType: application/json
+      correlationId:
+        location: '$message.payload#/correlationId'
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        $ref: '#/components/schemas/OrderFailedEventPayload'
+
+    OrderEventsDeadLetter:
+      name: OrderEventsDeadLetter
+      messageId: OrderEventsDeadLetter
+      title: Exhausted order event
+      summary: Original order.events payload after consumer retries are exhausted.
+      description: Spring Kafka supplies exception and original-record metadata in Kafka headers.
+      contentType: application/json
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/OrderPlacedEventPayload'
+          - $ref: '#/components/schemas/OrderCancelledEventPayload'
+          - $ref: '#/components/schemas/OrderFailedEventPayload'
+          - $ref: '#/components/schemas/OrderPackagedEventPayload'
+          - $ref: '#/components/schemas/OrderShippedEventPayload'
+          - $ref: '#/components/schemas/OrderDeliveredEventPayload'
+
+    StoreEventsDeadLetter:
+      name: StoreEventsDeadLetter
+      messageId: StoreEventsDeadLetter
+      title: Exhausted store event
+      summary: Original store.events payload after consumer retries are exhausted.
+      description: Spring Kafka supplies exception and original-record metadata in Kafka headers.
+      contentType: application/json
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderKey'
+          bindingVersion: '0.4.0'
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/StockReservedEventPayload'
+          - $ref: '#/components/schemas/StockInsufficientEventPayload'
+
+  schemas:
+    OrderKey:
+      type: string
+      format: uuid
+      description: Order aggregate UUID serialized as the Kafka record key.
+
+    DomainEvent:
+      type: object
+      description: Metadata inherited by every registered domain event.
+      required:
+        - eventId
+        - occurredAt
+        - schemaVersion
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Stable idempotency key generated before the outbox write.
+        occurredAt:
+          type: string
+          format: date-time
+          description: Time associated with creation of the fact.
+        schemaVersion:
+          type: integer
+          minimum: 1
+          description: Payload contract version.
+        correlationId:
+          type: string
+          maxLength: 100
+          description: Request/saga correlation value when supplied by the producer.
+
+    OrderStatus:
+      type: string
+      enum:
+        - PENDING
+        - CONFIRMED
+        - PACKAGED
+        - SHIPPED
+        - DELIVERED
+        - CANCELLED
+        - FAILED
+
+    ItemQuantities:
+      type: object
+      description: Map whose JSON property names are product UUIDs and values are positive quantities.
+      minProperties: 1
+      propertyNames:
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      additionalProperties:
+        type: integer
+        minimum: 1
+
+    FulfillmentFact:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          description: |
+            Shared fulfillment metadata. Only orderId is required for version-one
+            compatibility; current version-two producers populate the actor and
+            transition fields.
+          required:
+            - orderId
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            actorUserId:
+              type: string
+              format: uuid
+            actorRole:
+              type: string
+              maxLength: 64
+            fromStatus:
+              $ref: '#/components/schemas/OrderStatus'
+            toStatus:
+              $ref: '#/components/schemas/OrderStatus'
+            reason:
+              type: string
+              maxLength: 500
+
+    OrderPlacedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - userId
+            - items
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            items:
+              $ref: '#/components/schemas/ItemQuantities'
+
+    OrderCancelledEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - items
+            - reason
+            - actorUserId
+            - actorRole
+            - fromStatus
+            - toStatus
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            items:
+              $ref: '#/components/schemas/ItemQuantities'
+            reason:
+              type: string
+              maxLength: 500
+            actorUserId:
+              type: string
+              format: uuid
+            actorRole:
+              type: string
+              enum:
+                - ROLE_CUSTOMER
+                - ROLE_ADMIN
+            fromStatus:
+              type: string
+              enum:
+                - PENDING
+                - CONFIRMED
+            toStatus:
+              type: string
+              enum:
+                - CANCELLED
+
+    OrderPackagedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/FulfillmentFact'
+        - type: object
+          properties:
+            actorRole:
+              type: string
+              enum:
+                - ROLE_WAREHOUSE
+            fromStatus:
+              type: string
+              enum:
+                - CONFIRMED
+            toStatus:
+              type: string
+              enum:
+                - PACKAGED
+
+    OrderShippedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/FulfillmentFact'
+        - type: object
+          properties:
+            actorRole:
+              type: string
+              enum:
+                - ROLE_DELIVERY
+            fromStatus:
+              type: string
+              enum:
+                - PACKAGED
+            toStatus:
+              type: string
+              enum:
+                - SHIPPED
+            trackingReference:
+              type: string
+              maxLength: 100
+
+    OrderDeliveredEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/FulfillmentFact'
+        - type: object
+          properties:
+            actorRole:
+              type: string
+              enum:
+                - ROLE_DELIVERY
+            fromStatus:
+              type: string
+              enum:
+                - SHIPPED
+            toStatus:
+              type: string
+              enum:
+                - DELIVERED
+
+    StockReservedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - success
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            success:
+              type: boolean
+              description: Current producer always emits true for this event type.
+
+    StockInsufficientEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - success
+            - reason
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            success:
+              type: boolean
+              description: Current producer always emits false for this event type.
+            reason:
+              type: string
+              maxLength: 500
+
+    OrderConfirmedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - success
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            success:
+              type: boolean
+
+    OrderFailedEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - orderId
+            - success
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            items:
+              $ref: '#/components/schemas/ItemQuantities'
+            success:
+              type: boolean
+            reason:
+              type: string
+              maxLength: 500
+
+x-kafka-event-registry:
+  active-channel-contracts:
+    - OrderPlacedEvent
+    - OrderCancelledEvent
+    - OrderFailedEvent
+    - OrderPackagedEvent
+    - OrderShippedEvent
+    - OrderDeliveredEvent
+    - StockReservedEvent
+    - StockInsufficientEvent
+  registered-compatibility-contracts:
+    - OrderConfirmedEvent

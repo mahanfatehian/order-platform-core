@@ -5,6 +5,7 @@ import com.orderprocessing.webui.config.WebUiProperties;
 import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.form.LoginForm;
 import com.orderprocessing.webui.form.RegistrationForm;
+import com.orderprocessing.webui.model.UiAuthenticatedUser;
 import com.orderprocessing.webui.service.UiAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +35,12 @@ public class AuthPageController {
 
     @GetMapping("/")
     public String home(org.springframework.security.core.Authentication authentication) {
-        return authentication != null && authentication.isAuthenticated() ? "redirect:/app" : "redirect:/login";
+        if (authentication == null || !authentication.isAuthenticated()) return "redirect:/login";
+        if (authentication.getPrincipal() instanceof UiAuthenticatedUser user) return landingPage(user);
+        java.util.Set<String> roles = authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return landingPage(new UiAuthenticatedUser(null, authentication.getName(), roles));
     }
 
     @GetMapping("/login")
@@ -48,8 +54,8 @@ public class AuthPageController {
                         HttpServletRequest request, HttpServletResponse response) {
         if (binding.hasErrors()) return "auth/login";
         try {
-            authenticationService.authenticate(loginForm, request, response);
-            return "redirect:/app";
+            UiAuthenticatedUser user = authenticationService.authenticate(loginForm, request, response);
+            return landingPage(user);
         } catch (BackendClientException exception) {
             loginForm.setPassword(null);
             if (exception.getStatus().value() == 401) binding.reject("credentials", "Username or password is incorrect");
@@ -93,5 +99,12 @@ public class AuthPageController {
 
     private void requireRegistration() {
         if (!properties.getFeatures().isRegistrationEnabled()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    private String landingPage(UiAuthenticatedUser user) {
+        if (user.isWarehouse()) return "redirect:/admin/warehouse";
+        if (user.isDelivery()) return "redirect:/admin/delivery";
+        if (user.isAdmin()) return "redirect:/admin";
+        return "redirect:/app";
     }
 }

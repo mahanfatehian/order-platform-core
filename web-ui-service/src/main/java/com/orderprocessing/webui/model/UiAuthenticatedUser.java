@@ -13,6 +13,16 @@ public record UiAuthenticatedUser(UUID id, String username, Set<String> roles) i
     }
 
     public boolean isAdmin() {
-        return roles.stream().anyMatch(role -> "ADMIN".equals(role) || "ROLE_ADMIN".equals(role));
+        return hasRole("ADMIN");
+    }
+
+    public boolean isWarehouse() { return hasRole("WAREHOUSE"); }
+    public boolean isDelivery() { return hasRole("DELIVERY"); }
+    public boolean isCustomer() { return hasRole("USER"); }
+
+    public boolean hasRole(String role) {
+        String normalized = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+        return roles.stream().anyMatch(candidate -> normalized.equals(
+                candidate.startsWith("ROLE_") ? candidate : "ROLE_" + candidate));
     }
 }

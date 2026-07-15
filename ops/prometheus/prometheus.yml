@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: order-platform-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - discovery-service:8761
+          - gateway-service:8080
+          - auth-service:8081
+          - user-service:8082
+          - store-service:8083
+          - order-service:8084
+          - web-ui-service:8085

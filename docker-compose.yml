@@ -6,8 +6,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-userdb}
       POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
@@ -45,8 +43,6 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     command: ["/bin/sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     volumes:
       - redis_data:/data
@@ -65,8 +61,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "${ZOOKEEPER_PORT:-2181}:2181"
     healthcheck:
       test: ["CMD-SHELL", "cub zk-ready localhost 2181"]
       interval: 10s
@@ -82,13 +76,11 @@ services:
     depends_on:
       zookeeper:
         condition: service_healthy
-    ports:
-      - "${KAFKA_PORT:-9092}:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -102,6 +94,22 @@ services:
     networks:
       - backend
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: order-platform-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${KAFKA_UI_PORT:-8090}:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+
   discovery-service:
     build:
       context: .
@@ -112,7 +120,7 @@ services:
       DISCOVERY_SERVICE_PORT: ${DISCOVERY_SERVICE_PORT:-8761}
       EUREKA_INSTANCE_HOSTNAME: discovery-service
     ports:
-      - "${DISCOVERY_SERVICE_PORT:-8761}:${DISCOVERY_SERVICE_PORT:-8761}"
+      - "127.0.0.1:${DISCOVERY_SERVICE_PORT:-8761}:${DISCOVERY_SERVICE_PORT:-8761}"
     expose:
       - "${DISCOVERY_SERVICE_PORT:-8761}"
     healthcheck:
@@ -219,6 +227,11 @@ services:
       EUREKA_PORT: ${DISCOVERY_SERVICE_PORT:-8761}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       STORE_SERVICE_INTERNAL_API_KEY: ${STORE_SERVICE_INTERNAL_API_KEY:?Set STORE_SERVICE_INTERNAL_API_KEY in .env}
+      STORE_OUTBOX_MAX_ATTEMPTS: ${STORE_OUTBOX_MAX_ATTEMPTS:-5}
+      STORE_OUTBOX_RETRY_BASE_DELAY: ${STORE_OUTBOX_RETRY_BASE_DELAY:-1000}
+      STORE_OUTBOX_RETRY_MAX_DELAY: ${STORE_OUTBOX_RETRY_MAX_DELAY:-60000}
+      STORE_OUTBOX_RETENTION: ${STORE_OUTBOX_RETENTION:-P30D}
+      STORE_INBOX_RETENTION: ${STORE_INBOX_RETENTION:-P30D}
     expose:
       - "${STORE_SERVICE_PORT:-8083}"
     depends_on:
@@ -261,6 +274,12 @@ services:
       EUREKA_PORT: ${DISCOVERY_SERVICE_PORT:-8761}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       STORE_SERVICE_INTERNAL_API_KEY: ${STORE_SERVICE_INTERNAL_API_KEY:?Set STORE_SERVICE_INTERNAL_API_KEY in .env}
+      ORDER_PENDING_TIMEOUT: ${ORDER_PENDING_TIMEOUT:-PT10M}
+      ORDER_OUTBOX_MAX_ATTEMPTS: ${ORDER_OUTBOX_MAX_ATTEMPTS:-5}
+      ORDER_OUTBOX_RETRY_BASE_DELAY: ${ORDER_OUTBOX_RETRY_BASE_DELAY:-1000}
+      ORDER_OUTBOX_RETRY_MAX_DELAY: ${ORDER_OUTBOX_RETRY_MAX_DELAY:-60000}
+      ORDER_OUTBOX_RETENTION: ${ORDER_OUTBOX_RETENTION:-P30D}
+      ORDER_INBOX_RETENTION: ${ORDER_INBOX_RETENTION:-P30D}
     expose:
       - "${ORDER_SERVICE_PORT:-8084}"
     depends_on:
@@ -302,6 +321,7 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       THYMELEAF_CACHE: ${THYMELEAF_CACHE:-false}
       REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
+      DEMO_MODE: ${DEMO_MODE:-true}
       AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVICE_PORT:-8081}
       USER_SERVICE_URL: http://user-service:${USER_SERVICE_PORT:-8082}
       STORE_SERVICE_URL: http://store-service:${STORE_SERVICE_PORT:-8083}
@@ -359,7 +379,7 @@ services:
       web-ui-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${GATEWAY_SERVICE_PORT}/actuator/health | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${GATEWAY_SERVICE_PORT}/actuator/health | grep -q '\"status\":\"UP\"' && curl -fsS http://localhost:$${GATEWAY_SERVICE_PORT}/login | grep -q 'Sign in to order/flow'"]
       interval: 10s
       timeout: 5s
       retries: 18
@@ -368,9 +388,28 @@ services:
     networks:
       - backend
 
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
 
 networks:
   backend:

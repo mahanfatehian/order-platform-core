@@ -5,14 +5,18 @@
                 data-bs-toggle="offcanvas" data-bs-target="#appSidebar" aria-label="Open navigation">
             <i class="bi bi-list" aria-hidden="true"></i>
         </button>
-        <a class="brand" th:href="${currentUser == null} ? @{/login} : @{/app}">
+        <a class="brand" th:href="@{/}">
             <span class="brand__mark" aria-hidden="true"><span></span><span></span><span></span></span>
             <span>Order<span class="brand__quiet">/flow</span></span>
         </a>
         <nav class="topbar__actions" aria-label="Account">
-            <a sec:authorize="isAuthenticated()" class="cart-link" th:href="@{/app/cart}">
+            <button id="theme-toggle" class="btn icon-button" type="button" aria-label="Switch color theme"
+                    aria-pressed="false" title="Switch color theme">
+                <i class="bi bi-moon-stars" aria-hidden="true"></i>
+            </button>
+            <a sec:authorize="hasRole('USER')" class="cart-link" th:href="@{/app/cart}">
                 <i class="bi bi-bag" aria-hidden="true"></i><span>Cart</span>
-                <span class="cart-count" th:text="${cartCount}">0</span>
+                <span id="top-cart-count" class="cart-count" th:text="${cartCount}">0</span>
             </a>
             <a sec:authorize="isAuthenticated()" class="avatar-link" th:href="@{/app/profile}"
                th:attr="aria-label=${currentUser == null ? 'Profile' : 'Profile for ' + currentUser.username()}">

@@ -4,6 +4,7 @@ import com.orderprocessing.webui.config.WebUiProperties;
 import com.netflix.discovery.EurekaClient;
 import com.orderprocessing.webui.dto.*;
 import com.orderprocessing.webui.form.*;
+import com.orderprocessing.webui.service.CartQuoteValidator;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
@@ -25,15 +26,17 @@ public class PlatformClient {
     private final RestClient orders;
     private final String storeInternalApiKey;
     private final ObjectProvider<EurekaClient> eurekaClient;
+    private final CartQuoteValidator cartQuoteValidator;
 
     public PlatformClient(RestClient.Builder builder, WebUiProperties properties,
-                          ObjectProvider<EurekaClient> eurekaClient) {
+                          ObjectProvider<EurekaClient> eurekaClient, CartQuoteValidator cartQuoteValidator) {
         this.auth = builder.clone().baseUrl(properties.getServices().getAuthUrl()).build();
         this.users = builder.clone().baseUrl(properties.getServices().getUserUrl()).build();
         this.store = builder.clone().baseUrl(properties.getServices().getStoreUrl()).build();
         this.orders = builder.clone().baseUrl(properties.getServices().getOrderUrl()).build();
         this.storeInternalApiKey = properties.getServices().getStoreInternalApiKey();
         this.eurekaClient = eurekaClient;
+        this.cartQuoteValidator = cartQuoteValidator;
     }
 
     public LoginTokens login(String username, String password) {
@@ -83,11 +86,7 @@ public class PlatformClient {
                 })
                 .contentType(MediaType.APPLICATION_JSON).body(Map.of("items", items)).retrieve().body(QuoteResponse.class);
         List<QuoteItemView> quoted = response == null || response.items() == null ? List.of() : response.items();
-        java.math.BigDecimal total = quoted.stream().map(QuoteItemView::subtotal)
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-        boolean ready = !quoted.isEmpty() && quoted.size() == quantities.size()
-                && quoted.stream().allMatch(QuoteItemView::active);
-        return new CartView(quoted, total, ready);
+        return cartQuoteValidator.validate(quantities, quoted);
     }
 
     public OrderView createOrder(String token, Map<UUID, Integer> quantities, String idempotencyKey) {
@@ -191,6 +190,42 @@ public class PlatformClient {
         filters.put("search", nullToEmpty(search));
         return orders.get().uri(uri("/api/orders/admin", page, size, filters))
                 .headers(headers -> bearer(headers, token)).retrieve().body(new ParameterizedTypeReference<>() { });
+    }
+
+    public PageResponse<OrderView> fulfillmentOrders(String token, int page, int size, String status) {
+        if (!Set.of("CONFIRMED", "PACKAGED", "SHIPPED").contains(status)) {
+            throw new IllegalArgumentException("Unsupported fulfillment queue status: " + status);
+        }
+        return orders.get().uri(uri("/api/orders/fulfillment", page, size, Map.of("status", status)))
+                .headers(headers -> bearer(headers, token)).retrieve().body(new ParameterizedTypeReference<>() { });
+    }
+
+    public OrderView packOrder(String token, UUID id) {
+        return orders.post().uri("/api/orders/{id}/pack", id).headers(headers -> bearer(headers, token))
+                .retrieve().body(OrderView.class);
+    }
+
+    public OrderView shipOrder(String token, UUID id, String trackingReference) {
+        RestClient.RequestBodySpec request = orders.post().uri("/api/orders/{id}/ship", id)
+                .headers(headers -> bearer(headers, token));
+        if (trackingReference != null && !trackingReference.isBlank()) {
+            return request.contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("trackingReference", trackingReference.trim()))
+                    .retrieve().body(OrderView.class);
+        }
+        return request.retrieve().body(OrderView.class);
+    }
+
+    public OrderView deliverOrder(String token, UUID id) {
+        return orders.post().uri("/api/orders/{id}/deliver", id).headers(headers -> bearer(headers, token))
+                .retrieve().body(OrderView.class);
+    }
+
+    public List<OrderHistoryView> orderHistory(String token, UUID id) {
+        List<OrderHistoryView> history = orders.get().uri("/api/orders/{id}/history", id)
+                .headers(headers -> bearer(headers, token)).retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+        return history == null ? List.of() : List.copyOf(history);
     }
 
     public ServiceStatusView health(String baseName, RestClient client) {

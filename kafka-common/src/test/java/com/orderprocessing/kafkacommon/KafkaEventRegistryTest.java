@@ -56,10 +56,22 @@ class KafkaEventRegistryTest {
 
         OrderShippedEvent shipped = new OrderShippedEvent();
         shipped.setOrderId(orderId);
+        UUID actorUserId = UUID.randomUUID();
+        shipped.setActorUserId(actorUserId);
+        shipped.setActorRole("ROLE_DELIVERY");
+        shipped.setFromStatus("PACKAGED");
+        shipped.setToStatus("SHIPPED");
+        shipped.setTrackingReference("TRACK-123");
+        shipped.setSchemaVersion(2);
         shipped.setCorrelationId("ship-correlation");
         OrderShippedEvent decodedShipped = (OrderShippedEvent) roundTrip(shipped);
         assertThat(decodedShipped.getOrderId()).isEqualTo(orderId);
         assertThat(decodedShipped.getCorrelationId()).isEqualTo("ship-correlation");
+        assertThat(decodedShipped.getActorUserId()).isEqualTo(actorUserId);
+        assertThat(decodedShipped.getActorRole()).isEqualTo("ROLE_DELIVERY");
+        assertThat(decodedShipped.getFromStatus()).isEqualTo("PACKAGED");
+        assertThat(decodedShipped.getToStatus()).isEqualTo("SHIPPED");
+        assertThat(decodedShipped.getTrackingReference()).isEqualTo("TRACK-123");
 
         OrderDeliveredEvent delivered = new OrderDeliveredEvent();
         delivered.setOrderId(orderId);
@@ -67,6 +79,20 @@ class KafkaEventRegistryTest {
         OrderDeliveredEvent decodedDelivered = (OrderDeliveredEvent) roundTrip(delivered);
         assertThat(decodedDelivered.getOrderId()).isEqualTo(orderId);
         assertThat(decodedDelivered.getCorrelationId()).isEqualTo("deliver-correlation");
+    }
+
+    @Test
+    void deserializesLegacyFulfillmentPayloadWithoutNewActorMetadata() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        String legacyPayload = "{\"orderId\":\"" + orderId + "\",\"schemaVersion\":1}";
+
+        OrderPackagedEvent decoded = (OrderPackagedEvent) KafkaEventRegistry.deserialize(
+                "OrderPackagedEvent", legacyPayload, objectMapper);
+
+        assertThat(decoded.getOrderId()).isEqualTo(orderId);
+        assertThat(decoded.getSchemaVersion()).isEqualTo(1);
+        assertThat(decoded.getActorUserId()).isNull();
+        assertThat(decoded.getActorRole()).isNull();
     }
 
     private DomainEvent roundTrip(DomainEvent source) throws Exception {

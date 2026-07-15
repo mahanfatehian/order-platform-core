@@ -2,11 +2,13 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head}"></head>
-<body>
+<body data-app-shell>
 <a class="skip-link" href="#main-content">Skip to content</a>
 <header th:replace="~{fragments/navbar :: navbar}"></header>
 <div class="app-shell" th:classappend="${currentUser == null} ? ' app-shell--public'">
-    <aside sec:authorize="isAuthenticated()" th:replace="~{fragments/sidebar :: sidebar}"></aside>
+    <th:block sec:authorize="isAuthenticated()">
+        <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+    </th:block>
     <main id="main-content" class="app-main" tabindex="-1">
         <div th:replace="~{fragments/flash :: flash}"></div>
         <section layout:fragment="content"></section>
@@ -14,7 +16,7 @@
 </div>
 <footer th:replace="~{fragments/footer :: footer}"></footer>
 <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
-<script th:src="@{/webjars/htmx.org/2.0.4/dist/htmx.min.js}" defer></script>
-<script th:src="@{/assets/js/app.js}" defer></script>
+<script th:src="@{/webjars/htmx.org/2.0.4/dist/htmx.min.js}"></script>
+<script th:src="@{/assets/js/app.js}"></script>
 </body>
 </html>

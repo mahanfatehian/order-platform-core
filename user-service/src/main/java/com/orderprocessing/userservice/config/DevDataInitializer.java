@@ -21,6 +21,14 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DevDataInitializer implements ApplicationRunner {
 
+    // These credentials exist only when the dev profile is active. Keep them
+    // deterministic so the repository's guided demo can hand work between
+    // customer, warehouse, delivery, and administrator personas.
+    public static final String CUSTOMER_PASSWORD = "Customer123!";
+    public static final String ADMIN_PASSWORD = "Admin123!";
+    public static final String WAREHOUSE_PASSWORD = "WarehouseDemo2026!";
+    public static final String DELIVERY_PASSWORD = "DeliveryDemo2026!";
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -32,30 +40,35 @@ public class DevDataInitializer implements ApplicationRunner {
                 .orElseThrow(() -> new ResourceNotFoundException("ROLE_USER is required for dev data"));
         RoleEntity adminRole = roleRepository.findByName("ROLE_ADMIN")
                 .orElseThrow(() -> new ResourceNotFoundException("ROLE_ADMIN is required for dev data"));
+        RoleEntity warehouseRole = roleRepository.findByName("ROLE_WAREHOUSE")
+                .orElseThrow(() -> new ResourceNotFoundException("ROLE_WAREHOUSE is required for dev data"));
+        RoleEntity deliveryRole = roleRepository.findByName("ROLE_DELIVERY")
+                .orElseThrow(() -> new ResourceNotFoundException("ROLE_DELIVERY is required for dev data"));
 
-        if (userRepository.findByUsernameIgnoreCase("johndoe").isEmpty()) {
-            userRepository.save(UserEntity.builder()
-                    .username("johndoe")
-                    .email("john.doe@example.com")
-                    .passwordHash(passwordEncoder.encode("Customer123!"))
-                    .firstName("John")
-                    .lastName("Doe")
-                    .enabled(true)
-                    .accountNonLocked(true)
-                    .roles(new HashSet<>(Set.of(userRole)))
-                    .build());
+        seedUser("johndoe", "john.doe@example.com", CUSTOMER_PASSWORD,
+                "John", "Doe", userRole);
+        seedUser("admin", "admin@example.com", ADMIN_PASSWORD,
+                "Admin", "User", userRole, adminRole);
+        seedUser("warehouse_worker", "warehouse.worker@order-platform.test", WAREHOUSE_PASSWORD,
+                "Maya", "Chen", warehouseRole);
+        seedUser("delivery_driver", "delivery.driver@order-platform.test", DELIVERY_PASSWORD,
+                "Daniel", "Brooks", deliveryRole);
+    }
+
+    private void seedUser(String username, String email, String password, String firstName, String lastName,
+                          RoleEntity... roles) {
+        if (userRepository.findByUsernameIgnoreCase(username).isPresent()) {
+            return;
         }
-        if (userRepository.findByUsernameIgnoreCase("admin").isEmpty()) {
-            userRepository.save(UserEntity.builder()
-                    .username("admin")
-                    .email("admin@example.com")
-                    .passwordHash(passwordEncoder.encode("Admin123!"))
-                    .firstName("Admin")
-                    .lastName("User")
-                    .enabled(true)
-                    .accountNonLocked(true)
-                    .roles(new HashSet<>(Set.of(userRole, adminRole)))
-                    .build());
-        }
+        userRepository.save(UserEntity.builder()
+                .username(username)
+                .email(email)
+                .passwordHash(passwordEncoder.encode(password))
+                .firstName(firstName)
+                .lastName(lastName)
+                .enabled(true)
+                .accountNonLocked(true)
+                .roles(new HashSet<>(Set.of(roles)))
+                .build());
     }
 }

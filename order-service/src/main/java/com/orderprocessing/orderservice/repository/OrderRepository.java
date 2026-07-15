@@ -11,10 +11,13 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 import jakarta.persistence.LockModeType;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecificationExecutor<Order> {
+
+    long countByStatus(Order.Status status);
 
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items")
@@ -33,6 +36,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query(value = """
+            select * from orders
+            where status = 'PENDING' and created_at < :cutoff
+            order by created_at
+            limit :batchSize
+            for update skip locked
+            """, nativeQuery = true)
+    List<Order> lockStalePendingOrders(@Param("cutoff") Instant cutoff,
+                                       @Param("batchSize") int batchSize);
 
     @Query(value = """
             select 1

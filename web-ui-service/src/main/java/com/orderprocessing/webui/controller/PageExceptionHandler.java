@@ -3,6 +3,7 @@ package com.orderprocessing.webui.controller;
 import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.exception.SessionExpiredException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,7 +14,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @ControllerAdvice
 public class PageExceptionHandler {
     @ExceptionHandler(SessionExpiredException.class)
-    public ModelAndView expired(SessionExpiredException exception, RedirectAttributes redirect) {
+    public ModelAndView expired(SessionExpiredException exception, HttpServletRequest request,
+                                HttpServletResponse response, RedirectAttributes redirect) {
+        if ("true".equalsIgnoreCase(request.getHeader("HX-Request"))) {
+            response.setHeader("HX-Redirect", request.getContextPath() + "/login");
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            ModelAndView unauthorized = new ModelAndView();
+            return unauthorized;
+        }
         redirect.addFlashAttribute("warning", "Your session expired. Please sign in again.");
         return new ModelAndView("redirect:/login");
     }

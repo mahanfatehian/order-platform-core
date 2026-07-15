@@ -30,9 +30,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/login", "/register", "/assets/**", "/webjars/**", "/error/**").permitAll()
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/admin/warehouse", "/admin/warehouse/**").hasRole("WAREHOUSE")
+                        .requestMatchers("/admin/delivery", "/admin/delivery/**").hasRole("DELIVERY")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/app/**", "/fragments/**").authenticated()
+                        .requestMatchers("/app/profile", "/app/profile/**").authenticated()
+                        .requestMatchers("/app/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/fragments/**").authenticated()
                         .anyRequest().authenticated())
                 .formLogin(form -> form.loginPage("/login").disable())
                 .logout(logout -> logout

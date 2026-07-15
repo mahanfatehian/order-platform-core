@@ -1,7 +1,20 @@
-<nav th:fragment="pagination(page, baseUrl)" xmlns:th="http://www.thymeleaf.org" th:if="${page.totalPages() > 1}" aria-label="Pages">
-    <ul class="pagination pagination-sm justify-content-end">
-        <li class="page-item" th:classappend="${!page.hasPrevious()} ? 'disabled'"><a class="page-link" th:href="@{${baseUrl}(page=${page.number()-1})}">Previous</a></li>
-        <li class="page-item disabled"><span class="page-link" th:text="|${page.number()+1} / ${page.totalPages()}|">1 / 1</span></li>
-        <li class="page-item" th:classappend="${!page.hasNext()} ? 'disabled'"><a class="page-link" th:href="@{${baseUrl}(page=${page.number()+1})}">Next</a></li>
+<nav th:fragment="pagination(page, links, label)" xmlns:th="http://www.thymeleaf.org"
+     th:if="${page.totalPages() > 1}" th:attr="aria-label=${label}">
+    <ul class="pagination pagination-sm justify-content-end mb-0">
+        <li class="page-item" th:if="${page.hasPrevious()}">
+            <a class="page-link" th:href="${links.previousUrl()}" rel="prev" aria-label="Previous page">Previous</a>
+        </li>
+        <li class="page-item disabled" th:unless="${page.hasPrevious()}" aria-disabled="true">
+            <span class="page-link" aria-disabled="true">Previous</span>
+        </li>
+        <li class="page-item active">
+            <span class="page-link" aria-current="page" th:text="|Page ${page.number()+1} of ${page.totalPages()}|">Page 1 of 1</span>
+        </li>
+        <li class="page-item" th:if="${page.hasNext()}">
+            <a class="page-link" th:href="${links.nextUrl()}" rel="next" aria-label="Next page">Next</a>
+        </li>
+        <li class="page-item disabled" th:unless="${page.hasNext()}" aria-disabled="true">
+            <span class="page-link" aria-disabled="true">Next</span>
+        </li>
     </ul>
 </nav>

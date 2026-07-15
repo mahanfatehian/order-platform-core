@@ -35,6 +35,9 @@ public class Order {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    @Column(name = "tracking_reference", length = 100)
+    private String trackingReference;
+
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 

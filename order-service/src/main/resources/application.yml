@@ -66,6 +66,20 @@ outbox:
     interval: ${ORDER_OUTBOX_POLL_INTERVAL:1000}
   batch-size: ${ORDER_OUTBOX_BATCH_SIZE:50}
   max-attempts: ${ORDER_OUTBOX_MAX_ATTEMPTS:5}
+  retry:
+    base-delay: ${ORDER_OUTBOX_RETRY_BASE_DELAY:1000}
+    max-delay: ${ORDER_OUTBOX_RETRY_MAX_DELAY:60000}
+
+saga:
+  pending-timeout: ${ORDER_PENDING_TIMEOUT:PT10M}
+  reconciliation:
+    interval: ${ORDER_RECONCILIATION_INTERVAL:60000}
+    batch-size: ${ORDER_RECONCILIATION_BATCH_SIZE:50}
+
+maintenance:
+  outbox-retention: ${ORDER_OUTBOX_RETENTION:P30D}
+  inbox-retention: ${ORDER_INBOX_RETENTION:P30D}
+  cleanup-cron: ${ORDER_EVENT_CLEANUP_CRON:0 15 3 * * *}
 
 app:
   security:
@@ -78,6 +92,7 @@ app:
         - /swagger-ui.html
         - /actuator/health
         - /actuator/health/**
+        - /actuator/prometheus
 
 management:
   endpoint:
@@ -87,7 +102,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 logging:
   level:

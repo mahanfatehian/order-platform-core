@@ -1,252 +1,171 @@
-# Order Processing Platform
+# Order/flow
 
-Order Processing Platform is a Java 21/Spring portfolio application that demonstrates a production-minded microservice order lifecycle with a server-rendered browser experience. Customers can authenticate, browse and search the catalog, manage a cart, check out, follow asynchronous order processing, view their own orders, and cancel eligible orders. Administrators can manage users, products, inventory, and orders.
+Order/flow is a Java 21 and Spring Boot microservices showcase for a human-in-the-loop, event-driven order saga. A customer submits an order, inventory confirms it asynchronously, a warehouse operator packs it, a delivery operator ships and delivers it, and every handoff is visible in a live customer timeline and durable audit history.
 
-The browser-facing application deliberately remains a backend-for-frontend (BFF): HTML is rendered by Spring MVC and Thymeleaf, while order processing, identity, inventory, and messaging remain independent backend services.
+The repository is designed to be evaluated from a clean clone. Docker Compose builds every service, creates the databases, applies Flyway migrations, seeds four demo personas and 15 realistic products, and waits for the complete platform to become healthy. Java and Maven are not required on the host.
 
-## Architecture
+## What you can demonstrate
+
+- Human fulfillment flow: `PENDING → CONFIRMED → PACKAGED → SHIPPED → DELIVERED`
+- Role-specific customer, warehouse, delivery, and administrator workspaces
+- Kafka choreography with transactional outbox/inbox and idempotent consumers
+- Strict pre-checkout validation against live price, product state, and exact stock quantity
+- Cancellation only while an order is `PENDING` or `CONFIRMED`
+- Inventory reservations that are released on cancellation/failure and consumed on delivery
+- Immutable lifecycle history with actor, reason, correlation ID, event ID, and timestamps
+- Bootstrap 5.3 server-rendered UI with HTMX updates and a persisted light/dark theme
+- Optional Kafka event browser and Prometheus metrics through Compose profiles
+- Health-gated startup, non-root application images, graceful shutdown, CI, and safe demo reset scripts
+
+## Run it
+
+### Prerequisites
+
+- Docker Desktop, or Docker Engine with Docker Compose v2
+- About 8 GB of memory available to Docker for the first parallel image build
+- Ports `8080` and `8761` free; optional tools use `8090` and `9090`
+
+### Fastest start
+
+Linux/macOS:
+
+```bash
+sh scripts/start-demo.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\start-demo.ps1
+```
+
+Or use Compose directly:
+
+```bash
+docker compose --env-file .env.example up -d --build --wait --wait-timeout 360
+```
+
+Open <http://localhost:8080/login>. The first build can take several minutes; later builds reuse Docker layers.
+
+### Demo accounts
+
+These deterministic accounts exist only with the default `dev` profile.
+
+| Persona | Username | Password | Starts at |
+| --- | --- | --- | --- |
+| Customer | `johndoe` | `Customer123!` | `/app` |
+| Warehouse operator | `warehouse_worker` | `WarehouseDemo2026!` | `/admin/warehouse` |
+| Delivery operator | `delivery_driver` | `DeliveryDemo2026!` | `/admin/delivery` |
+| Administrator | `admin` | `Admin123!` | `/admin` |
+
+These are local showcase credentials, not production defaults. Set `DEMO_MODE=false` to hide them from the login page, and never run a shared environment with the values in `.env.example`.
+
+## Five-minute guided walkthrough
+
+Use separate private browser windows for the personas, or sign out between steps.
+
+1. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The BFF revalidates the exact cart against live store inventory immediately before creating the order.
+2. Open the new order. It moves from `PENDING` to `CONFIRMED` after the Kafka inventory handshake. The status region continues polling while fulfillment is active and replaces itself completely on a terminal outcome.
+3. Sign in as `warehouse_worker`. Open **Warehouse queue** and choose **Pack order**. The authoritative HTTP command commits `PACKAGED`, history, and an `OrderPackagedEvent` outbox row atomically.
+4. Sign in as `delivery_driver`. Open **Delivery queue**, enter an optional tracking reference, choose **Mark shipped**, then **Mark delivered**. Delivery settles the reservation as `CONSUMED` and reduces on-hand stock exactly once.
+5. Return to the customer order. The horizontal rail shows all five completed stages, the tracking reference, and the actor-aware activity history. The cancel control disappeared when fulfillment advanced beyond `CONFIRMED`.
+6. Optionally sign in as `admin` to inspect all statuses, users, roles, products, inventory, and service readiness.
+
+To see checkout protection, add more units than are live and available. Checkout remains blocked with an actionable availability message instead of creating a knowingly invalid saga. The seeded **Lumen Portable Bluetooth Speaker** has zero stock for this path.
+
+## Architecture at a glance
 
 ```mermaid
 flowchart LR
-    Browser[Browser] -->|HTTP / session cookie| Gateway[Reactive gateway-service]
-    Gateway --> WebUI[web-ui-service<br/>Spring MVC + Thymeleaf]
+    Browser -->|session cookie| Gateway[gateway-service]
+    Gateway --> BFF[web-ui-service]
     Gateway --> Auth[auth-service]
     Gateway --> Users[user-service]
     Gateway --> Store[store-service]
     Gateway --> Orders[order-service]
-    WebUI --> Auth
-    WebUI --> Users
-    WebUI --> Store
-    WebUI --> Orders
-    Auth --> Users
+
+    BFF --> Auth
+    BFF --> Users
+    BFF --> Store
+    BFF --> Orders
     Auth --> Redis[(Redis)]
-    WebUI --> Redis
+    BFF --> Redis
     Users --> UserDB[(userdb)]
     Store --> StoreDB[(storedb)]
     Orders --> OrderDB[(orderdb)]
-    Store <--> Kafka[(Kafka)]
-    Orders <--> Kafka
-    Gateway --> Eureka[Eureka discovery-service]
-    Auth --> Eureka
-    Users --> Eureka
-    Store --> Eureka
-    Orders --> Eureka
-    WebUI --> Eureka
+    Orders -->|order.events| Kafka[(Kafka)]
+    Kafka --> Store
+    Store -->|store.events| Kafka
+    Kafka --> Orders
+    Gateway -.-> Eureka[discovery-service]
 ```
 
-Only the gateway is the public application entry point. Service containers use the Compose network and Eureka for internal traffic; their application ports are exposed to other containers but are not bound to the host. This keeps browser traffic centralized and allows application services to be scaled without host-port collisions.
+Human actions are authenticated HTTP commands owned by `order-service`; Kafka carries past-tense facts after the state change is committed. This prevents broker access from becoming fulfillment authorization while retaining an event-driven integration boundary.
 
-### Modules
-
-| Module | Responsibility |
-| --- | --- |
-| `security-starter` | Shared servlet JWT validation, role mapping, revocation checks, and REST security responses |
-| `kafka-common` | Shared event contracts, topic definitions, serializer configuration, retry, and dead-letter behavior |
-| `user-service` | Users, profiles, password changes, roles, administrative lifecycle, and protected identity lookups |
-| `auth-service` | Login, JWT access/refresh rotation, current-role refresh, logout, and token revocation |
-| `store-service` | Product catalog, authoritative quotes, inventory, durable reservations, and stock-side saga processing |
-| `order-service` | Order ownership, authoritative totals, state transitions, order outbox, and stock-result processing |
-| `web-ui-service` | Spring MVC BFF, Redis-backed browser sessions, Thymeleaf pages, cart, checkout, profile, and admin UI |
-| `gateway-service` | Reactive edge routing, JWT enforcement for APIs, UI routing, rate limiting, and forwarded headers |
-| `discovery-service` | Eureka registry and discovery dashboard |
-
-### Technology stack
-
-- Java 21, Maven multi-module build
-- Spring Boot 3.3 and Spring Cloud 2023
-- Spring MVC, Thymeleaf, Layout Dialect, Spring Security, and Spring Session Redis
-- HTMX for optional fragment updates; Bootstrap 5.3 and Bootstrap Icons via WebJars
-- Spring Cloud Gateway (reactive) and Netflix Eureka
-- PostgreSQL 16, Flyway, JPA/Hibernate
-- Redis 7.2 for browser sessions, token state, and gateway rate limits
-- Kafka with ZooKeeper for the order saga
-- Spring Boot Actuator and Springdoc OpenAPI
-- Docker Compose with clean-clone multi-stage image builds
-
-## Request and security flows
-
-### Browser request flow
-
-1. The browser connects to `gateway-service` at `/`.
-2. The gateway routes HTML, assets, and form posts to `web-ui-service`; API paths remain mapped to their owning service.
-3. The BFF reads the authenticated principal and cart from the server-side Redis session.
-4. The BFF calls backend services over the private Compose network and renders a complete HTML response.
-5. Normal forms remain functional without JavaScript. HTMX requests may return a focused fragment for a faster update.
-
-JWT access and refresh tokens stay in the server-side session. They are never written to URLs, HTML attributes, browser storage, or JavaScript. The browser receives only an HTTP-only session cookie. State-changing forms retain CSRF protection.
-
-### Login flow
+The inventory handshake is asynchronous:
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser
-    participant G as Gateway
-    participant W as Web UI BFF
-    participant A as Auth service
-    participant U as User service
-    participant R as Redis
-
-    B->>G: POST /login + CSRF token
-    G->>W: Forward form
-    W->>A: Authenticate credentials
-    A->>U: Protected internal credential/current-role lookup
-    U-->>A: Active user ID and current roles
-    A-->>W: Access and rotating refresh JWTs
-    W->>R: Store tokens and principal in server session
-    W-->>B: HTTP-only session cookie + redirect
-```
-
-Refresh validates token type, JTI, token version, blacklist state, current account status, and current roles before rotating tokens. Logout requires an authenticated access token, revokes the relevant token state, invalidates the Redis session, and clears the browser cookie. API authorization is enforced at the gateway and again by each backend service.
-
-## Order saga, outbox, and inventory concurrency
-
-```mermaid
-sequenceDiagram
-    participant W as Web UI
+    participant UI as Web UI BFF
     participant O as Order service
-    participant OO as Order outbox
     participant K as Kafka
     participant S as Store service
-    participant SO as Store outbox
-
-    W->>O: Create order (product IDs + quantities only)
-    O->>S: Request authoritative product quotes
-    S-->>O: Current names, prices, active state, availability
-    O->>OO: Commit PENDING order + OrderPlaced atomically
-    OO->>K: Publish OrderPlaced to order.events
-    K->>S: Deliver OrderPlaced (at least once)
-    S->>S: Lock inventory rows and reserve all-or-nothing
-    alt stock available
-        S->>SO: Commit reservations + StockReserved atomically
-        SO->>K: Publish StockReserved to store.events
-        K->>O: Deliver StockReserved
-        O->>O: PENDING -> CONFIRMED
-    else insufficient stock
-        S->>SO: Commit StockInsufficient
-        SO->>K: Publish StockInsufficient to store.events
-        K->>O: Deliver StockInsufficient
-        O->>O: PENDING -> FAILED
+    UI->>S: Exact live cart quote
+    UI->>O: Create order + idempotency key
+    O->>O: Commit PENDING + outbox
+    O-->>K: OrderPlacedEvent
+    K-->>S: Reserve all items atomically
+    alt inventory available
+        S->>S: Commit reservations + outbox
+        S-->>K: StockReservedEvent
+        K-->>O: PENDING → CONFIRMED
+    else inventory unavailable
+        S-->>K: StockInsufficientEvent
+        K-->>O: PENDING → FAILED
     end
 ```
 
-The create-order contract accepts product IDs and positive quantities only. `order-service` obtains current prices from `store-service`, calculates item totals and the order total, and commits the `PENDING` order with its `OrderPlaced` outbox row in one database transaction.
+For the full state machine, trust boundaries, retry/reconciliation behavior, and consistency guarantees, read [Architecture](docs/architecture.md). The message contracts are in [AsyncAPI](docs/asyncapi.yaml), and the command-versus-fact decision is recorded in [ADR-0001](docs/adr/0001-human-in-the-loop-fulfillment.md).
 
-Outbox publishers claim bounded batches with database locking, publish using the order ID as the Kafka key, wait for broker acknowledgement, and only then mark a row published. Failed sends remain eligible for bounded retry and dead-letter handling. Consumers record event identity and Kafka position in durable inbox/processed-event tables, so an at-least-once redelivery cannot reserve, release, confirm, or fail twice.
+## Modules
 
-Inventory reservations are durable rows keyed by order and product. The store locks inventory rows in deterministic product-ID order with pessimistic write locks, validates the complete batch, and changes quantities in a single transaction. Therefore a failed item rolls back the entire batch. Cancellation emits `OrderCancelled` through the order outbox; store-side processing locks the reservation rows and changes only `RESERVED` rows to `RELEASED`, making repeated cancellation delivery harmless.
-
-The supported state transitions are:
-
-- `PENDING -> CONFIRMED` after `StockReserved`
-- `PENDING -> FAILED` after `StockInsufficient`
-- `PENDING -> CANCELLED` for an eligible early cancellation
-- `CONFIRMED -> CANCELLED` with inventory compensation
-
-No client endpoint can assign an arbitrary status. Customer ownership comes from validated JWT claims; administrators use separately authorized operations.
-
-## Why the UI is a separate service
-
-`gateway-service` is built on Spring WebFlux and should stay focused on reactive edge concerns: routing, authentication, rate limits, and forwarded headers. Thymeleaf controllers, servlet security, form validation, CSRF, and Redis-backed `HttpSession` semantics belong naturally to Spring MVC. Keeping those concerns in `web-ui-service` avoids mixing incompatible web stacks and lets the gateway remain a small infrastructure component.
-
-The BFF renders login and registration, dashboard, catalog search/pagination/detail, cart, checkout, pending/confirmed/failed order views, order history/detail/cancellation, profile/password forms, and administrator pages. Shared Thymeleaf layouts and fragments provide navigation, flash messages, pagination, status badges, form errors, empty states, and loading indicators. HTMX enhances selected interactions but is not required for correctness.
-
-## Start from a clean clone
-
-Prerequisites are Docker Desktop (or Docker Engine) with Docker Compose. Host-side Java and Maven are not required.
-
-On Linux/macOS:
-
-```bash
-cp .env.example .env
-docker compose up -d --build
-docker compose ps
-```
-
-On PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-docker compose up -d --build
-docker compose ps
-```
-
-Each service image uses the repository root as its build context. Its Maven build stage runs `mvn -pl <module> -am clean package -DskipTests`; the runtime stage contains only a Java 21 JRE, `curl` for health probes, and a non-root application user.
-
-Compose starts one instance of every application service. PostgreSQL, Redis, ZooKeeper, Kafka, Eureka, and downstream services are gated by health conditions. The one-shot `database-init` service idempotently ensures `userdb`, `storedb`, and `orderdb` exist even when a PostgreSQL volume already exists. Each owning service then runs its own Flyway migrations against its own database.
-
-To watch startup:
-
-```bash
-docker compose ps
-docker compose logs --tail=200 -f discovery-service user-service auth-service store-service order-service web-ui-service gateway-service
-```
-
-Application containers use graceful Spring shutdown and a 40-second Compose stop grace period. Configuration or migration failures receive only three restart attempts, avoiding an endless local restart loop.
-
-### Environment variables
-
-`.env.example` contains explicitly labelled local-development values. Copy it; do not treat those values as production credentials.
-
-| Variable | Purpose | Local default/example |
-| --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | Enables local development data and behavior | `dev` |
-| `DB_NAME` | Initial PostgreSQL database; init also ensures all three service databases | `userdb` |
-| `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL application credentials | local development values |
-| `DB_PORT` | PostgreSQL host port | `5432` |
-| `REDIS_PASSWORD` | Required Redis authentication shared by Redis clients | local development value |
-| `REDIS_PORT` | Redis host port | `6379` |
-| `KAFKA_PORT` / `ZOOKEEPER_PORT` | Host listener ports | `9092` / `2181` |
-| `JWT_SECRET` | HMAC JWT signing key; use at least 64 random characters | local development value |
-| `USER_SERVICE_INTERNAL_API_KEY` | Auth-to-user protected API key | local development value |
-| `STORE_SERVICE_INTERNAL_API_KEY` | Order-to-store protected API key | local development value |
-| `GATEWAY_SERVICE_PORT` | Public application/gateway port | `8080` |
-| `DISCOVERY_SERVICE_PORT` | Eureka dashboard and discovery port | `8761` |
-| `AUTH_SERVICE_PORT` | Auth container port | `8081` |
-| `USER_SERVICE_PORT` | User container port | `8082` |
-| `STORE_SERVICE_PORT` | Store container port | `8083` |
-| `ORDER_SERVICE_PORT` | Order container port | `8084` |
-| `WEB_UI_SERVICE_PORT` | BFF container port | `8085` |
-| `SESSION_COOKIE_SECURE` | Require HTTPS for the browser session cookie | `false` locally; `true` behind HTTPS |
-| `THYMELEAF_CACHE` | Cache templates | `false` locally |
-| `REGISTRATION_ENABLED` | Show/accept customer self-registration | `true` locally |
-
-Compose requires database, Redis, JWT, and internal API secrets rather than silently inventing them. For a non-development environment, use a secret manager, select a non-`dev` profile, enable secure cookies behind HTTPS, restrict infrastructure ports, and rotate every value copied from `.env.example`.
-
-### Development users
-
-The `dev` profile creates these users idempotently. They are not created by non-development profiles.
-
-| Role | Username | Password |
-| --- | --- | --- |
-| Customer | `johndoe` | `Customer123!` |
-| Administrator | `admin` | `Admin123!` |
-
-The development catalog contains several products with varied availability, including an out-of-stock item, so both successful and insufficient-stock flows can be demonstrated.
-
-### Demonstration walkthrough
-
-For the customer path, sign in as `johndoe`, search or page through the catalog, open a product, add it to the cart, adjust quantity, and submit checkout. The detail page initially shows `PENDING`; refresh or its HTMX status fragment then observes `CONFIRMED`. The order appears under My Orders, and attempts to open an order owned by another customer are rejected.
-
-To demonstrate insufficient stock, check out with more units than the displayed availability. The order moves from `PENDING` to `FAILED`, shows the stock reason, and leaves no partial reservation. To demonstrate compensation, cancel an eligible `PENDING` or `CONFIRMED` order; its durable reservation is released once even if the request or Kafka event is repeated.
-
-For the administrator path, sign in as `admin`, open `/admin`, then manage the product catalog and inventory, filter all orders, and manage user activation and roles. Administrative controls are protected by backend authorization as well as conditional UI rendering.
-
-## URLs
-
-The defaults below assume `.env.example` was copied unchanged.
-
-| Purpose | URL |
+| Module | Responsibility |
 | --- | --- |
-| Browser UI | <http://localhost:8080/> |
-| Gateway base URL | <http://localhost:8080/> |
-| Login | <http://localhost:8080/login> |
-| Customer application | <http://localhost:8080/app> |
-| Administrator application | <http://localhost:8080/admin> |
-| Gateway health | <http://localhost:8080/actuator/health> |
-| Eureka dashboard | <http://localhost:8761/> |
-| Eureka health | <http://localhost:8761/actuator/health> |
+| `gateway-service` | Reactive edge routing, JWT enforcement, rate limits, correlation IDs, and forwarded headers |
+| `web-ui-service` | Spring MVC BFF, Thymeleaf/HTMX UI, Redis session/cart, checkout guard, and role workspaces |
+| `auth-service` | Login, access/refresh rotation, logout, and token revocation |
+| `user-service` | Identities, account state, `USER`/`WAREHOUSE`/`DELIVERY`/`ADMIN` roles, and dev personas |
+| `store-service` | Product catalog, authoritative quotes, inventory locking, durable reservations, and settlement |
+| `order-service` | Order aggregate, lifecycle commands, history, reconciliation, and order outbox/inbox |
+| `kafka-common` | Shared event contracts, registry, topics, serializers, retries, and Kafka dead-letter routing |
+| `security-starter` | Shared servlet JWT and revocation enforcement |
+| `discovery-service` | Eureka registry and dashboard |
 
-Swagger UI and raw OpenAPI JSON are routed through the gateway's Eureka discovery routes:
+## Seed catalog
+
+The `dev` profile creates exactly 15 deterministic products: five electronics, five clothing items, and five home goods. Prices range from `$49.95` to `$249.99`, stock levels range from `0` to `85`, SKUs are unique, and descriptions are presentation-ready. Seeding is idempotent and profile-scoped; production profiles do not receive demo catalog rows.
+
+Development seed changes use forward-only Flyway migrations plus the profile initializer. Previously applied migrations are intentionally not rewritten, so an existing clone can upgrade without a checksum failure.
+
+## Optional inspection tools
+
+Start the core platform plus Kafka UI and Prometheus:
+
+```bash
+docker compose --env-file .env.example --profile tools --profile observability up -d --build --wait --wait-timeout 360
+```
+
+| Tool | URL | Useful for |
+| --- | --- | --- |
+| Kafka UI | <http://localhost:8090> | Inspect `order.events`, `store.events`, and their DLTs |
+| Prometheus | <http://localhost:9090> | Query JVM/HTTP metrics and `order_platform_*` lifecycle, reservation, outbox, and dead-letter gauges |
+| Eureka | <http://localhost:8761> | Inspect registered service instances |
+
+Optional tools bind to loopback and do not start in the default profile.
+
+## API documentation
+
+The gateway is the public application entry point.
 
 | Service | Swagger UI | OpenAPI JSON |
 | --- | --- | --- |
@@ -255,126 +174,109 @@ Swagger UI and raw OpenAPI JSON are routed through the gateway's Eureka discover
 | Store | <http://localhost:8080/store-service/swagger-ui/index.html> | <http://localhost:8080/store-service/v3/api-docs> |
 | Orders | <http://localhost:8080/order-service/swagger-ui/index.html> | <http://localhost:8080/order-service/v3/api-docs> |
 
-Backend health endpoints are intentionally not published as host ports. Compose probes these exact internal URLs:
+Application service and infrastructure ports are not published to the host. Eureka and optional inspection tools bind to loopback; the gateway is the only broadly bound application port.
 
-- `http://auth-service:8081/actuator/health`
-- `http://user-service:8082/actuator/health`
-- `http://store-service:8083/actuator/health`
-- `http://order-service:8084/actuator/health`
-- `http://web-ui-service:8085/actuator/health`
+## Operations
 
-For example:
+Check readiness and logs:
 
 ```bash
-docker compose exec auth-service curl -fsS http://localhost:8081/actuator/health
-docker compose exec web-ui-service curl -fsS http://localhost:8085/actuator/health
+docker compose --env-file .env.example ps
+docker compose --env-file .env.example logs --tail=200 -f gateway-service web-ui-service order-service store-service
+curl --fail http://localhost:8080/actuator/health
 ```
 
-Only health information is anonymous; other Actuator details remain protected or unexposed.
+Stop while keeping local data:
 
-## Build, tests, and validation
+```bash
+sh scripts/stop-demo.sh
+```
 
-With Maven 3.9+ and Java 21 installed locally:
+```powershell
+.\scripts\stop-demo.ps1
+```
+
+Reset all local database, Redis, and Prometheus volumes and recreate the demo:
+
+```bash
+sh scripts/reset-demo.sh --yes
+```
+
+```powershell
+.\scripts\reset-demo.ps1 -Force
+```
+
+Reset is intentionally explicit because it permanently deletes local demo data.
+
+## Configuration
+
+`.env.example` contains local-development values and documents every required secret/port. The start scripts use it directly. To customize the environment, copy it to `.env`, change the values, and omit `--env-file .env.example` from Compose commands.
+
+Important runtime switches:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | `dev` | Enables demo identities and catalog |
+| `DEMO_MODE` | `true` | Shows demo credentials on the sign-in page |
+| `REGISTRATION_ENABLED` | `true` | Enables customer self-registration |
+| `SESSION_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
+| `ORDER_PENDING_TIMEOUT` | `PT10M` | Deadline before an unfinished inventory handshake is reconciled to `FAILED` |
+| `ORDER_OUTBOX_MAX_ATTEMPTS` / `STORE_OUTBOX_MAX_ATTEMPTS` | `5` | Database outbox publish attempts before operator intervention |
+| `ORDER_OUTBOX_RETENTION` / `STORE_OUTBOX_RETENTION` | `P30D` | Retention for successfully published outbox rows |
+
+Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to the source topic's `.dlt`.
+
+## Build and test
+
+With Java 21 and Maven 3.9+:
 
 ```bash
 mvn clean verify
-mvn -pl user-service test
-mvn -pl auth-service test
-mvn -pl store-service test
-mvn -pl order-service test
-mvn -pl gateway-service test
-mvn -pl web-ui-service test
 ```
 
-Without host Maven, use the same builder image and repository mount, or rely on the clean-clone Docker builds:
+Without local Java/Maven, the Dockerfiles support an opt-in test build:
 
 ```bash
-docker compose --env-file .env.example config --quiet
-docker compose build --no-cache
-docker compose up -d
-docker compose ps
-docker compose logs --tail=200
+docker compose --env-file .env.example build --build-arg "MAVEN_TEST_ARGS=" order-service store-service web-ui-service
 ```
 
-Useful repository checks:
+Repository checks used by CI:
 
 ```bash
 git diff --check
 docker compose --env-file .env.example config --quiet
 ```
 
-## Local scaling
-
-There are no Swarm-only `deploy.replicas` declarations and scalable application services have neither `container_name` nor host port bindings. Compose therefore starts one replica by default and can scale a stateless service explicitly:
-
-```bash
-docker compose up -d --scale user-service=3
-```
-
-Eureka assigns unique instance IDs and the gateway load-balances discovered instances. Scale only after migrations are current and retain a single-instance Kafka replication configuration for this local demonstration.
+GitHub Actions runs the Java 21 reactor, validates Compose, builds the complete stack, waits for health, and smoke-tests the gateway and login page. Dependabot covers Maven, Docker, and workflow dependencies.
 
 ## Troubleshooting
 
-### A service remains `starting` or becomes `unhealthy`
-
-Inspect the dependency first, then the application:
+### A container is unhealthy
 
 ```bash
-docker compose ps
-docker compose logs --tail=200 postgres redis kafka discovery-service
-docker compose logs --tail=200 <service-name>
-docker inspect --format '{{json .State.Health}}' <container-id>
+docker compose --env-file .env.example ps
+docker compose --env-file .env.example logs --tail=250 postgres redis kafka discovery-service
+docker compose --env-file .env.example logs --tail=250 <service-name>
 ```
 
-Typical causes are a host port collision, a missing required `.env` value, an old database volume with different credentials, or a failed Flyway migration.
+Typical causes are a port collision, insufficient Docker memory, or an old local volume created with different credentials.
 
-### Compose reports a required variable is missing
+### Database credentials changed after first startup
 
-Create `.env` from the example and rerun the command. Compose intentionally fails instead of falling back to fixed secrets:
-
-```bash
-cp .env.example .env
-docker compose config --quiet
-```
-
-### PostgreSQL credentials changed after the volume was created
-
-The official image applies `POSTGRES_USER` and `POSTGRES_PASSWORD` only when initializing a new data directory. Restore the old values, change the role inside PostgreSQL, or—only when local data can be discarded—remove the volumes and recreate them:
-
-```bash
-docker compose down -v
-docker compose up -d --build
-```
-
-`down -v` permanently deletes local PostgreSQL and Redis data.
+The PostgreSQL image applies its bootstrap credentials only when the volume is created. Restore the old values, or reset disposable demo data with the explicit reset script.
 
 ### Flyway validation fails
 
-Never edit an applied migration. Restore the original migration, add a new versioned migration for the correction, and review the owning service log. To inspect history:
+Do not edit an applied migration. Restore it and add a new versioned migration. The database owner logs identify the exact checksum or SQL error.
 
-```bash
-docker compose exec postgres sh -c 'psql --username="$POSTGRES_USER" --dbname=userdb --command="select * from flyway_schema_history order by installed_rank;"'
-```
+### Login redirects back to the sign-in page
 
-Repeat with `storedb` or `orderdb` for the other services.
+Check `redis`, `auth-service`, and `web-ui-service`. Browser tokens are kept in the Redis-backed server session; clearing Redis intentionally expires active sessions. All token-validating services must share the same `JWT_SECRET`.
 
-### Kafka is not ready
+### Start from a completely clean Docker state
 
-Kafka waits for a healthy ZooKeeper and advertises `kafka:29092` internally plus `localhost:9092` to host tools. Check both services and confirm the port is free:
+Run the reset script, then the start script. Do not use `down -v` if the volumes contain data you need.
 
-```bash
-docker compose logs --tail=200 zookeeper kafka
-docker compose exec kafka kafka-broker-api-versions --bootstrap-server localhost:29092
-```
+## Repository policies
 
-### Login succeeds but later requests redirect to login
-
-Check Redis health and `web-ui-service` logs. The browser cookie stores only a session identifier; losing Redis data invalidates the session. Also confirm all token-validating services receive the same `JWT_SECRET` and that `SESSION_COOKIE_SECURE=false` is used only for local HTTP.
-
-### UI/API route returns 404
-
-Confirm the target appears in Eureka and is healthy. The explicit UI route must precede generic discovery routes; APIs remain under `/api/auth/**`, `/api/users/**`, `/api/store/**`, and `/api/orders/**`.
-
-## Portfolio concepts demonstrated
-
-This repository is intentionally backend-led. It demonstrates bounded microservices, service discovery, a reactive gateway, JWT authentication and revocation, internal API-key authentication, Redis-backed server sessions, SSR with Thymeleaf, progressive HTMX enhancement, a Kafka choreography saga, transactional outbox/inbox patterns, idempotent consumers, Flyway migrations, pessimistic concurrency control, authoritative server-side pricing, role and ownership authorization, health-aware orchestration, graceful shutdown, non-root container images, and clean-clone Docker builds.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [SECURITY.md](SECURITY.md) for responsible vulnerability reporting and production-hardening boundaries.

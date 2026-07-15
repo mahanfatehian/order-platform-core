@@ -1,11 +1,33 @@
 <div th:fragment="grid" xmlns:th="http://www.thymeleaf.org">
-    <div th:if="${products.content().isEmpty()}" th:replace="~{fragments/empty-state :: empty('bi-box-seam','No matching products','Change the search or availability filter and try again.')}"></div>
+    <th:block th:if="${products.content().isEmpty()}">
+        <div th:replace="~{fragments/empty-state :: empty('bi-box-seam','No matching products','Change the search or availability filter and try again.')}"></div>
+    </th:block>
     <div th:if="${!products.content().isEmpty()}" class="product-grid">
-        <article class="product-card surface" th:each="product : ${products.content()}"><div class="product-card__signal"></div><div class="product-card__body">
-            <div class="product-card__meta"><span th:text="${product.category()}">OTHER</span><span th:text="${product.sku() ?: 'NO-SKU'}">SKU</span></div>
-            <h2><a th:href="@{/app/catalog/{id}(id=${product.id()})}" th:text="${product.name()}">Product</a></h2><p th:text="${#strings.abbreviate(product.description() ?: 'No description available',110)}">Description</p>
-            <div class="product-card__footer"><div><span class="money" th:text="|$${#numbers.formatDecimal(product.price(),1,2)}|">$0</span><span class="availability d-block mt-1" th:classappend="${!product.inStock()} ? ' availability--out'" th:text="${product.inStock()} ? |${product.availableQuantity()} available| : 'Unavailable'">Available</span></div><a class="btn btn-sm btn-outline-primary" th:href="@{/app/catalog/{id}(id=${product.id()})}">Details</a></div>
-        </div></article>
+        <article class="product-card surface" th:each="product : ${products.content()}">
+            <div class="product-card__signal"></div>
+            <div class="product-card__visual" th:switch="${product.category()}" aria-hidden="true">
+                <i th:case="'ELECTRONICS'" class="bi bi-headphones"></i>
+                <i th:case="'CLOTHING'" class="bi bi-handbag"></i>
+                <i th:case="'HOME'" class="bi bi-lamp"></i>
+                <i th:case="*" class="bi bi-box-seam"></i>
+            </div>
+            <div class="product-card__body">
+                <div class="product-card__meta">
+                    <span th:text="${product.category()}">OTHER</span>
+                    <span th:text="${product.sku() ?: 'NO-SKU'}">SKU</span>
+                </div>
+                <h2><a th:href="@{/app/catalog/{id}(id=${product.id()})}" th:text="${product.name()}">Product</a></h2>
+                <p th:text="${#strings.abbreviate(product.description() ?: 'No description available',110)}">Description</p>
+                <div class="product-card__footer">
+                    <div>
+                        <span class="money" th:text="|$${#numbers.formatDecimal(product.price(),1,2)}|">$0</span>
+                        <span class="availability d-block mt-1" th:classappend="${!product.inStock()} ? ' availability--out'"
+                              th:text="${product.inStock()} ? |${product.availableQuantity()} available| : 'Unavailable'">Available</span>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary" th:href="@{/app/catalog/{id}(id=${product.id()})}">View product</a>
+                </div>
+            </div>
+        </article>
     </div>
-    <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${products}, '/app/catalog')}"></div>
+    <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${products}, ${catalogPagination}, 'Product catalog pages')}"></div>
 </div>

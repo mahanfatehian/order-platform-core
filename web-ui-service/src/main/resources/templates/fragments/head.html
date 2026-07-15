@@ -5,7 +5,17 @@
     <link rel="icon" type="image/svg+xml" th:href="@{/assets/img/favicon.svg}">
     <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
-    <title>Order Platform</title>
+    <title>Order/flow</title>
+    <script>
+        (() => {
+            let saved = null;
+            try { saved = localStorage.getItem('orderflow-theme'); } catch (_) { /* Storage may be disabled. */ }
+            const theme = saved === 'light' || saved === 'dark'
+                ? saved
+                : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        })();
+    </script>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.11.3/font/bootstrap-icons.css}">
     <link rel="stylesheet" th:href="@{/assets/css/app.css}">

@@ -59,6 +59,15 @@ public class AuthenticatedPlatformClient {
     public PageResponse<OrderView> adminOrders(int page, int size, String status, String search) {
         return get(t -> client.adminOrders(t, page, size, status, search));
     }
+    public PageResponse<OrderView> fulfillmentOrders(int page, int size, String status) {
+        return get(t -> client.fulfillmentOrders(t, page, size, status));
+    }
+    public OrderView packOrder(UUID id) { return mutate(t -> client.packOrder(t, id)); }
+    public OrderView shipOrder(UUID id, String trackingReference) {
+        return mutate(t -> client.shipOrder(t, id, trackingReference));
+    }
+    public OrderView deliverOrder(UUID id) { return mutate(t -> client.deliverOrder(t, id)); }
+    public List<OrderHistoryView> orderHistory(UUID id) { return get(t -> client.orderHistory(t, id)); }
     public List<ServiceStatusView> serviceHealth() { return client.serviceHealth(); }
 
     private <T> T get(Function<String, T> operation) {

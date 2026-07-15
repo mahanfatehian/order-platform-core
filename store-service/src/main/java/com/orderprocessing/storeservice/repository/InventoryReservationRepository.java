@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface InventoryReservationRepository extends JpaRepository<InventoryReservation, UUID> {
+    long countByStatus(InventoryReservation.Status status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from InventoryReservation r where r.orderId = :orderId order by r.productId")
     List<InventoryReservation> findByOrderIdForUpdate(@Param("orderId") UUID orderId);

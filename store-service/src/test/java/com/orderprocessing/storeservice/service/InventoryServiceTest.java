@@ -2,6 +2,8 @@ package com.orderprocessing.storeservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.storeservice.model.Inventory;
 import com.orderprocessing.storeservice.model.InventoryReservation;
@@ -120,11 +122,119 @@ class InventoryServiceTest {
         verify(reservationRepository).saveAll(any());
     }
 
+    @Test
+    void deliveryConsumesReservationAndSettlesOnHandAndReservedQuantitiesTogether() {
+        UUID orderId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        OrderDeliveredEvent event = delivered(orderId);
+        InventoryReservation reservation = reservation(orderId, productId, 4,
+                InventoryReservation.Status.RESERVED);
+        Inventory stock = inventory(productId, 10, 5);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
+        when(reservationRepository.findByOrderIdForUpdate(orderId)).thenReturn(List.of(reservation));
+        when(inventoryRepository.findAllForUpdate(any())).thenReturn(List.of(stock));
+
+        service.processOrderDelivered(event, "order.events", 0, 13L);
+
+        assertThat(stock.getQuantity()).isEqualTo(6);
+        assertThat(stock.getReservedQuantity()).isEqualTo(1);
+        assertThat(stock.getAvailableQuantity()).isEqualTo(5);
+        assertThat(reservation.getStatus()).isEqualTo(InventoryReservation.Status.CONSUMED);
+        assertThat(reservation.getConsumedAt()).isNotNull();
+        assertThat(reservation.getReleasedAt()).isNull();
+        verify(inventoryRepository).saveAll(any());
+        verify(reservationRepository).saveAll(any());
+    }
+
+    @Test
+    void duplicateDeliveryEventCannotConsumeInventoryTwice() {
+        UUID orderId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        OrderDeliveredEvent event = delivered(orderId);
+        InventoryReservation reservation = reservation(orderId, productId, 3,
+                InventoryReservation.Status.RESERVED);
+        Inventory stock = inventory(productId, 9, 3);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong()))
+                .thenReturn(1, 0);
+        when(reservationRepository.findByOrderIdForUpdate(orderId)).thenReturn(List.of(reservation));
+        when(inventoryRepository.findAllForUpdate(any())).thenReturn(List.of(stock));
+
+        service.processOrderDelivered(event, "order.events", 1, 20L);
+        service.processOrderDelivered(event, "order.events", 1, 20L);
+
+        assertThat(stock.getQuantity()).isEqualTo(6);
+        assertThat(stock.getReservedQuantity()).isZero();
+        assertThat(reservation.getStatus()).isEqualTo(InventoryReservation.Status.CONSUMED);
+        verify(reservationRepository).saveAll(any());
+        verify(inventoryRepository).saveAll(any());
+    }
+
+    @Test
+    void cancellationAfterConsumptionLeavesSettledInventoryUnchanged() {
+        UUID orderId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        OrderCancelledEvent event = new OrderCancelledEvent();
+        event.setOrderId(orderId);
+        InventoryReservation consumed = reservation(orderId, productId, 2,
+                InventoryReservation.Status.CONSUMED);
+        consumed.setConsumedAt(Instant.now());
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
+        when(reservationRepository.findByOrderIdForUpdate(orderId)).thenReturn(List.of(consumed));
+
+        service.processOrderCancelled(event, "order.events", 2, 21L);
+
+        assertThat(consumed.getStatus()).isEqualTo(InventoryReservation.Status.CONSUMED);
+        assertThat(consumed.getReleasedAt()).isNull();
+        verify(inventoryRepository, never()).findAllForUpdate(any());
+        verify(inventoryRepository, never()).saveAll(any());
+        verify(reservationRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void timedOutOrderReleasesReservationWithoutConsumingOnHandStock() {
+        UUID orderId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        OrderFailedEvent event = new OrderFailedEvent();
+        event.setOrderId(orderId);
+        InventoryReservation reservation = reservation(orderId, productId, 3,
+                InventoryReservation.Status.RESERVED);
+        Inventory stock = inventory(productId, 10, 3);
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
+        when(reservationRepository.findByOrderIdForUpdate(orderId)).thenReturn(List.of(reservation));
+        when(inventoryRepository.findAllForUpdate(any())).thenReturn(List.of(stock));
+
+        service.processOrderFailed(event, "order.events", 1, 22L);
+
+        assertThat(stock.getQuantity()).isEqualTo(10);
+        assertThat(stock.getReservedQuantity()).isZero();
+        assertThat(reservation.getStatus()).isEqualTo(InventoryReservation.Status.RELEASED);
+        assertThat(reservation.getReleasedAt()).isNotNull();
+    }
+
     private OrderPlacedEvent placed(UUID orderId, UUID productId, int quantity) {
         OrderPlacedEvent event = new OrderPlacedEvent();
         event.setOrderId(orderId);
         event.setItems(Map.of(productId, quantity));
         return event;
+    }
+
+    private OrderDeliveredEvent delivered(UUID orderId) {
+        OrderDeliveredEvent event = new OrderDeliveredEvent();
+        event.setOrderId(orderId);
+        return event;
+    }
+
+    private InventoryReservation reservation(UUID orderId, UUID productId, int quantity,
+                                             InventoryReservation.Status status) {
+        InventoryReservation reservation = new InventoryReservation();
+        reservation.setId(UUID.randomUUID());
+        reservation.setOrderId(orderId);
+        reservation.setProductId(productId);
+        reservation.setQuantity(quantity);
+        reservation.setStatus(status);
+        reservation.setCreatedAt(Instant.now());
+        reservation.setUpdatedAt(Instant.now());
+        return reservation;
     }
 
     private Product product(UUID id, boolean active) {

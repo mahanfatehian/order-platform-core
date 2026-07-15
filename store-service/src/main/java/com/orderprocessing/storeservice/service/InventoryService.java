@@ -6,6 +6,8 @@ import com.orderprocessing.kafkacommon.KafkaEventRegistry;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
+import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
@@ -185,10 +187,72 @@ public class InventoryService {
         if (event.getOrderId() == null) {
             throw new IllegalArgumentException("Order id is required");
         }
+        releaseReservations(event.getOrderId());
+    }
 
-        List<InventoryReservation> reservations = reservationRepository.findByOrderIdForUpdate(event.getOrderId());
+    @Transactional
+    public void processOrderDelivered(OrderDeliveredEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset)) {
+            return;
+        }
+        if (event.getOrderId() == null) {
+            throw new IllegalArgumentException("Order id is required");
+        }
+
+        consumeReservations(event.getOrderId());
+    }
+
+    @Transactional
+    public void processOrderFailed(OrderFailedEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset)) {
+            return;
+        }
+        if (event.getOrderId() == null) {
+            throw new IllegalArgumentException("Order id is required");
+        }
+
+        releaseReservations(event.getOrderId());
+    }
+
+    private void consumeReservations(UUID orderId) {
+        List<InventoryReservation> reservations = reservationRepository.findByOrderIdForUpdate(orderId);
         List<InventoryReservation> active = reservations.stream()
-                .filter(r -> r.getStatus() == InventoryReservation.Status.RESERVED)
+                .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.RESERVED)
+                .sorted(Comparator.comparing(InventoryReservation::getProductId))
+                .toList();
+        if (active.isEmpty()) {
+            return;
+        }
+
+        List<UUID> productIds = active.stream().map(InventoryReservation::getProductId).toList();
+        Map<UUID, Inventory> inventory = inventoryRepository.findAllForUpdate(productIds).stream()
+                .collect(Collectors.toMap(Inventory::getProductId, Function.identity()));
+        if (inventory.size() != productIds.size()) {
+            throw new IllegalStateException("Reserved inventory row is missing");
+        }
+
+        Instant now = Instant.now();
+        for (InventoryReservation reservation : active) {
+            Inventory stock = inventory.get(reservation.getProductId());
+            int reservedQuantity = reservation.getQuantity();
+            if (stock.getReservedQuantity() < reservedQuantity || stock.getQuantity() < reservedQuantity) {
+                throw new IllegalStateException("Inventory reservation invariant was violated");
+            }
+            stock.setQuantity(stock.getQuantity() - reservedQuantity);
+            stock.setReservedQuantity(stock.getReservedQuantity() - reservedQuantity);
+            stock.setLastUpdated(now);
+            reservation.setStatus(InventoryReservation.Status.CONSUMED);
+            reservation.setConsumedAt(now);
+            reservation.setUpdatedAt(now);
+        }
+        inventoryRepository.saveAll(inventory.values());
+        reservationRepository.saveAll(active);
+    }
+
+    private void releaseReservations(UUID orderId) {
+        List<InventoryReservation> reservations = reservationRepository.findByOrderIdForUpdate(orderId);
+        List<InventoryReservation> active = reservations.stream()
+                .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.RESERVED)
                 .sorted(Comparator.comparing(InventoryReservation::getProductId))
                 .toList();
         if (active.isEmpty()) {

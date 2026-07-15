@@ -1,11 +1,89 @@
-<section id="order-status" th:fragment="status" xmlns:th="http://www.thymeleaf.org" class="surface surface--padded"
-         th:attr="hx-get=${order.pending()} ? @{/app/orders/{id}/status(id=${order.id()})} : null,hx-trigger=${order.pending()} ? 'every 3s' : null,hx-swap=${order.pending()} ? 'outerHTML' : null">
-    <div class="d-flex align-items-center justify-content-between gap-3"><div><p class="eyebrow mb-1">Current state</p><span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span></div><span class="small muted" th:if="${order.pending()}"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Checking every 3 seconds</span></div>
-    <div class="order-rail" aria-label="Order progress">
-        <div class="order-step order-step--done"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Submitted</span></div>
-        <div class="order-step" th:classappend="${order.pending()} ? ' order-step--active' : (${order.status() == 'FAILED'} ? ' order-step--failed' : ' order-step--done')"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Inventory</span></div>
-        <div class="order-step" th:classappend="${order.status() == 'CONFIRMED'} ? ' order-step--done' : (${order.status() == 'CANCELLED'} ? ' order-step--failed' : '')"><span class="order-step__node"><i class="bi bi-check"></i></span><span>Confirmed</span></div>
-        <div class="order-step" th:classappend="${order.terminal()} ? ' order-step--done' : ''"><span class="order-step__node"><i class="bi bi-check"></i></span><span th:text="${order.status() == 'CANCELLED'} ? 'Cancelled' : (${order.status() == 'FAILED'} ? 'Failed' : 'Ready')">Ready</span></div>
+<section id="order-status" th:fragment="status" xmlns:th="http://www.thymeleaf.org"
+         class="surface surface--padded"
+         th:attr="data-order-state=${order.status()},
+                  hx-get=${order.inProgress()} ? ${statusEndpoint} : null,
+                  hx-trigger=${order.inProgress()} ? 'every 3s' : null,
+                  hx-swap=${order.inProgress()} ? 'outerHTML' : null">
+    <span class="visually-hidden" data-order-status-announcement aria-live="polite" aria-atomic="true"></span>
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div>
+            <p class="eyebrow mb-1">Fulfillment status</p>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
+                <span class="small muted" th:if="${order.inProgress()}">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    Live updates every 3 seconds
+                </span>
+            </div>
+        </div>
+        <form th:if="${order.cancellable()}" th:action="${cancelEndpoint}"
+              method="post" data-confirm="Cancel this order and release its reserved inventory?">
+            <button class="btn btn-outline-danger" type="submit">
+                <i class="bi bi-x-circle me-1" aria-hidden="true"></i>Cancel order
+            </button>
+        </form>
     </div>
-    <div th:if="${order.failureReason() != null}" class="alert alert-danger mb-0"><i class="bi bi-exclamation-circle"></i><span th:text="${order.failureReason()}">Failure reason</span></div>
+
+    <div th:if="${order.cancelled()}" class="outcome-panel outcome-panel--cancelled mt-4" role="status">
+        <i class="bi bi-slash-circle fs-4" aria-hidden="true"></i>
+        <div><strong>Order cancelled</strong><div class="small mt-1">The fulfillment flow has stopped and any reserved inventory is being released.</div></div>
+    </div>
+    <div th:if="${order.failed()}" class="outcome-panel outcome-panel--failed mt-4" role="alert">
+        <i class="bi bi-exclamation-octagon fs-4" aria-hidden="true"></i>
+        <div><strong>Order could not be confirmed</strong><div class="small mt-1" th:text="${order.failureReason() ?: 'Inventory was unavailable when the order was processed.'}">Reason</div></div>
+    </div>
+
+    <div th:if="${!order.cancelled() and !order.failed()}" class="order-rail" aria-label="Order progress">
+        <div class="order-step"
+             th:classappend="${order.pending()} ? ' order-step--active' : (${order.reachedStage(1)} ? ' order-step--done' : '')"
+             th:attr="aria-current=${order.pending()} ? 'step' : null">
+            <span class="order-step__node"><i class="bi bi-check" aria-hidden="true"></i></span><span>Pending</span>
+        </div>
+        <div class="order-step"
+             th:classappend="${order.confirmed()} ? ' order-step--active' : (${order.reachedStage(2)} ? ' order-step--done' : '')"
+             th:attr="aria-current=${order.confirmed()} ? 'step' : null">
+            <span class="order-step__node"><i class="bi bi-check" aria-hidden="true"></i></span><span>Confirmed</span>
+        </div>
+        <div class="order-step"
+             th:classappend="${order.packaged()} ? ' order-step--active' : (${order.reachedStage(3)} ? ' order-step--done' : '')"
+             th:attr="aria-current=${order.packaged()} ? 'step' : null">
+            <span class="order-step__node"><i class="bi bi-check" aria-hidden="true"></i></span><span>Packaged</span>
+        </div>
+        <div class="order-step"
+             th:classappend="${order.shipped()} ? ' order-step--active' : (${order.reachedStage(4)} ? ' order-step--done' : '')"
+             th:attr="aria-current=${order.shipped()} ? 'step' : null">
+            <span class="order-step__node"><i class="bi bi-check" aria-hidden="true"></i></span><span>Shipped</span>
+        </div>
+        <div class="order-step" th:classappend="${order.delivered()} ? ' order-step--done' : ''"
+             th:attr="aria-current=${order.delivered()} ? 'step' : null">
+            <span class="order-step__node"><i class="bi bi-check" aria-hidden="true"></i></span><span>Delivered</span>
+        </div>
+    </div>
+
+    <div th:if="${order.trackingReference() != null and !#strings.isEmpty(order.trackingReference())}"
+         class="d-flex align-items-center gap-2 p-3 mt-3 border rounded">
+        <i class="bi bi-truck text-primary" aria-hidden="true"></i>
+        <span class="small muted">Tracking reference</span>
+        <strong class="mono" th:text="${order.trackingReference()}">TRACK-001</strong>
+    </div>
+
+    <div class="border-top mt-4 pt-4">
+        <h2 class="section-title">Order activity</h2>
+        <div class="activity-feed" th:if="${history != null and !history.isEmpty()}">
+            <article class="activity-item" th:each="entry : ${history}">
+                <span class="activity-marker" aria-hidden="true"></span>
+                <div>
+                    <h3>
+                        <span th:text="${entry.fromStatus() == null} ? 'Order created' : |${entry.fromStatus()} → ${entry.toStatus()}|">Status transition</span>
+                    </h3>
+                    <p>
+                        <span th:text="${#temporals.format(entry.occurredAt(), 'MMM d, yyyy HH:mm:ss')}">Timestamp</span>
+                        <span th:if="${entry.actorRole() != null}" th:text="| · ${#strings.replace(entry.actorRole(), 'ROLE_', '')}|">Actor</span>
+                        <span th:if="${entry.reason() != null and !#strings.isEmpty(entry.reason())}" th:text="| · ${entry.reason()}|">Reason</span>
+                    </p>
+                </div>
+            </article>
+        </div>
+        <p class="small muted mb-0" th:if="${history == null or history.isEmpty()}">The first lifecycle entry will appear after the order is recorded.</p>
+    </div>
 </section>

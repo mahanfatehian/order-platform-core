@@ -17,7 +17,7 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
           lower-case-service-id: true
       routes:
         - id: web-ui-static
@@ -75,6 +75,34 @@ spring:
                 redis-rate-limiter.burstCapacity: 60
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@uiSessionKeyResolver}"
+
+        - id: auth-service-docs
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth-service/swagger-ui/**,/auth-service/v3/api-docs/**,/auth-service/swagger-ui.html
+          filters:
+            - StripPrefix=1
+
+        - id: user-service-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/swagger-ui/**,/user-service/v3/api-docs/**,/user-service/swagger-ui.html
+          filters:
+            - StripPrefix=1
+
+        - id: store-service-docs
+          uri: lb://store-service
+          predicates:
+            - Path=/store-service/swagger-ui/**,/store-service/v3/api-docs/**,/store-service/swagger-ui.html
+          filters:
+            - StripPrefix=1
+
+        - id: order-service-docs
+          uri: lb://order-service
+          predicates:
+            - Path=/order-service/swagger-ui/**,/order-service/v3/api-docs/**,/order-service/swagger-ui.html
+          filters:
+            - StripPrefix=1
 
         - id: auth-login
           uri: lb://auth-service
@@ -173,6 +201,7 @@ app:
         - /api/users/register
         - /actuator/health
         - /actuator/health/**
+        - /actuator/prometheus
         - /
         - /login
         - /logout
@@ -221,7 +250,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:

@@ -49,6 +49,7 @@ app:
         - /api/users/register
         - /actuator/health
         - /actuator/health/**
+        - /actuator/prometheus
     internal:
       api-key: ${USER_SERVICE_INTERNAL_API_KEY}
 
@@ -84,7 +85,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:

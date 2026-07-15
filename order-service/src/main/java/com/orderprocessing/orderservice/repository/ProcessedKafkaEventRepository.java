@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.UUID;
+import java.time.Instant;
 
 public interface ProcessedKafkaEventRepository extends JpaRepository<ProcessedKafkaEvent, UUID> {
     @Modifying
@@ -21,4 +22,8 @@ public interface ProcessedKafkaEventRepository extends JpaRepository<ProcessedKa
                        @Param("topic") String topic,
                        @Param("partitionNumber") int partitionNumber,
                        @Param("recordOffset") long recordOffset);
+
+    @Modifying
+    @Query(value = "delete from processed_kafka_events where processed_at < :cutoff", nativeQuery = true)
+    int deleteProcessedBefore(@Param("cutoff") Instant cutoff);
 }

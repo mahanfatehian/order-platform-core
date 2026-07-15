@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Last-mile handoff</p>
+            <h1>Delivery operations</h1>
+            <p>Move packaged orders into transit, then close the loop when delivery is complete.</p>
+        </div>
+        <a class="btn btn-outline-primary" th:href="@{/admin/delivery}">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh queues
+        </a>
+    </header>
+
+    <div class="queue-layout">
+        <section class="surface queue-lane" aria-labelledby="ready-to-ship-title">
+            <div class="queue-lane__header">
+                <div>
+                    <h2 id="ready-to-ship-title">Ready to ship</h2>
+                    <p class="small muted mb-0">Packed orders waiting for a tracking handoff.</p>
+                </div>
+                <span class="queue-count" th:text="${packagedOrders.totalElements()}">0</span>
+            </div>
+
+            <th:block th:if="${packagedOrders.content().isEmpty()}">
+                <div th:replace="~{fragments/empty-state :: empty('bi-truck','No packages waiting','Packed orders will appear here when warehouse work is complete.')}"></div>
+            </th:block>
+
+            <article class="queue-card" th:each="order : ${packagedOrders.content()}">
+                <div>
+                    <div class="queue-card__title">
+                        <strong class="mono" th:text="|Order ${#strings.substring(order.id().toString(),0,8)}|">Order</strong>
+                        <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
+                    </div>
+                    <div class="queue-card__meta">
+                        <span th:text="|${order.itemCount()} units|">0 units</span>
+                        <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
+                    </div>
+                </div>
+                <form class="queue-card__action" th:action="@{/admin/delivery/orders/{id}/ship(id=${order.id()})}" method="post">
+                    <div>
+                        <label class="visually-hidden" th:for="|tracking-${order.id()}|">Tracking reference</label>
+                        <input class="form-control form-control-sm mono" th:id="|tracking-${order.id()}|"
+                               name="trackingReference" maxlength="100" placeholder="Tracking reference (optional)">
+                    </div>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-truck" aria-hidden="true"></i> Mark shipped
+                    </button>
+                </form>
+            </article>
+            <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${packagedOrders}, ${packagedPagination}, 'Ready to ship pages')}"></div>
+        </section>
+
+        <section class="surface queue-lane" aria-labelledby="in-transit-title">
+            <div class="queue-lane__header">
+                <div>
+                    <h2 id="in-transit-title">In transit</h2>
+                    <p class="small muted mb-0">Confirm delivery only after the customer handoff is complete.</p>
+                </div>
+                <span class="queue-count" th:text="${shippedOrders.totalElements()}">0</span>
+            </div>
+
+            <th:block th:if="${shippedOrders.content().isEmpty()}">
+                <div th:replace="~{fragments/empty-state :: empty('bi-geo-alt','No orders in transit','Shipped orders stay here until delivery is confirmed.')}"></div>
+            </th:block>
+
+            <article class="queue-card" th:each="order : ${shippedOrders.content()}">
+                <div>
+                    <div class="queue-card__title">
+                        <strong class="mono" th:text="|Order ${#strings.substring(order.id().toString(),0,8)}|">Order</strong>
+                        <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
+                    </div>
+                    <div class="queue-card__meta">
+                        <span th:text="|${order.itemCount()} units|">0 units</span>
+                        <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
+                    </div>
+                </div>
+                <form class="queue-card__action" th:action="@{/admin/delivery/orders/{id}/deliver(id=${order.id()})}"
+                      method="post" data-confirm="Confirm that this order was delivered to the customer?">
+                    <button class="btn btn-success" type="submit">
+                        <i class="bi bi-check2-circle" aria-hidden="true"></i> Mark delivered
+                    </button>
+                </form>
+            </article>
+            <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${shippedOrders}, ${shippedPagination}, 'In-transit order pages')}"></div>
+        </section>
+    </div>
+</section>
+</html>

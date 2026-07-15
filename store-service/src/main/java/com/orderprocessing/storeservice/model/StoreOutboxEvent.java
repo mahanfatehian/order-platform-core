@@ -38,4 +38,6 @@ public class StoreOutboxEvent {
     private boolean deadLettered;
     @Column(name = "last_error")
     private String lastError;
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
 }

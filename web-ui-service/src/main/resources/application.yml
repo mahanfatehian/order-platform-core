@@ -51,6 +51,7 @@ app:
     maximum-quantity: ${CART_MAXIMUM_QUANTITY:99}
   features:
     registration-enabled: ${REGISTRATION_ENABLED:true}
+    demo-mode: ${DEMO_MODE:false}
 
 eureka:
   client:
@@ -66,7 +67,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
