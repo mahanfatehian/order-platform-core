@@ -6,10 +6,12 @@ import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.storeservice.model.Inventory;
+import com.orderprocessing.storeservice.model.InventoryOrderLifecycle;
 import com.orderprocessing.storeservice.model.InventoryReservation;
 import com.orderprocessing.storeservice.model.Product;
 import com.orderprocessing.storeservice.model.StoreOutboxEvent;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
+import com.orderprocessing.storeservice.repository.InventoryOrderLifecycleRepository;
 import com.orderprocessing.storeservice.repository.InventoryReservationRepository;
 import com.orderprocessing.storeservice.repository.ProcessedKafkaEventRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +42,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
     @Mock private InventoryRepository inventoryRepository;
+    @Mock private InventoryOrderLifecycleRepository lifecycleRepository;
     @Mock private InventoryReservationRepository reservationRepository;
     @Mock private ProductRepository productRepository;
     @Mock private ProcessedKafkaEventRepository processedRepository;
@@ -48,8 +52,16 @@ class InventoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new InventoryService(inventoryRepository, reservationRepository, productRepository,
+        service = new InventoryService(inventoryRepository, lifecycleRepository, reservationRepository, productRepository,
                 processedRepository, outboxRepository, new ObjectMapper().findAndRegisterModules());
+        when(lifecycleRepository.findByOrderIdForUpdate(any())).thenAnswer(invocation -> {
+            InventoryOrderLifecycle lifecycle = new InventoryOrderLifecycle();
+            lifecycle.setOrderId(invocation.getArgument(0));
+            lifecycle.setState(InventoryOrderLifecycle.State.ACTIVE);
+            lifecycle.setLastEventId(UUID.randomUUID());
+            lifecycle.setUpdatedAt(Instant.now());
+            return Optional.of(lifecycle);
+        });
     }
 
     @Test

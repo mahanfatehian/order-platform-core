@@ -16,10 +16,12 @@ import com.orderprocessing.storeservice.dto.PageResponse;
 import com.orderprocessing.storeservice.exception.InvalidInventoryException;
 import com.orderprocessing.storeservice.exception.ResourceNotFoundException;
 import com.orderprocessing.storeservice.model.Inventory;
+import com.orderprocessing.storeservice.model.InventoryOrderLifecycle;
 import com.orderprocessing.storeservice.model.InventoryReservation;
 import com.orderprocessing.storeservice.model.Product;
 import com.orderprocessing.storeservice.model.StoreOutboxEvent;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
+import com.orderprocessing.storeservice.repository.InventoryOrderLifecycleRepository;
 import com.orderprocessing.storeservice.repository.InventoryReservationRepository;
 import com.orderprocessing.storeservice.repository.ProcessedKafkaEventRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 @Service
 public class InventoryService {
     private final InventoryRepository inventoryRepository;
+    private final InventoryOrderLifecycleRepository lifecycleRepository;
     private final InventoryReservationRepository reservationRepository;
     private final ProductRepository productRepository;
     private final ProcessedKafkaEventRepository processedEventRepository;
@@ -50,12 +53,14 @@ public class InventoryService {
     private final ObjectMapper objectMapper;
 
     public InventoryService(InventoryRepository inventoryRepository,
+                            InventoryOrderLifecycleRepository lifecycleRepository,
                             InventoryReservationRepository reservationRepository,
                             ProductRepository productRepository,
                             ProcessedKafkaEventRepository processedEventRepository,
                             StoreOutboxEventRepository outboxEventRepository,
                             ObjectMapper objectMapper) {
         this.inventoryRepository = inventoryRepository;
+        this.lifecycleRepository = lifecycleRepository;
         this.reservationRepository = reservationRepository;
         this.productRepository = productRepository;
         this.processedEventRepository = processedEventRepository;
@@ -110,6 +115,12 @@ public class InventoryService {
             return;
         }
         validateOrderEvent(event.getOrderId(), event.getItems());
+
+        InventoryOrderLifecycle lifecycle = lockLifecycle(event.getOrderId(),
+                InventoryOrderLifecycle.State.ACTIVE, event.getEventId());
+        if (lifecycle.getState() != InventoryOrderLifecycle.State.ACTIVE) {
+            return;
+        }
 
         List<InventoryReservation> existing = reservationRepository.findByOrderIdForUpdate(event.getOrderId());
         if (!existing.isEmpty()) {
@@ -187,7 +198,13 @@ public class InventoryService {
         if (event.getOrderId() == null) {
             throw new IllegalArgumentException("Order id is required");
         }
+        InventoryOrderLifecycle lifecycle = lockLifecycle(event.getOrderId(),
+                InventoryOrderLifecycle.State.RELEASED, event.getEventId());
+        if (lifecycle.getState() != InventoryOrderLifecycle.State.ACTIVE) {
+            return;
+        }
         releaseReservations(event.getOrderId());
+        transitionLifecycle(lifecycle, InventoryOrderLifecycle.State.RELEASED, event.getEventId());
     }
 
     @Transactional
@@ -199,7 +216,13 @@ public class InventoryService {
             throw new IllegalArgumentException("Order id is required");
         }
 
+        InventoryOrderLifecycle lifecycle = lockLifecycle(event.getOrderId(),
+                InventoryOrderLifecycle.State.ACTIVE, event.getEventId());
+        if (lifecycle.getState() != InventoryOrderLifecycle.State.ACTIVE) {
+            return;
+        }
         consumeReservations(event.getOrderId());
+        transitionLifecycle(lifecycle, InventoryOrderLifecycle.State.CONSUMED, event.getEventId());
     }
 
     @Transactional
@@ -211,7 +234,28 @@ public class InventoryService {
             throw new IllegalArgumentException("Order id is required");
         }
 
+        InventoryOrderLifecycle lifecycle = lockLifecycle(event.getOrderId(),
+                InventoryOrderLifecycle.State.RELEASED, event.getEventId());
+        if (lifecycle.getState() != InventoryOrderLifecycle.State.ACTIVE) {
+            return;
+        }
         releaseReservations(event.getOrderId());
+        transitionLifecycle(lifecycle, InventoryOrderLifecycle.State.RELEASED, event.getEventId());
+    }
+
+    private InventoryOrderLifecycle lockLifecycle(UUID orderId, InventoryOrderLifecycle.State initialState,
+                                                  UUID eventId) {
+        lifecycleRepository.insertIfAbsent(orderId, initialState.name(), eventId, Instant.now());
+        return lifecycleRepository.findByOrderIdForUpdate(orderId)
+                .orElseThrow(() -> new IllegalStateException("Inventory order lifecycle row is missing"));
+    }
+
+    private void transitionLifecycle(InventoryOrderLifecycle lifecycle, InventoryOrderLifecycle.State state,
+                                     UUID eventId) {
+        lifecycle.setState(state);
+        lifecycle.setLastEventId(eventId);
+        lifecycle.setUpdatedAt(Instant.now());
+        lifecycleRepository.save(lifecycle);
     }
 
     private void consumeReservations(UUID orderId) {
