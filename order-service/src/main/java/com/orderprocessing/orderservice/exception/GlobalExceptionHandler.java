@@ -96,7 +96,6 @@ public class GlobalExceptionHandler {
     }
 
     private String correlationId(HttpServletRequest request) {
-        String value = request.getHeader("X-Correlation-Id");
-        return value == null || value.isBlank() ? UUID.randomUUID().toString() : value;
+        return com.orderprocessing.security.web.CorrelationId.resolve(request);
     }
 }
