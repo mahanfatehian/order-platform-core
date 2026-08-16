@@ -3,6 +3,8 @@ package com.orderprocessing.gateway.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.gateway.security.GatewayErrorWriter;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,12 +45,9 @@ class InternalApiBoundaryFilterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-            "X-Internal-Api-Key",
-            "x-store-internal-api-key"
-    })
-    void removesInternalCredentialsFromForwardedPublicRequests(String internalHeader) {
-        MockServerWebExchange exchange = exchange("/api/store/products");
+    @MethodSource("internalHeaderCasings")
+    void removesInternalCredentialsFromForwardedPublicRequests(String userHeader, String storeHeader) {
+        MockServerWebExchange exchange = exchange("/api/store/products", userHeader, storeHeader);
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
         WebFilterChain chain = forwardedExchange -> {
             forwarded.set(forwardedExchange);
@@ -64,11 +64,22 @@ class InternalApiBoundaryFilterTest {
         });
     }
 
+    private static Stream<Arguments> internalHeaderCasings() {
+        return Stream.of(
+                Arguments.of("x-internal-api-key", "X-Store-Internal-Api-Key"),
+                Arguments.of("X-Internal-Api-Key", "x-store-internal-api-key")
+        );
+    }
+
     private static MockServerWebExchange exchange(String path) {
+        return exchange(path, "X-Internal-Api-Key", "x-store-internal-api-key");
+    }
+
+    private static MockServerWebExchange exchange(String path, String userHeader, String storeHeader) {
         MockServerHttpRequest request = MockServerHttpRequest.get(path)
                 .header(CorrelationIdWebFilter.HEADER, "correlation-123")
-                .header("X-Internal-Api-Key", "user-internal-secret")
-                .header("x-store-internal-api-key", "store-internal-secret")
+                .header(userHeader, "user-internal-secret")
+                .header(storeHeader, "store-internal-secret")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         exchange.getAttributes().put(CorrelationIdWebFilter.ATTRIBUTE, "correlation-123");
