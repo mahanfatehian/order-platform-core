@@ -34,6 +34,24 @@ docker run --rm \
 
 To verify the scanner itself, create a disposable canary outside the repository by concatenating the `A`, `K`, `I`, and `A` fragments with a cryptographically random 16-character uppercase alphanumeric suffix. Scan only that temporary directory with `gitleaks dir --redact --exit-code=2`; it must exit `2`. Do not paste a literal credential into a file, terminal, issue, or pull request, and remove the verified temporary directory immediately after the check.
 
+## Full Saga acceptance
+
+Run the public, bounded Saga proof only against a disposable Compose project. The runner discovers the four local dev personas from the gateway demo page at runtime; do not pass, print, or store passwords or JWTs.
+
+```bash
+DISCOVERY_SERVICE_PORT=18761 GATEWAY_SERVICE_PORT=18080 docker compose -p orderflow-acceptance --env-file .env.example up -d --build --wait --wait-timeout 360
+python3 scripts/acceptance/full-saga.py --base-url http://localhost:18080
+```
+
+If the runner fails, collect bounded diagnostics before cleanup:
+
+```bash
+docker compose -p orderflow-acceptance logs --no-color --tail=300
+docker compose -p orderflow-acceptance down --volumes --remove-orphans
+```
+
+Always run the final teardown command, including after a successful run. The runner uses only public gateway routes and verifies the customer order history has `PENDING`, `CONFIRMED`, `PACKAGED`, `SHIPPED`, and `DELIVERED` transitions with event and correlation IDs.
+
 ## Database changes
 
 Never edit an applied Flyway migration. Add the next versioned migration and verify both clean installation and upgrade behavior. Demo-only records belong in `@Profile("dev")` initializers unless a migration is explicitly production reference data.

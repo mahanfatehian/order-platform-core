@@ -57,6 +57,8 @@ jobs:
             "curl --fail --silent http://localhost:8084/actuator/prometheus | grep --quiet order_platform_outbox_pending"
           docker compose --env-file .env.example exec -T store-service sh -c \
             "curl --fail --silent http://localhost:8083/actuator/prometheus | grep --quiet order_platform_inventory_reservations"
+      - name: Exercise the complete public Saga
+        run: python3 scripts/acceptance/full-saga.py --base-url http://localhost:8080
       - name: Capture service state
         if: always()
         run: docker compose --env-file .env.example ps
