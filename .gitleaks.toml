@@ -1,0 +1,4 @@
+title = "Order/flow secret scanning"
+
+[extend]
+useDefault = true
