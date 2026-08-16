@@ -13,8 +13,8 @@ from html.parser import HTMLParser
 
 PERSONAS = ("customer", "warehouse", "delivery", "admin")
 PERSONA_LABELS = {"customer": "customer", "warehouse": "warehouse", "delivery": "delivery", "administrator": "admin", "admin": "admin"}
-PERSONA_USERNAMES = {"customer": "johndoe", "warehouse": "warehouse_worker", "delivery": "delivery_driver", "admin": "admin"}
 POLL_INTERVAL_SECONDS = 0.5
+HISTORY_QUIESCENCE_INTERVALS = 3
 HTTP_TIMEOUT_SECONDS = 10
 EXPECTED_HISTORY = ("PENDING", "CONFIRMED", "PACKAGED", "SHIPPED", "DELIVERED")
 
@@ -168,7 +168,7 @@ def login(base_url: str, username: str, password: str) -> str:
                             body={"username": username, "password": password})
     token = response.get("accessToken")
     if not isinstance(token, str) or not token:
-        raise RuntimeError("Login response did not include an access token for username=" + username)
+        raise RuntimeError("Login response did not include an access token")
     return token
 
 
@@ -238,9 +238,71 @@ def assert_history(history, order_id):
     return states
 
 
-def run_saga(base_url, timeout_seconds, personas=None):
+def history_snapshot(history, order_id):
+    """Return immutable technical identities from a history response."""
+    if not isinstance(history, list):
+        raise RuntimeError("Order history was not a list for order_id=" + order_id)
+    snapshot = []
+    for entry in history:
+        event_id, state, correlation_id = (entry.get("eventId"), entry.get("toStatus"),
+                                           entry.get("correlationId"))
+        if not event_id or not state or not correlation_id:
+            raise RuntimeError("Order history omitted replay evidence for order_id=" + order_id)
+        snapshot.append((event_id, state, correlation_id))
+    return tuple(snapshot)
+
+
+def poll_history_snapshot(base_url, token, order_id, deadline):
+    """Wait, within the global deadline, for multi-interval history quiescence."""
+    url, previous, stable_intervals = (base_url.rstrip("/") + "/api/orders/" + order_id + "/history",
+                                       None, 0)
+    last_state = "unknown"
+    while time.monotonic() < deadline:
+        snapshot = history_snapshot(request_json("GET", url, token=token), order_id)
+        last_state = "history_count:" + str(len(snapshot))
+        if snapshot == previous:
+            stable_intervals += 1
+            if stable_intervals >= HISTORY_QUIESCENCE_INTERVALS:
+                return snapshot
+        else:
+            previous, stable_intervals = snapshot, 0
+        time.sleep(min(POLL_INTERVAL_SECONDS, max(0, deadline - time.monotonic())))
+    raise request_error("GET", url, (200,), 200, order_id, last_state)
+
+
+def assert_replay_history_unchanged(base_url, token, before, action, order_id, deadline):
+    """Reject any new/replaced history identity during the bounded replay settling window."""
+    url = base_url.rstrip("/") + "/api/orders/" + order_id + "/history"
+    settle_deadline = min(deadline, time.monotonic() + POLL_INTERVAL_SECONDS * HISTORY_QUIESCENCE_INTERVALS)
+    last_state = "history_count:" + str(len(before))
+    while True:
+        after = history_snapshot(request_json("GET", url, token=token), order_id)
+        last_state = "history_count:" + str(len(after))
+        if after != before:
+            description = "Replay added history" if len(after) > len(before) else "Replay changed history identity"
+            raise RuntimeError(
+                "{description}: method=POST url=/api/orders/{order_id}{action} expected_status=200 actual_status=200 "
+                "order_id={order_id} last_observed_order_state=history_count:{before_count}->{after_count}".format(
+                    description=description, action=action, order_id=order_id,
+                    before_count=len(before), after_count=len(after)))
+        if time.monotonic() >= settle_deadline:
+            return
+        time.sleep(min(POLL_INTERVAL_SECONDS, max(0, settle_deadline - time.monotonic())))
+
+
+def require_demo_personas(personas):
+    if not isinstance(personas, dict) or set(personas) != set(PERSONAS):
+        raise RuntimeError("Demo credential discovery must provide exactly the four expected roles")
+    for persona in PERSONAS:
+        pair = personas[persona]
+        if not isinstance(pair, tuple) or len(pair) != 2 or not all(isinstance(value, str) and value for value in pair):
+            raise RuntimeError("Demo credential discovery produced an invalid persona record")
+    return personas
+
+
+def run_saga(base_url, timeout_seconds, personas):
     base_url, deadline = base_url.rstrip("/"), time.monotonic() + timeout_seconds
-    personas = personas or {persona: (PERSONA_USERNAMES[persona], None) for persona in PERSONAS}
+    personas = require_demo_personas(personas)
     customer_token = login_until_ready(base_url, *personas["customer"], deadline)
     warehouse_token = login_until_ready(base_url, *personas["warehouse"], deadline)
     delivery_token = login_until_ready(base_url, *personas["delivery"], deadline)
@@ -270,20 +332,26 @@ def run_saga(base_url, timeout_seconds, personas=None):
     packed = request_json("POST", base_url + "/api/orders/" + order_id + "/pack", token=warehouse_token,
                           headers={"X-Correlation-Id": correlation_id})
     require_status(packed, "PACKAGED", "/pack", order_id)
+    before_pack_replay = poll_history_snapshot(base_url, customer_token, order_id, deadline)
     require_status(request_json("POST", base_url + "/api/orders/" + order_id + "/pack", token=warehouse_token,
                                 headers={"X-Correlation-Id": correlation_id}), "PACKAGED", "/pack", order_id)
+    assert_replay_history_unchanged(base_url, customer_token, before_pack_replay, "/pack", order_id, deadline)
     tracking = "saga-" + str(uuid.uuid4())
     shipped = request_json("POST", base_url + "/api/orders/" + order_id + "/ship", token=delivery_token,
                            body={"trackingReference": tracking}, headers={"X-Correlation-Id": correlation_id})
     require_status(shipped, "SHIPPED", "/ship", order_id)
+    before_ship_replay = poll_history_snapshot(base_url, customer_token, order_id, deadline)
     require_status(request_json("POST", base_url + "/api/orders/" + order_id + "/ship", token=delivery_token,
                                 body={"trackingReference": tracking}, headers={"X-Correlation-Id": correlation_id}),
                    "SHIPPED", "/ship", order_id)
+    assert_replay_history_unchanged(base_url, customer_token, before_ship_replay, "/ship", order_id, deadline)
     delivered = request_json("POST", base_url + "/api/orders/" + order_id + "/deliver", token=delivery_token,
                              headers={"X-Correlation-Id": correlation_id})
     require_status(delivered, "DELIVERED", "/deliver", order_id)
+    before_deliver_replay = poll_history_snapshot(base_url, customer_token, order_id, deadline)
     require_status(request_json("POST", base_url + "/api/orders/" + order_id + "/deliver", token=delivery_token,
                                 headers={"X-Correlation-Id": correlation_id}), "DELIVERED", "/deliver", order_id)
+    assert_replay_history_unchanged(base_url, customer_token, before_deliver_replay, "/deliver", order_id, deadline)
     final_inventory = poll_inventory(base_url, admin_token, product_id, starting_available - 1, deadline)
     if final_inventory.get("availableQuantity") != starting_available - 1:
         raise RuntimeError("Final availability was not exactly one lower for product_id=" + product_id)

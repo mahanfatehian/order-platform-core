@@ -55,7 +55,12 @@ class FullSagaContractTest(unittest.TestCase):
         with patch.object(runner, "request_json", side_effect=fake_request), \
                 patch.object(runner, "poll_order", side_effect=lambda *args: {"id": order_id, "status": args[3]}), \
                 patch.object(runner, "poll_inventory", side_effect=lambda *args: {"availableQuantity": 7}):
-            result = runner.run_saga("http://gateway.example", 30)
+            result = runner.run_saga("http://gateway.example", 30, {
+                "customer": ("johndoe", "test-only"),
+                "warehouse": ("warehouse_worker", "test-only"),
+                "delivery": ("delivery_driver", "test-only"),
+                "admin": ("admin", "test-only"),
+            })
 
         self.assertEqual(order_id, result["order_id"])
         self.assertEqual(product_id, result["product_id"])
