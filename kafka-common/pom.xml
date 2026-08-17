@@ -29,6 +29,14 @@
         </dependency>
         
         <!-- Other common dependencies -->
+        <!-- EventCorrelationContext writes to the MDC. slf4j-api only reaches
+             this module at runtime through spring-kafka, so it is declared
+             explicitly rather than compiled against a transitive coincidence.
+             The version is managed by spring-boot-dependencies. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

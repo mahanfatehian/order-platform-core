@@ -1,5 +1,6 @@
 package com.orderprocessing.orderservice.kafka;
 
+import com.orderprocessing.kafkacommon.EventCorrelationContext;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
@@ -21,6 +22,15 @@ public class OrderKafkaConsumer {
 
     @KafkaListener(topics = KafkaTopics.STORE_EVENTS, groupId = "order-service")
     public void handleStoreEvent(ConsumerRecord<String, Object> record) {
+        EventCorrelationContext.run(record, () -> dispatchStoreEvent(record));
+    }
+
+    @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "order-service")
+    public void handleOrderEvent(ConsumerRecord<String, Object> record) {
+        EventCorrelationContext.run(record, () -> dispatchOrderEvent(record));
+    }
+
+    private void dispatchStoreEvent(ConsumerRecord<String, Object> record) {
         Object event = record.value();
         if (event instanceof StockReservedEvent reserved) {
             orderService.processStockReserved(reserved, record.topic(), record.partition(), record.offset());
@@ -34,8 +44,7 @@ public class OrderKafkaConsumer {
                 event == null ? "null" : event.getClass().getSimpleName());
     }
 
-    @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "order-service")
-    public void handleOrderEvent(ConsumerRecord<String, Object> record) {
+    private void dispatchOrderEvent(ConsumerRecord<String, Object> record) {
         // These are the service's own past-tense facts. Routing them through the
         // inbox provides retry-safe acknowledgement only; OrderService never
         // treats Kafka messages as authorization to perform a human action.

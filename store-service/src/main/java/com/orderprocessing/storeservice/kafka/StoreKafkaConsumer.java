@@ -1,5 +1,6 @@
 package com.orderprocessing.storeservice.kafka;
 
+import com.orderprocessing.kafkacommon.EventCorrelationContext;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
@@ -20,6 +21,10 @@ public class StoreKafkaConsumer {
 
     @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "store-service")
     public void handleOrderEvent(ConsumerRecord<String, Object> record) {
+        EventCorrelationContext.run(record, () -> dispatchOrderEvent(record));
+    }
+
+    private void dispatchOrderEvent(ConsumerRecord<String, Object> record) {
         Object event = record.value();
         if (event instanceof OrderPlacedEvent placed) {
             inventoryService.processOrderPlaced(placed, record.topic(), record.partition(), record.offset());
