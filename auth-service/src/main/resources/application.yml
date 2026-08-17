@@ -51,8 +51,8 @@ app:
 
 logging:
   level:
-    org.springframework.security: INFO
-    com.orderprocessing.authservice.client.UserServiceClient: INFO
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    com.orderprocessing.authservice.client.UserServiceClient: ${LOG_LEVEL_INTERNAL_CLIENT:INFO}
 
 eureka:
   client:

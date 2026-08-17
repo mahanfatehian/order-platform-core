@@ -109,9 +109,9 @@ management:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    org.flywaydb: INFO
-    org.springframework.security: DEBUG
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:INFO}
+    org.flywaydb: ${LOG_LEVEL_FLYWAY:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
 
 eureka:
   client:

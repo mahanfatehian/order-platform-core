@@ -78,4 +78,4 @@ logging:
   pattern:
     level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
-    org.springframework.security: INFO
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
