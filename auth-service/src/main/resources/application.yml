@@ -50,6 +50,8 @@ app:
         - /actuator/prometheus
 
 logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     com.orderprocessing.authservice.client.UserServiceClient: ${LOG_LEVEL_INTERNAL_CLIENT:INFO}

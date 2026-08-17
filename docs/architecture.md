@@ -215,6 +215,20 @@ The Kafka consumer error handler retries a failed record three times at one-seco
 
 The platform implements a bounded deadline for the initial inventory handshake, but it does not include an outbox/DLT replay console or a DLT consumer. A dead-lettered first outbox row blocks later facts for that order until an operator repairs it, and an exhausted delivery-settlement record can leave inventory unsettled. These are explicit operational follow-ups rather than hidden exactly-once claims.
 
+## Log correlation
+
+`X-Correlation-Id` is resolved once at the edge and travels with the request. The gateway accepts a caller-supplied value only when it matches `[A-Za-z0-9._-]{1,128}` and otherwise substitutes a fresh UUID, so the value that reaches the services is always safe to log. Each servlet service binds it to the SLF4J MDC under `correlationId` for the life of the request and echoes it back on the response.
+
+Every servlet service renders that value in its log level field:
+
+```
+logging.pattern.level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+```
+
+which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | grep <id>` return one request's path across `web-ui-service`, `auth-service`, `user-service`, `store-service`, and `order-service`. Lines logged outside a request scope render `-` in the correlation position.
+
+`gateway-service` is deliberately excluded. It is a reactive WebFlux application, where work for one exchange moves between event-loop threads and the thread-bound MDC does not follow it. `CorrelationIdWebFilter` therefore carries the value on the exchange and the header rather than in the MDC, and adding the pattern there would print an empty field on every line. Correlating a gateway line with a service line is done through the `X-Correlation-Id` response header.
+
 ## Contract evolution rules
 
 - `eventId` is the durable idempotency key and must remain stable across outbox retries.

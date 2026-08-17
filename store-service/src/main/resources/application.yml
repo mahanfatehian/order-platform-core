@@ -88,6 +88,8 @@ management:
         include: health,info,prometheus
 
 logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
     org.hibernate.SQL: ${LOG_LEVEL_SQL:INFO}
     org.flywaydb: ${LOG_LEVEL_FLYWAY:INFO}
