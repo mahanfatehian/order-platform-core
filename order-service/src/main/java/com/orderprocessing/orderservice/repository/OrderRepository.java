@@ -19,13 +19,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     long countByStatus(Order.Status status);
 
-
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items")
-    List<Order> findAllWithItems();
-
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.userId = :userId ORDER BY o.createdAt DESC")
-    List<Order> findAllByUserIdWithItems(@Param("userId") UUID userId);
-
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id = :id")
     Optional<Order> findOrderWithItemsById(@Param("id") UUID id);
 

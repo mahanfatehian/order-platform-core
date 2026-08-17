@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = "orders")
@@ -51,6 +52,13 @@ public class Order {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * Paged listings load orders through a {@code Specification}, which cannot
+     * join-fetch without moving pagination into memory. Batching the lazy
+     * collection keeps pagination in the database while resolving the items of
+     * a whole page in a single {@code IN (...)} query instead of one per order.
+     */
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     private List<OrderItem> items = new java.util.ArrayList<>();
 }
