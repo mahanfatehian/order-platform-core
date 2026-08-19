@@ -1,9 +1,11 @@
 package com.orderprocessing.webui.controller;
 
 import com.orderprocessing.webui.exception.BackendClientException;
+import com.orderprocessing.webui.exception.RateLimitedException;
 import com.orderprocessing.webui.exception.SessionExpiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,6 +43,14 @@ public class PageExceptionHandler {
         ModelAndView view = new ModelAndView("error/service-unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         view.addObject("serviceMessage", "The platform is temporarily unavailable. Try again shortly.");
         view.addObject("retryPath", request.getRequestURI());
+        return view;
+    }
+
+    @ExceptionHandler(RateLimitedException.class)
+    public ModelAndView rateLimited(RateLimitedException exception, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(exception.retryAfterSeconds()));
+        ModelAndView view = new ModelAndView("error/rate-limited", HttpStatus.TOO_MANY_REQUESTS);
+        view.addObject("retryAfterSeconds", exception.retryAfterSeconds());
         return view;
     }
 }

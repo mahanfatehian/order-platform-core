@@ -23,12 +23,15 @@ public class WebUiProperties {
     private final Features features = new Features();
     @Valid
     private final Captcha captcha = new Captcha();
+    @Valid
+    private final RateLimit rateLimit = new RateLimit();
 
     public Services getServices() { return services; }
     public Security getSecurity() { return security; }
     public Cart getCart() { return cart; }
     public Features getFeatures() { return features; }
     public Captcha getCaptcha() { return captcha; }
+    public RateLimit getRateLimit() { return rateLimit; }
 
     public static class Services {
         @NotBlank private String authUrl;
@@ -111,5 +114,27 @@ public class WebUiProperties {
         public void setWidth(int width) { this.width = width; }
         public int getHeight() { return height; }
         public void setHeight(int height) { this.height = height; }
+    }
+
+    /**
+     * Request ceilings for the endpoints an unauthenticated caller can reach. These bound volume regardless of
+     * outcome, which the captcha thresholds deliberately do not: those only react to genuine credential failures.
+     */
+    public static class RateLimit {
+        private boolean enabled = true;
+        /** Sign-in and registration submissions allowed from one address per window, whatever the outcome. */
+        @Min(1) private int submissionsPerWindow = 10;
+        /** Captcha images allowed from one address per window; each page render costs exactly one. */
+        @Min(1) private int challengesPerWindow = 30;
+        @NotNull private Duration window = Duration.ofMinutes(1);
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getSubmissionsPerWindow() { return submissionsPerWindow; }
+        public void setSubmissionsPerWindow(int submissionsPerWindow) { this.submissionsPerWindow = submissionsPerWindow; }
+        public int getChallengesPerWindow() { return challengesPerWindow; }
+        public void setChallengesPerWindow(int challengesPerWindow) { this.challengesPerWindow = challengesPerWindow; }
+        public Duration getWindow() { return window; }
+        public void setWindow(Duration window) { this.window = window; }
     }
 }

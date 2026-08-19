@@ -58,6 +58,11 @@ app:
     registration-threshold: ${CAPTCHA_REGISTRATION_THRESHOLD:3}
     window: ${CAPTCHA_WINDOW:15m}
     ttl: ${CAPTCHA_TTL:2m}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    submissions-per-window: ${RATE_LIMIT_SUBMISSIONS_PER_WINDOW:10}
+    challenges-per-window: ${RATE_LIMIT_CHALLENGES_PER_WINDOW:30}
+    window: ${RATE_LIMIT_WINDOW:1m}
 
 eureka:
   client:
