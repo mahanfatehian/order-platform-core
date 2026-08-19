@@ -52,6 +52,12 @@ app:
   features:
     registration-enabled: ${REGISTRATION_ENABLED:true}
     demo-mode: ${DEMO_MODE:false}
+  captcha:
+    enabled: ${CAPTCHA_ENABLED:true}
+    failure-threshold: ${CAPTCHA_FAILURE_THRESHOLD:3}
+    registration-threshold: ${CAPTCHA_REGISTRATION_THRESHOLD:3}
+    window: ${CAPTCHA_WINDOW:15m}
+    ttl: ${CAPTCHA_TTL:2m}
 
 eureka:
   client:

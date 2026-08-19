@@ -3,6 +3,7 @@ package com.orderprocessing.webui.config;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -20,11 +21,14 @@ public class WebUiProperties {
     private final Cart cart = new Cart();
     @Valid
     private final Features features = new Features();
+    @Valid
+    private final Captcha captcha = new Captcha();
 
     public Services getServices() { return services; }
     public Security getSecurity() { return security; }
     public Cart getCart() { return cart; }
     public Features getFeatures() { return features; }
+    public Captcha getCaptcha() { return captcha; }
 
     public static class Services {
         @NotBlank private String authUrl;
@@ -74,5 +78,38 @@ public class WebUiProperties {
         public void setRegistrationEnabled(boolean registrationEnabled) { this.registrationEnabled = registrationEnabled; }
         public boolean isDemoMode() { return demoMode; }
         public void setDemoMode(boolean demoMode) { this.demoMode = demoMode; }
+    }
+
+    /** Settings for the self-hosted sign-in captcha; see {@code com.orderprocessing.webui.captcha}. */
+    public static class Captcha {
+        private boolean enabled = true;
+        /** Failed sign-ins tolerated from one address, or against one account, before a captcha is demanded. */
+        @Min(1) private int failureThreshold = 3;
+        /** Registration submissions tolerated from one address before a captcha is demanded. */
+        @Min(1) private int registrationThreshold = 3;
+        /** How long attempt counters survive without further activity. */
+        @NotNull private Duration window = Duration.ofMinutes(15);
+        /** How long an issued challenge stays solvable. */
+        @NotNull private Duration ttl = Duration.ofMinutes(2);
+        @Min(4) private int length = 6;
+        @Min(120) private int width = 240;
+        @Min(40) private int height = 72;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getFailureThreshold() { return failureThreshold; }
+        public void setFailureThreshold(int failureThreshold) { this.failureThreshold = failureThreshold; }
+        public int getRegistrationThreshold() { return registrationThreshold; }
+        public void setRegistrationThreshold(int registrationThreshold) { this.registrationThreshold = registrationThreshold; }
+        public Duration getWindow() { return window; }
+        public void setWindow(Duration window) { this.window = window; }
+        public Duration getTtl() { return ttl; }
+        public void setTtl(Duration ttl) { this.ttl = ttl; }
+        public int getLength() { return length; }
+        public void setLength(int length) { this.length = length; }
+        public int getWidth() { return width; }
+        public void setWidth(int width) { this.width = width; }
+        public int getHeight() { return height; }
+        public void setHeight(int height) { this.height = height; }
     }
 }
