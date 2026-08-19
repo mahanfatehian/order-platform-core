@@ -1,0 +1,16 @@
+<div th:fragment="challenge" xmlns:th="http://www.thymeleaf.org" class="captcha" data-captcha>
+    <label class="form-label" for="captcha">Security check</label>
+    <p class="captcha__hint" id="captchaHint">Repeated attempts came from this location. Type the characters shown to continue.</p>
+    <div class="captcha__row">
+        <img class="captcha__image" th:src="@{/captcha/image}" data-captcha-image
+             alt="Distorted characters that must be typed into the security check field below">
+        <button class="btn btn-outline-secondary captcha__refresh" type="button" data-captcha-refresh
+                title="Show a different image" aria-label="Show a different security check image">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+        </button>
+    </div>
+    <input id="captcha" class="form-control form-control-lg" type="text" th:field="*{captcha}"
+           autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32"
+           aria-describedby="captchaHint" required>
+    <div class="field-error" th:errors="*{captcha}"></div>
+</div>

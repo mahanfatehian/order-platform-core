@@ -143,6 +143,19 @@
     }
   });
 
+  document.addEventListener("click", event => {
+    const trigger = event.target.closest("[data-captcha-refresh]");
+    if (!trigger) return;
+    const widget = trigger.closest("[data-captcha]");
+    const image = widget?.querySelector("[data-captcha-image]");
+    if (!image) return;
+    // Each request mints a fresh challenge; the cache-buster keeps a revisited page from reusing a spent one.
+    const next = new URL(image.getAttribute("src"), window.location.origin);
+    next.searchParams.set("t", Date.now().toString());
+    image.setAttribute("src", next.pathname + next.search);
+    widget.querySelector("#captcha")?.focus();
+  });
+
   markActiveNavigation();
   updateDocumentTitle();
   syncCartCount(document);

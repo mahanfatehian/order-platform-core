@@ -12,6 +12,9 @@
                 <div class="col-12"><label class="form-label" for="password">Password</label><input id="password" name="password" class="form-control" type="password" autocomplete="new-password" required><div class="form-text">Use at least 8 characters.</div><div class="field-error" th:errors="*{password}"></div></div>
                 <div class="col-12"><label class="form-label" for="confirmPassword">Confirm password</label><input id="confirmPassword" name="confirmPassword" class="form-control" type="password" autocomplete="new-password" required><div class="field-error" th:errors="*{confirmPassword}"></div></div>
             </div>
+            <th:block th:if="${captchaRequired}">
+                <div th:replace="~{fragments/captcha :: challenge}"></div>
+            </th:block>
             <button class="btn btn-primary btn-lg w-100 mt-4" type="submit">Create customer account</button>
         </form>
         <p class="mt-4 mb-0 text-center muted">Already registered? <a th:href="@{/login}">Sign in</a></p>

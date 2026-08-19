@@ -11,6 +11,8 @@ public class RegistrationForm {
     @Size(max = 100) private String lastName;
     @NotBlank @Size(min = 8, max = 100) private String password;
     @NotBlank private String confirmPassword;
+    /** Required only once the attempt counter escalates; enforced by the controller, not by an annotation. */
+    @Size(max = 32) private String captcha;
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -24,4 +26,6 @@ public class RegistrationForm {
     public void setPassword(String password) { this.password = password; }
     public String getConfirmPassword() { return confirmPassword; }
     public void setConfirmPassword(String confirmPassword) { this.confirmPassword = confirmPassword; }
+    public String getCaptcha() { return captcha; }
+    public void setCaptcha(String captcha) { this.captcha = captcha; }
 }

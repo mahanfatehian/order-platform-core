@@ -231,6 +231,12 @@ a:hover { color: var(--app-primary-hover); }
 .auth-aside p { position: relative; max-width: 35rem; color: #b8cad9; }
 .demo-personas { margin-top: 1.25rem; padding: 1rem; background: var(--app-surface-alt); border: 1px solid var(--app-border); border-radius: .65rem; }
 .demo-personas code { color: var(--app-text); }
+.captcha { margin-bottom: 1.25rem; padding: 1rem; background: var(--app-surface-alt); border: 1px solid var(--app-border); border-radius: .65rem; }
+.captcha__hint { margin: 0 0 .7rem; color: var(--app-muted); font-size: .85rem; }
+.captcha__row { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
+.captcha__image { display: block; max-width: 100%; height: auto; border: 1px solid var(--app-border-strong); border-radius: .45rem; background: var(--app-surface); }
+.captcha__refresh { flex: none; }
+.captcha .form-control { text-transform: uppercase; letter-spacing: .16em; font-weight: 700; }
 
 .empty-state { padding: clamp(2.5rem,7vw,5rem) 1rem; color: var(--app-muted); text-align: center; }
 .empty-state > i { display: block; margin-bottom: .8rem; color: var(--app-muted); font-size: 2rem; }
