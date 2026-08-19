@@ -13,6 +13,7 @@ The repository is designed to be evaluated from a clean clone. Docker Compose bu
 - Cancellation only while an order is `PENDING` or `CONFIRMED`
 - Inventory reservations that are released on cancellation/failure and consumed on delivery
 - Immutable lifecycle history with actor, reason, correlation ID, event ID, and timestamps
+- Adaptive sign-in protection: an in-process captcha after repeated credential failures, plus per-address request ceilings
 - Bootstrap 5.3 server-rendered UI with HTMX updates and a persisted light/dark theme
 - Optional Kafka event browser and Prometheus metrics through Compose profiles
 - Health-gated startup, non-root application images, graceful shutdown, CI, and safe demo reset scripts
@@ -208,6 +209,23 @@ sh scripts/reset-demo.sh --yes
 
 Reset is intentionally explicit because it permanently deletes local demo data.
 
+### Sign-in abuse controls
+
+Two independent controls guard the anonymous entry points; [ADR-0002](docs/adr/0002-sign-in-abuse-controls.md) records the reasoning in full.
+
+| Control | Reacts to | Effect |
+| --- | --- | --- |
+| Captcha escalation | Failed credential attempts, per address and per targeted account | The next submission must solve a challenge |
+| Request ceiling | Every request, whatever the outcome | Further submissions are refused with `429` and a `Retry-After` |
+
+The challenge is drawn in process with Java2D and held in the Redis-backed session, so there is no captcha vendor, API key, or outbound call, and the demo behaves identically offline. A challenge is consumed on first verification, so a solved one cannot be replayed.
+
+Only a genuine `401` counts towards the captcha threshold; a `503` from a degraded `auth-service` never does, so an outage cannot push a legitimate user towards a challenge. The request ceiling is what bounds volume in that case, and it covers the sign-in form, the registration form, and the challenge images the gateway limiter never sees.
+
+Counters are shared through Redis. If Redis is unreachable they fall back to bounded per-instance counting rather than reporting zero, so the controls degrade instead of switching themselves off.
+
+To watch it happen locally, submit a wrong password three times at http://localhost:8085/login.
+
 ## Configuration
 
 `.env.example` contains local-development values and documents every required secret/port. The start scripts use it directly. To customize the environment, copy it to `.env`, change the values, and omit `--env-file .env.example` from Compose commands.
@@ -219,6 +237,12 @@ Important runtime switches:
 | `SPRING_PROFILES_ACTIVE` | `dev` | Enables demo identities and catalog |
 | `DEMO_MODE` | `true` | Shows demo credentials on the sign-in page |
 | `REGISTRATION_ENABLED` | `true` | Enables customer self-registration |
+| `CAPTCHA_ENABLED` | `true` | Escalates the sign-in and registration forms to a captcha after repeated failures |
+| `CAPTCHA_FAILURE_THRESHOLD` | `3` | Failed sign-ins tolerated from one address, or against one account, before a captcha is demanded |
+| `CAPTCHA_REGISTRATION_THRESHOLD` | `3` | Registration submissions tolerated from one address before a captcha is demanded |
+| `CAPTCHA_WINDOW` | `15m` | How long attempt counters survive without further activity |
+| `RATE_LIMIT_SUBMISSIONS_PER_WINDOW` | `10` | Sign-in and registration submissions allowed per address per window |
+| `RATE_LIMIT_CHALLENGES_PER_WINDOW` | `30` | Captcha images allowed per address per window |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `ORDER_PENDING_TIMEOUT` | `PT10M` | Deadline before an unfinished inventory handshake is reconciled to `FAILED` |
 | `ORDER_OUTBOX_MAX_ATTEMPTS` / `STORE_OUTBOX_MAX_ATTEMPTS` | `5` | Database outbox publish attempts before operator intervention |
