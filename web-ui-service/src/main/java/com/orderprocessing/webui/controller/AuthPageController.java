@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.Objects;
+
 @Controller
 public class AuthPageController {
     private final UiAuthenticationService authenticationService;
@@ -79,7 +81,7 @@ public class AuthPageController {
     public String register(@Valid @ModelAttribute RegistrationForm registrationForm, BindingResult binding,
                            RedirectAttributes redirect) {
         requireRegistration();
-        if (!registrationForm.getPassword().equals(registrationForm.getConfirmPassword())) {
+        if (!Objects.equals(registrationForm.getPassword(), registrationForm.getConfirmPassword())) {
             binding.rejectValue("confirmPassword", "mismatch", "Passwords do not match");
         }
         if (binding.hasErrors()) return "auth/register";
