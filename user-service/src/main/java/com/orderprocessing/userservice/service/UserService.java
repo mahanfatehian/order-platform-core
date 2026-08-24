@@ -18,17 +18,22 @@ import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -135,13 +140,25 @@ public class UserService {
             throw new IllegalArgumentException("Unsupported user sort field: " + sort);
         }
         String query = search == null || search.isBlank() ? "" : search.strip();
-        Page<UserResponse> result = userRepository.search(
-                        query,
-                        enabled,
-                        PageRequest.of(page, size, Sort.by(direction, sortField))
-                )
-                .map(this::mapToResponse);
-        return PageResponse.from(result);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        // Page the identifiers first so the database applies the limit, then load just that page with its roles.
+        // Doing both in one fetch-joined query would force Hibernate to read every match and page in memory.
+        Page<UUID> identifiers = userRepository.searchIds(query, enabled, pageable);
+        if (identifiers.isEmpty()) {
+            return PageResponse.from(new PageImpl<>(List.<UserResponse>of(), pageable, identifiers.getTotalElements()));
+        }
+
+        Map<UUID, UserEntity> loaded = userRepository.findAllWithRolesByIdIn(identifiers.getContent()).stream()
+                .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
+        // The second query returns no useful order, so the sorted identifier page is what rebuilds it. A user
+        // deleted between the two reads simply drops out rather than surfacing as a null row.
+        List<UserResponse> content = identifiers.getContent().stream()
+                .map(loaded::get)
+                .filter(Objects::nonNull)
+                .map(this::mapToResponse)
+                .toList();
+        return PageResponse.from(new PageImpl<>(content, pageable, identifiers.getTotalElements()));
     }
 
     @Transactional(readOnly = true)

@@ -3,6 +3,7 @@ package com.orderprocessing.userservice.service;
 import com.orderprocessing.security.service.TokenRevocationService;
 import com.orderprocessing.userservice.dto.ChangePasswordRequest;
 import com.orderprocessing.userservice.dto.CreateUserRequest;
+import com.orderprocessing.userservice.dto.PageResponse;
 import com.orderprocessing.userservice.dto.UserResponse;
 import com.orderprocessing.userservice.entity.RoleEntity;
 import com.orderprocessing.userservice.entity.UserEntity;
@@ -10,19 +11,24 @@ import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,12 +40,77 @@ class UserServiceTest {
         RoleRepository roles = mock(RoleRepository.class);
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         TokenRevocationService revocation = mock(TokenRevocationService.class);
-        when(users.search(eq(""), isNull(), any(Pageable.class))).thenReturn(Page.empty());
+        when(users.searchIds(eq(""), isNull(), any(Pageable.class))).thenReturn(Page.empty());
 
         new UserService(users, roles, encoder, revocation)
                 .searchAdminUsers(null, null, 0, 20, "createdAt", Sort.Direction.DESC);
 
-        verify(users).search(eq(""), isNull(), any(Pageable.class));
+        verify(users).searchIds(eq(""), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    void adminSearchLoadsOnlyThePagedIdentifiersAndKeepsTheirOrder() {
+        UserRepository users = mock(UserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UserEntity first = user("bravo");
+        UserEntity second = user("alpha");
+        List<UUID> ordered = List.of(first.getId(), second.getId());
+        when(users.searchIds(eq(""), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(ordered, PageRequest.of(0, 20), 57));
+        // Returned deliberately out of order: an "in :ids" query guarantees nothing about row order.
+        when(users.findAllWithRolesByIdIn(anyList())).thenReturn(List.of(second, first));
+
+        PageResponse<UserResponse> page = new UserService(users, roles, encoder, revocation)
+                .searchAdminUsers(null, null, 0, 20, "username", Sort.Direction.ASC);
+
+        assertThat(page.content()).extracting(UserResponse::getUsername).containsExactly("bravo", "alpha");
+        assertThat(page.totalElements()).isEqualTo(57);
+        verify(users).findAllWithRolesByIdIn(ordered);
+    }
+
+    @Test
+    void adminSearchSkipsTheSecondQueryWhenThePageIsEmpty() {
+        UserRepository users = mock(UserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        when(users.searchIds(eq("ghost"), isNull(), any(Pageable.class))).thenReturn(Page.empty());
+
+        PageResponse<UserResponse> page = new UserService(users, roles, encoder, revocation)
+                .searchAdminUsers("ghost", null, 0, 20, "createdAt", Sort.Direction.DESC);
+
+        assertThat(page.content()).isEmpty();
+        verify(users, never()).findAllWithRolesByIdIn(anyList());
+    }
+
+    @Test
+    void adminSearchDropsAUserDeletedBetweenTheTwoQueries() {
+        UserRepository users = mock(UserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UserEntity survivor = user("survivor");
+        when(users.searchIds(eq(""), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(survivor.getId(), UUID.randomUUID()), PageRequest.of(0, 20), 2));
+        when(users.findAllWithRolesByIdIn(anyList())).thenReturn(List.of(survivor));
+
+        PageResponse<UserResponse> page = new UserService(users, roles, encoder, revocation)
+                .searchAdminUsers(null, null, 0, 20, "createdAt", Sort.Direction.DESC);
+
+        assertThat(page.content()).extracting(UserResponse::getUsername).containsExactly("survivor");
+    }
+
+    private static UserEntity user(String username) {
+        UserEntity user = UserEntity.builder()
+                .username(username)
+                .email(username + "@example.com")
+                .passwordHash("hash")
+                .roles(Set.of(RoleEntity.builder().name("ROLE_USER").build()))
+                .build();
+        user.setId(UUID.randomUUID());
+        return user;
     }
 
     @Test

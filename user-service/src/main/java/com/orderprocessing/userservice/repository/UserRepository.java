@@ -12,6 +12,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +40,13 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
     @Query("select u from UserEntity u where u.id = :id")
     Optional<UserEntity> findByIdForUpdate(@Param("id") UUID id);
 
-    @EntityGraph(attributePaths = {"roles"})
+    /**
+     * Pages the matching identifiers only. Fetching the roles collection here would stop Hibernate pushing the
+     * limit into SQL, because a user spans as many rows as it holds roles and the database cannot count pages in
+     * users while the driver counts them in rows.
+     */
     @Query(value = """
-            select u from UserEntity u
+            select u.id from UserEntity u
             where (:search = ''
                 or lower(u.username) like lower(concat('%', :search, '%'))
                 or lower(u.email) like lower(concat('%', :search, '%'))
@@ -58,7 +63,12 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
                 or lower(coalesce(u.lastName, '')) like lower(concat('%', :search, '%')))
               and (:enabled is null or u.enabled = :enabled)
             """)
-    Page<UserEntity> search(@Param("search") String search, @Param("enabled") Boolean enabled, Pageable pageable);
+    Page<UUID> searchIds(@Param("search") String search, @Param("enabled") Boolean enabled, Pageable pageable);
+
+    /** Loads one already-paged set of users with their roles. Order is restored by the caller. */
+    @EntityGraph(attributePaths = {"roles"})
+    @Query("select u from UserEntity u where u.id in :ids")
+    List<UserEntity> findAllWithRolesByIdIn(@Param("ids") Collection<UUID> ids);
 
     @Query("""
             select count(distinct u) from UserEntity u join u.roles r
