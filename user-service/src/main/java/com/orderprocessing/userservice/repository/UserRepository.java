@@ -42,7 +42,7 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
     @EntityGraph(attributePaths = {"roles"})
     @Query(value = """
             select u from UserEntity u
-            where (:search is null
+            where (:search = ''
                 or lower(u.username) like lower(concat('%', :search, '%'))
                 or lower(u.email) like lower(concat('%', :search, '%'))
                 or lower(coalesce(u.firstName, '')) like lower(concat('%', :search, '%'))
@@ -51,7 +51,7 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
             """,
             countQuery = """
             select count(u) from UserEntity u
-            where (:search is null
+            where (:search = ''
                 or lower(u.username) like lower(concat('%', :search, '%'))
                 or lower(u.email) like lower(concat('%', :search, '%'))
                 or lower(coalesce(u.firstName, '')) like lower(concat('%', :search, '%'))
