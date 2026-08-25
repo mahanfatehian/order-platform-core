@@ -19,6 +19,19 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     long countByStatus(Order.Status status);
 
+    /**
+     * One grouped pass in place of a count per status. A status with no rows is simply absent from the result,
+     * which the caller treats as zero.
+     */
+    @Query("select o.status as status, count(o) as total from Order o group by o.status")
+    List<StatusCount> countGroupedByStatus();
+
+    interface StatusCount {
+        Order.Status getStatus();
+
+        long getTotal();
+    }
+
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id = :id")
     Optional<Order> findOrderWithItemsById(@Param("id") UUID id);
 
