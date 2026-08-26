@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -157,5 +158,34 @@ class OutboxPublisherServiceTest {
         assertThat(event.getAttemptCount()).isEqualTo(5);
         assertThat(event.isDeadLettered()).isTrue();
         assertThat(event.getNextAttemptAt()).isNull();
+    }
+
+    @Test
+    void stopsDispatchingOnceTheBudgetIsSpentBecauseSendBlocksBeforeItReturnsAFuture() {
+        List<OutboxEvent> events = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            events.add(event("OrderPlacedEvent"));
+        }
+        when(repository.lockReadyBatch(anyInt())).thenReturn(events);
+        AtomicInteger dispatched = new AtomicInteger();
+        when(kafkaTemplate.send(anyString(), anyString(), any())).thenAnswer(invocation -> {
+            dispatched.incrementAndGet();
+            // Stands in for waitOnMetadata blocking against an unreachable broker, which happens before any
+            // future exists and so cannot be bounded by a timeout on the future.
+            Thread.sleep(200L);
+            return CompletableFuture.completedFuture(null);
+        });
+
+        long startedAt = System.nanoTime();
+        publisher(Duration.ofMillis(300)).publishUnpublishedEvents();
+        long elapsedMillis = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+
+        assertThat(dispatched.get()).isLessThan(events.size());
+        assertThat(elapsedMillis).isLessThan(1200L);
+        // Whatever was never handed to the producer keeps a clean slate for the next run.
+        assertThat(events.subList(dispatched.get(), events.size())).allSatisfy(event -> {
+            assertThat(event.getAttemptCount()).isZero();
+            assertThat(event.isPublished()).isFalse();
+        });
     }
 }

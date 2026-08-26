@@ -58,7 +58,10 @@ public class OutboxPublisherService {
         if (events.isEmpty()) {
             return;
         }
-        awaitWithinBudget(dispatch(events));
+        // One deadline covers both halves. send() blocks before it returns a future, so a budget applied only
+        // to the futures would leave the dispatch loop unbounded.
+        long deadline = System.nanoTime() + batchTimeout.toNanos();
+        awaitWithinBudget(dispatch(events, deadline), deadline);
         repository.saveAll(events);
     }
 
@@ -67,9 +70,14 @@ public class OutboxPublisherService {
      * the same aggregate, so this cannot reorder two facts about one order, and the idempotent producer preserves
      * order per partition in any case.
      */
-    private Map<OutboxEvent, CompletableFuture<SendResult<String, Object>>> dispatch(List<OutboxEvent> events) {
+    private Map<OutboxEvent, CompletableFuture<SendResult<String, Object>>> dispatch(List<OutboxEvent> events, long deadline) {
         Map<OutboxEvent, CompletableFuture<SendResult<String, Object>>> inFlight = new LinkedHashMap<>();
         for (OutboxEvent event : events) {
+            if (System.nanoTime() >= deadline) {
+                // Out of budget. Leave the rest of the batch untouched, with no attempt recorded, so the next
+                // run retries them as though they had never been picked up.
+                break;
+            }
             try {
                 DomainEvent payload =
                         KafkaEventRegistry.deserialize(event.getEventType(), event.getPayload(), objectMapper);
@@ -85,8 +93,7 @@ public class OutboxPublisherService {
      * Spends one budget across the batch rather than one per event, so an unreachable broker cannot hold the
      * transaction, and the row locks it carries, for the batch size multiplied by the timeout.
      */
-    private void awaitWithinBudget(Map<OutboxEvent, CompletableFuture<SendResult<String, Object>>> inFlight) {
-        long deadline = System.nanoTime() + batchTimeout.toNanos();
+    private void awaitWithinBudget(Map<OutboxEvent, CompletableFuture<SendResult<String, Object>>> inFlight, long deadline) {
         for (Map.Entry<OutboxEvent, CompletableFuture<SendResult<String, Object>>> entry : inFlight.entrySet()) {
             OutboxEvent event = entry.getKey();
             try {
