@@ -1,7 +1,11 @@
 server:
   port: ${GATEWAY_SERVICE_PORT:8080}
   shutdown: graceful
-  forward-headers-strategy: framework
+  # This service is published on all interfaces and has no proxy in front of it by default, so the forwarded
+  # headers are attacker-controlled and must not be believed. Set to "framework" only when a trusted load
+  # balancer terminates in front of the gateway; the boundary filter reads the same value and stops stripping
+  # the headers when it does.
+  forward-headers-strategy: ${GATEWAY_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   lifecycle:
