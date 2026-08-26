@@ -5,6 +5,7 @@ import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.sql.Connection;
@@ -18,6 +19,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@EnabledIf(value = "com.orderprocessing.storeservice.support.PostgresAvailability#present",
+        disabledReason = "Needs Docker for Testcontainers, or -Dtask5.postgres.url pointing at a database")
 class InventoryLifecycleMigrationIntegrationTest {
 
     private static final String SCHEMA = "task5_v8_migration";

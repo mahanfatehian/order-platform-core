@@ -16,6 +16,7 @@ import com.orderprocessing.storeservice.repository.StoreOutboxEventRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -45,6 +46,8 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+@EnabledIf(value = "com.orderprocessing.storeservice.support.PostgresAvailability#present",
+        disabledReason = "Needs Docker for Testcontainers, or -Dtask5.postgres.url pointing at a database")
 @DataJpaTest(properties = {
         "spring.jpa.show-sql=false",
         "spring.datasource.hikari.maximum-pool-size=6"
