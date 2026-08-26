@@ -220,7 +220,7 @@ Two independent controls guard the anonymous entry points; [ADR-0002](docs/adr/0
 
 The challenge is drawn in process with Java2D and held in the Redis-backed session, so there is no captcha vendor, API key, or outbound call, and the demo behaves identically offline. A challenge is consumed on first verification, so a solved one cannot be replayed.
 
-Only a genuine `401` counts towards the captcha threshold; a `503` from a degraded `auth-service` never does, so an outage cannot push a legitimate user towards a challenge. The request ceiling is what bounds volume in that case, and it covers the sign-in form, the registration form, and the challenge images the gateway limiter never sees.
+Only a genuine `401` counts towards the captcha threshold; a `503` from a degraded `auth-service` never does, so an outage cannot push a legitimate user towards a challenge. The request ceiling is what bounds volume in that case. It sits behind the gateway's own per-address limit on the same routes rather than replacing it, and lives beside the counters that decide when a challenge appears so the two stay tuned together.
 
 Counters are shared through Redis. If Redis is unreachable they fall back to bounded per-instance counting rather than reporting zero, so the controls degrade instead of switching themselves off.
 

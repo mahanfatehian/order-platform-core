@@ -17,8 +17,9 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * such a caller could otherwise submit without limit. Counting every request here closes that gap without
  * distorting what the captcha reacts to.
  *
- * <p>The gateway rate limiter covers {@code /api/**} only, and browsers reach this service directly, so these
- * routes would otherwise be unmetered.
+ * <p>The gateway already meters these routes per address at the edge. This duplicates that ceiling on purpose:
+ * it lives beside the attempt counters that decide when a challenge appears, so the two stay tuned together,
+ * and it still applies if this service is ever reached by anything other than the gateway.
  */
 public class AuthRateLimitInterceptor implements HandlerInterceptor {
     private static final String KEY_PREFIX = "order-platform:web-ui:rate:";

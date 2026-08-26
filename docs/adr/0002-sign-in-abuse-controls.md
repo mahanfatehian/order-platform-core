@@ -6,7 +6,9 @@
 
 ## Context
 
-The sign-in and registration forms in `web-ui-service` were reachable by anonymous callers with no cost attached to a request. Credentials could be guessed as fast as the backend would answer, and accounts could be created in a loop. The gateway rate limiter did not help: it guards `/api/**` on `gateway-service`, whereas a browser reaches the BFF directly.
+The sign-in and registration forms in `web-ui-service` were reachable by anonymous callers with nothing to make a wrong guess cost more than a right one. Credentials could be guessed as fast as the backend would answer, and accounts could be created in a loop.
+
+Raw volume was not the missing piece. `gateway-service` already meters `POST /login` and `POST /register` per address and the rest of the UI per session, and it is the only published application port, so every browser request already passes a ceiling. What no layer did was react to *evidence*. An edge limiter sees requests, not outcomes: it cannot tell a failed credential attempt from a successful one, so it can only make guessing expensive by taxing everyone who signs in correctly at the same rate.
 
 Two different problems hide behind the phrase "too many sign-in attempts", and conflating them produces a control that is wrong in both directions:
 
@@ -39,6 +41,8 @@ A challenge is consumed on the first verification attempt whether or not the ans
 ### 3. Request volume is metered separately
 
 `AuthRateLimitInterceptor` caps how often one address may submit the sign-in and registration forms, and how many challenge images it may request. This counts every request regardless of outcome, which is exactly what the captcha thresholds deliberately do not do. The two controls are complementary: the rate limiter bounds volume, the captcha reacts to evidence of guessing.
+
+This duplicates the edge ceiling rather than replacing it, and that is the point. The gateway limit protects the platform; this one lives beside the counters that decide when a challenge appears, so the two stay tuned together and the service is still bounded if it is ever reached by anything other than the gateway.
 
 Rendering a page is never metered. Charging a `GET` would lock people out of the very page explaining why they were blocked.
 
