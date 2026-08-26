@@ -51,6 +51,20 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@ipKeyResolver}"
 
+        # The sign-in page embeds <img src="/captcha/image"> once the attempt threshold is crossed, so this
+        # path has to be routed or the challenge renders as a broken image and can never be solved.
+        - id: web-ui-captcha
+          uri: lb://web-ui-service
+          predicates:
+            - Path=/captcha/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
         - id: web-ui-checkout
           uri: lb://web-ui-service
           predicates:
