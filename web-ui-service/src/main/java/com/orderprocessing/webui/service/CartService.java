@@ -28,9 +28,24 @@ public class CartService {
         if (quantity < 1 || quantity > properties.getCart().getMaximumQuantity()) {
             throw new IllegalArgumentException("Quantity must be between 1 and " + properties.getCart().getMaximumQuantity());
         }
+        if (!hasRoomFor(session, productId)) {
+            throw new IllegalArgumentException("Cart cannot hold more than " + maximumLineItems() + " products");
+        }
         get(session).put(productId, quantity);
         session.setAttribute(CART, get(session));
     }
+
+    /**
+     * Whether this product can still be added. A cart larger than the quote contract of store-service cannot be
+     * priced, and the cart page prices itself on every render, so growing past the limit would leave the page
+     * unable to display the very items the shopper needs to remove.
+     */
+    public boolean hasRoomFor(HttpSession session, UUID productId) {
+        Cart cart = get(session);
+        return cart.getQuantities().containsKey(productId) || cart.distinctItems() < maximumLineItems();
+    }
+
+    public int maximumLineItems() { return properties.getCart().getMaximumLineItems(); }
 
     public void remove(HttpSession session, UUID productId) { get(session).remove(productId); session.setAttribute(CART, get(session)); }
     public void clear(HttpSession session) { get(session).clear(); session.setAttribute(CART, get(session)); }

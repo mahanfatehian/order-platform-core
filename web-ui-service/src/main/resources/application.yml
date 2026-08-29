@@ -49,6 +49,7 @@ app:
     refresh-skew: 45s
   cart:
     maximum-quantity: ${CART_MAXIMUM_QUANTITY:99}
+    maximum-line-items: ${CART_MAXIMUM_LINE_ITEMS:100}
   features:
     registration-enabled: ${REGISTRATION_ENABLED:true}
     demo-mode: ${DEMO_MODE:false}

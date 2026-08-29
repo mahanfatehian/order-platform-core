@@ -1,6 +1,7 @@
 package com.orderprocessing.webui.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -70,8 +71,15 @@ public class WebUiProperties {
 
     public static class Cart {
         @Min(1) private int maximumQuantity = 99;
+        /**
+         * Distinct products one cart may hold. Must not exceed the quote contract of store-service, which
+         * rejects a request carrying more than 100 products; a larger cart could never be priced.
+         */
+        @Min(1) @Max(100) private int maximumLineItems = 100;
         public int getMaximumQuantity() { return maximumQuantity; }
         public void setMaximumQuantity(int maximumQuantity) { this.maximumQuantity = maximumQuantity; }
+        public int getMaximumLineItems() { return maximumLineItems; }
+        public void setMaximumLineItems(int maximumLineItems) { this.maximumLineItems = maximumLineItems; }
     }
 
     public static class Features {

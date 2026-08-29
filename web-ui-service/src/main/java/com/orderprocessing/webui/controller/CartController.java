@@ -39,6 +39,12 @@ public class CartController {
                 binding.reject("unavailable", "This product is not active");
             }
         }
+        if (!binding.hasErrors() && !cartService.hasRoomFor(session, productId)) {
+            // Refuse here rather than letting the service throw, so the shopper gets the existing flash message
+            // instead of an error page.
+            binding.reject("cartFull", "Your cart already holds the maximum of "
+                    + cartService.maximumLineItems() + " different products");
+        }
         if (binding.hasErrors()) {
             redirect.addFlashAttribute("error", binding.getAllErrors().getFirst().getDefaultMessage());
             return "redirect:/app/catalog/" + productId;
