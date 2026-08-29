@@ -19,6 +19,14 @@ spring:
       password: ${REDIS_PASSWORD:}
   cloud:
     gateway:
+      # Reactor Netty applies no response timeout unless one is set, so a downstream that accepts a connection
+      # and then stalls holds the exchange for as long as it likes. Its connection pool is per remote host and
+      # shared across routes, so enough stuck requests to one service starve every other route through the same
+      # edge. This bounds the wait; it is deliberately generous, because a single admin page render fans out to
+      # several backend calls and must not be cut off while it is legitimately working.
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:2000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:30s}
       discovery:
         locator:
           enabled: false

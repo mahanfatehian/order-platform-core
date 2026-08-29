@@ -3,10 +3,13 @@ package com.orderprocessing.gateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.gateway.config.HttpClientProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.logout.LogoutWebFilter;
 import org.springframework.test.web.reactive.server.WebTestClient;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt;
@@ -25,6 +28,9 @@ class GatewayApplicationContextTest {
 
     @Autowired
     ApplicationContext applicationContext;
+
+    @Autowired
+    HttpClientProperties httpClientProperties;
 
     @Test
     void contextLoadsWithAllRateLimitResolvers() {
@@ -55,5 +61,19 @@ class GatewayApplicationContextTest {
                 .expectHeader().valueEquals("X-Correlation-Id", "context-test-correlation")
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("INTERNAL_API_FORBIDDEN");
+    }
+
+    @Test
+    void everyRouteInheritsABoundedWaitOnAStalledDownstream() {
+        // Left unset, responseTimeout is null and Reactor Netty waits indefinitely, which starves the shared
+        // per-host connection pool and takes unrelated routes down with it.
+        assertThat(httpClientProperties.getResponseTimeout())
+                .describedAs("no response timeout means the edge waits forever on a hung downstream")
+                .isNotNull()
+                .isLessThanOrEqualTo(Duration.ofSeconds(60));
+        assertThat(httpClientProperties.getConnectTimeout())
+                .describedAs("the 45s default delays failover far past any healthy connect")
+                .isNotNull()
+                .isLessThanOrEqualTo(5000);
     }
 }
