@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: ${ORDER_SERVICE_PORT:8084}
   shutdown: graceful
 spring:
@@ -6,6 +6,13 @@ spring:
     throw-exception-if-no-handler-found: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # Three @Scheduled jobs share this pool: the one-second outbox publisher, the pending-order reconciler and
+  # the nightly retention sweep. At the Spring default of one thread they serialise, so a long retention DELETE
+  # or a stalled publish batch stops the publisher from polling at all. One thread per job keeps them independent.
+  task:
+    scheduling:
+      pool:
+        size: ${SCHEDULER_POOL_SIZE:3}
   application:
     name: order-service
   data:

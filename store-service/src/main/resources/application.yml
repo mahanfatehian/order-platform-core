@@ -6,6 +6,12 @@ spring:
     throw-exception-if-no-handler-found: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # Two @Scheduled jobs share this pool: the one-second outbox publisher and the nightly retention sweep. At the
+  # Spring default of one thread the sweep blocks the publisher for as long as it runs.
+  task:
+    scheduling:
+      pool:
+        size: ${SCHEDULER_POOL_SIZE:2}
   application:
     name: store-service
   data:
