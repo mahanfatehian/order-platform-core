@@ -82,6 +82,8 @@ maintenance:
   outbox-retention: ${STORE_OUTBOX_RETENTION:P30D}
   inbox-retention: ${STORE_INBOX_RETENTION:P30D}
   cleanup-cron: ${STORE_EVENT_CLEANUP_CRON:0 30 3 * * *}
+  cleanup-batch-size: ${STORE_EVENT_CLEANUP_BATCH_SIZE:500}
+  cleanup-max-batches-per-run: ${STORE_EVENT_CLEANUP_MAX_BATCHES_PER_RUN:20}
 
 management:
   endpoint:

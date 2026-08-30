@@ -16,9 +16,23 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
     long countByDeadLetteredTrue();
 
     @Modifying
-    @Query(value = "delete from outbox_events where published = true and published_at < :cutoff",
-            nativeQuery = true)
-    int deletePublishedBefore(@Param("cutoff") Instant cutoff);
+    @Query(value = """
+            WITH candidates AS (
+                SELECT id
+                FROM outbox_events
+                WHERE published = TRUE
+                  AND dead_lettered = FALSE
+                  AND published_at < :cutoff
+                ORDER BY published_at
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM outbox_events event
+            USING candidates
+            WHERE event.id = candidates.id
+            """, nativeQuery = true)
+    int deletePublishedBatchBefore(@Param("cutoff") Instant cutoff,
+                                   @Param("batchSize") int batchSize);
 
     @Query(value = """
             select e.* from outbox_events e

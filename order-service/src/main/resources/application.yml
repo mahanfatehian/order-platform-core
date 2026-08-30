@@ -90,6 +90,8 @@ maintenance:
   outbox-retention: ${ORDER_OUTBOX_RETENTION:P30D}
   inbox-retention: ${ORDER_INBOX_RETENTION:P30D}
   cleanup-cron: ${ORDER_EVENT_CLEANUP_CRON:0 15 3 * * *}
+  cleanup-batch-size: ${ORDER_EVENT_CLEANUP_BATCH_SIZE:500}
+  cleanup-max-batches-per-run: ${ORDER_EVENT_CLEANUP_MAX_BATCHES_PER_RUN:20}
 
 app:
   security:

@@ -247,6 +247,10 @@ Important runtime switches:
 | `ORDER_PENDING_TIMEOUT` | `PT10M` | Deadline before an unfinished inventory handshake is reconciled to `FAILED` |
 | `ORDER_OUTBOX_MAX_ATTEMPTS` / `STORE_OUTBOX_MAX_ATTEMPTS` | `5` | Database outbox publish attempts before operator intervention |
 | `ORDER_OUTBOX_RETENTION` / `STORE_OUTBOX_RETENTION` | `P30D` | Retention for successfully published outbox rows |
+| `ORDER_INBOX_RETENTION` / `STORE_INBOX_RETENTION` | `P30D` | Retention for processed Kafka inbox rows |
+| `ORDER_EVENT_CLEANUP_CRON` / `STORE_EVENT_CLEANUP_CRON` | `0 15 3 * * *` / `0 30 3 * * *` | Nightly event-retention schedules |
+| `ORDER_EVENT_CLEANUP_BATCH_SIZE` / `STORE_EVENT_CLEANUP_BATCH_SIZE` | `500` | Rows deleted per source and independently committed transaction |
+| `ORDER_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` / `STORE_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` | `20` | Maximum delete batches per source and scheduled run |
 
 Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to consumer-owned DLTs: `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`. The source-only `order.events.dlt` and `store.events.dlt` remain provisioned as legacy compatibility topics but receive no new failures.
 

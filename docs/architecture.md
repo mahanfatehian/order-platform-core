@@ -176,7 +176,7 @@ A crash after Kafka acknowledges but before the database marks the row may publi
 
 Publisher failures increment `attempt_count` and set `next_attempt_at` using exponential backoff, capped at 60 seconds, with deterministic ±20% jitter. The default limit is five attempts, after which the database row is marked `dead_lettered`. That row intentionally blocks later facts for the same aggregate so lifecycle order cannot silently corrupt; unrelated aggregates continue publishing. This database outbox flag is different from a Kafka `.dlt` topic. There is currently no automatic replay or operator endpoint for database-dead-lettered outbox rows.
 
-Published outbox rows and processed inbox rows are retained for 30 days by default and then removed by scheduled maintenance. Dead-lettered outbox rows are never removed automatically. The retention windows are configurable and must remain longer than the broker replay window used by an environment.
+Published outbox rows and processed inbox rows are retained for 30 days by default and then removed by scheduled maintenance. Dead-lettered and unpublished outbox rows are never removed automatically. Each source deletes at most 10,000 rows per run by default, in independently committed batches of 500; any remaining backlog waits for the next nightly schedule. The retention windows and work limits are configurable, and retention must remain longer than the broker replay window used by an environment.
 
 ### Inbox/idempotency
 

@@ -24,6 +24,19 @@ public interface ProcessedKafkaEventRepository extends JpaRepository<ProcessedKa
                        @Param("recordOffset") long recordOffset);
 
     @Modifying
-    @Query(value = "delete from processed_kafka_events where processed_at < :cutoff", nativeQuery = true)
-    int deleteProcessedBefore(@Param("cutoff") Instant cutoff);
+    @Query(value = """
+            WITH candidates AS (
+                SELECT event_id
+                FROM processed_kafka_events
+                WHERE processed_at < :cutoff
+                ORDER BY processed_at
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM processed_kafka_events event
+            USING candidates
+            WHERE event.event_id = candidates.event_id
+            """, nativeQuery = true)
+    int deleteProcessedBatchBefore(@Param("cutoff") Instant cutoff,
+                                   @Param("batchSize") int batchSize);
 }
