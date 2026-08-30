@@ -71,13 +71,82 @@ channels:
           - $ref: '#/components/messages/StockReservedEvent'
           - $ref: '#/components/messages/StockInsufficientEvent'
 
+  order.events.order-service.dlt:
+    description: |
+      Active dead-letter destination owned by order-service for exhausted
+      order.events records. The original payload and Spring Kafka
+      failure/origin metadata headers are retained. No in-repository listener
+      automatically replays this topic.
+    x-producer: spring-kafka-dead-letter-recoverer
+    x-owner: order-service
+    x-current-consumer: none
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    subscribe:
+      operationId: inspectOrderEventsOrderServiceDeadLetters
+      summary: Inspect order-service exhausted order-event records
+      tags:
+        - name: order-lifecycle
+      description: Operator-facing contract only; the repository has no DLT consumer.
+      message:
+        $ref: '#/components/messages/OrderEventsDeadLetter'
+
+  order.events.store-service.dlt:
+    description: |
+      Active dead-letter destination owned by store-service for exhausted
+      order.events records. The original payload and Spring Kafka
+      failure/origin metadata headers are retained. No in-repository listener
+      automatically replays this topic.
+    x-producer: spring-kafka-dead-letter-recoverer
+    x-owner: store-service
+    x-current-consumer: none
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    subscribe:
+      operationId: inspectOrderEventsStoreServiceDeadLetters
+      summary: Inspect store-service exhausted order-event records
+      tags:
+        - name: order-lifecycle
+      description: Operator-facing contract only; the repository has no DLT consumer.
+      message:
+        $ref: '#/components/messages/OrderEventsDeadLetter'
+
+  store.events.order-service.dlt:
+    description: |
+      Active dead-letter destination owned by order-service for exhausted
+      store.events records. The original payload and Spring Kafka
+      failure/origin metadata headers are retained. No in-repository listener
+      automatically replays this topic.
+    x-producer: spring-kafka-dead-letter-recoverer
+    x-owner: order-service
+    x-current-consumer: none
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+        bindingVersion: '0.4.0'
+    subscribe:
+      operationId: inspectStoreEventsOrderServiceDeadLetters
+      summary: Inspect order-service exhausted store-event records
+      tags:
+        - name: inventory
+      description: Operator-facing contract only; the repository has no DLT consumer.
+      message:
+        $ref: '#/components/messages/StoreEventsDeadLetter'
+
   order.events.dlt:
     description: |
-      Dead-letter destination for order.events records that still fail after
-      the configured consumer retries. The original payload is retained and
-      Spring Kafka adds failure/origin metadata as record headers. No
-      in-repository listener automatically replays this topic.
+      Legacy compatibility dead-letter destination for existing order.events
+      records. New failures are not routed here; consumer-owned active DLTs
+      retain the original payload and Spring Kafka failure/origin headers.
     x-producer: spring-kafka-dead-letter-recoverer
+    x-legacy: true
     x-current-consumer: none
     bindings:
       kafka:
@@ -95,11 +164,11 @@ channels:
 
   store.events.dlt:
     description: |
-      Dead-letter destination for store.events records that still fail after
-      the configured consumer retries. The original payload is retained and
-      Spring Kafka adds failure/origin metadata as record headers. No
-      in-repository listener automatically replays this topic.
+      Legacy compatibility dead-letter destination for existing store.events
+      records. New failures are not routed here; consumer-owned active DLTs
+      retain the original payload and Spring Kafka failure/origin headers.
     x-producer: spring-kafka-dead-letter-recoverer
+    x-legacy: true
     x-current-consumer: none
     bindings:
       kafka:

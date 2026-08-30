@@ -24,6 +24,9 @@ import java.util.Map;
 @Configuration
 public class KafkaConfig {
 
+    @Value("${spring.application.name}")
+    private String applicationName;
+
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
 
@@ -74,10 +77,9 @@ public class KafkaConfig {
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
             KafkaTemplate<String, Object> kafkaTemplate) {
 
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
-                (consumerRecord, exception) ->
-                        new org.apache.kafka.common.TopicPartition(
-                                consumerRecord.topic() + ".dlt", consumerRecord.partition()));
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                kafkaTemplate,
+                new ConsumerOwnedDeadLetterResolver(applicationName));
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
 

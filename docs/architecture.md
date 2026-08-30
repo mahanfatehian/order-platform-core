@@ -190,12 +190,15 @@ Because the inbox insert shares the transaction, a handler exception rolls back 
 | --- | --- | --- | --- |
 | `order.events` | `order-service` outbox | `store-service`; `order-service` observes fulfillment facts | `OrderPlacedEvent`, `OrderCancelledEvent`, `OrderFailedEvent`, `OrderPackagedEvent`, `OrderShippedEvent`, `OrderDeliveredEvent` |
 | `store.events` | `store-service` outbox | `order-service` | `StockReservedEvent`, `StockInsufficientEvent` |
-| `order.events.dlt` | Kafka error recoverer | No in-repository listener | Poison/exhausted records originating on `order.events` |
-| `store.events.dlt` | Kafka error recoverer | No in-repository listener | Poison/exhausted records originating on `store.events` |
+| `order.events.order-service.dlt` | Kafka error recoverer, owned by `order-service` | No in-repository listener | Poison/exhausted `order.events` records from the `order-service` consumer |
+| `order.events.store-service.dlt` | Kafka error recoverer, owned by `store-service` | No in-repository listener | Poison/exhausted `order.events` records from the `store-service` consumer |
+| `store.events.order-service.dlt` | Kafka error recoverer, owned by `order-service` | No in-repository listener | Poison/exhausted `store.events` records from the `order-service` consumer |
+| `order.events.dlt` | Legacy compatibility topic | No in-repository listener | Retained for existing records; no new failures are routed here |
+| `store.events.dlt` | Legacy compatibility topic | No in-repository listener | Retained for existing records; no new failures are routed here |
 
 `OrderFailedEvent` is emitted only by pending-order reconciliation so `store-service` can release a reservation whose stock result never completed the saga. `OrderConfirmedEvent` remains in `KafkaEventRegistry` as a deserializable compatibility contract but is not emitted or consumed by the current saga.
 
-The Kafka consumer error handler retries a failed record three times at one-second intervals after its initial delivery, then republishes the original record to `<source-topic>.dlt` on the same partition. No application listener automatically replays either DLT.
+The Kafka consumer error handler retries a failed record three times at one-second intervals after its initial delivery, then republishes the original record to `<source-topic>.<consumer-service>.dlt` on the same partition. The active routes are `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`; the source-only DLTs are legacy compatibility topics and receive no new failures. No application listener automatically replays a DLT.
 
 ## Failure paths and recovery boundaries
 
@@ -207,11 +210,11 @@ The Kafka consumer error handler retries a failed record three times at one-seco
 | Wrong role | BFF/backend authorization rejects the command; backend enforcement is authoritative |
 | Correct role, wrong order state | Command returns HTTP `409` and makes no change |
 | Cancellation after fulfillment starts | Returns HTTP `409`; no compensation event is emitted |
-| Kafka consumer handler repeatedly fails | Original record plus three retries, then source-topic DLT |
+| Kafka consumer handler repeatedly fails | Original record plus three retries, then its consumer-owned DLT on the source partition |
 | Outbox publish repeatedly fails | Database outbox row is marked `dead_lettered` at the configured attempt limit |
 | Process dies after broker acknowledgement | Outbox may republish; downstream inbox absorbs the duplicate |
 | Inventory handshake never completes | After 10 minutes by default, reconciliation commits `FAILED`, records history, and emits `OrderFailedEvent` so active reservations are released |
-| Delivery fact commits but stock settlement repeatedly fails | Order remains `DELIVERED`; store processing retries and can land in `order.events.dlt`, requiring operator repair |
+| Delivery fact commits but stock settlement repeatedly fails | Order remains `DELIVERED`; store processing retries and can land in `order.events.store-service.dlt`, requiring operator repair |
 
 The platform implements a bounded deadline for the initial inventory handshake, but it does not include an outbox/DLT replay console or a DLT consumer. A dead-lettered first outbox row blocks later facts for that order until an operator repairs it, and an exhausted delivery-settlement record can leave inventory unsettled. These are explicit operational follow-ups rather than hidden exactly-once claims.
 

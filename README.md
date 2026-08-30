@@ -248,7 +248,7 @@ Important runtime switches:
 | `ORDER_OUTBOX_MAX_ATTEMPTS` / `STORE_OUTBOX_MAX_ATTEMPTS` | `5` | Database outbox publish attempts before operator intervention |
 | `ORDER_OUTBOX_RETENTION` / `STORE_OUTBOX_RETENTION` | `P30D` | Retention for successfully published outbox rows |
 
-Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to the source topic's `.dlt`.
+Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to consumer-owned DLTs: `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`. The source-only `order.events.dlt` and `store.events.dlt` remain provisioned as legacy compatibility topics but receive no new failures.
 
 ## Build and test
 
