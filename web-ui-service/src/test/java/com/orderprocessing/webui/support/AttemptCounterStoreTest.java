@@ -10,12 +10,17 @@ import org.mockito.quality.Strictness;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,17 +43,21 @@ class AttemptCounterStoreTest {
 
     @Test
     void prefersTheSharedTallySoEveryInstanceSeesTheSameCount() {
-        when(values.increment(KEY)).thenReturn(4L);
+        when(redis.execute(any(RedisScript.class), eq(List.of(KEY)), eq("900000")))
+                .thenReturn(4L);
         when(values.get(KEY)).thenReturn("4");
 
         assertThat(store.increment(KEY, WINDOW)).isEqualTo(4L);
         assertThat(store.count(KEY)).isEqualTo(4L);
-        verify(redis).expire(KEY, WINDOW);
+        verify(redis).execute(any(RedisScript.class), eq(List.of(KEY)), eq("900000"));
+        verify(values, never()).increment(anyString());
+        verify(redis, never()).expire(anyString(), any(Duration.class));
     }
 
     @Test
     void keepsCountingLocallyWhenTheSharedStoreIsUnreachable() {
-        when(values.increment(anyString())).thenThrow(new QueryTimeoutException("redis is down"));
+        when(redis.execute(any(RedisScript.class), eq(List.of(KEY)), anyString()))
+                .thenThrow(new QueryTimeoutException("redis is down"));
         when(values.get(anyString())).thenThrow(new QueryTimeoutException("redis is down"));
 
         assertThat(store.increment(KEY, WINDOW)).isEqualTo(1L);
@@ -59,14 +68,16 @@ class AttemptCounterStoreTest {
 
     @Test
     void carriesOutageCountsForwardOnceTheSharedStoreReturns() {
-        when(values.increment(anyString())).thenThrow(new QueryTimeoutException("redis is down"));
-        store.increment(KEY, WINDOW);
-        store.increment(KEY, WINDOW);
-        store.increment(KEY, WINDOW);
+        when(redis.execute(any(RedisScript.class), eq(List.of(KEY)), anyString()))
+                .thenThrow(new QueryTimeoutException("redis is down"))
+                .thenThrow(new QueryTimeoutException("redis is down"))
+                .thenThrow(new QueryTimeoutException("redis is down"))
+                .thenReturn(1L);
 
-        // Redis recovers but never saw those attempts; the higher local tally must still hold.
-        when(values.get(KEY)).thenReturn("1");
-        assertThat(store.count(KEY)).isEqualTo(3L);
+        assertThat(store.increment(KEY, WINDOW)).isEqualTo(1L);
+        assertThat(store.increment(KEY, WINDOW)).isEqualTo(2L);
+        assertThat(store.increment(KEY, WINDOW)).isEqualTo(3L);
+        assertThat(store.increment(KEY, WINDOW)).isEqualTo(3L);
     }
 
     @Test
@@ -78,7 +89,8 @@ class AttemptCounterStoreTest {
 
     @Test
     void clearingWipesBothTheSharedAndTheLocalTally() {
-        when(values.increment(anyString())).thenThrow(new QueryTimeoutException("redis is down"));
+        when(redis.execute(any(RedisScript.class), eq(List.of(KEY)), anyString()))
+                .thenThrow(new QueryTimeoutException("redis is down"));
         store.increment(KEY, WINDOW);
 
         store.clear(KEY);
@@ -90,7 +102,7 @@ class AttemptCounterStoreTest {
 
     @Test
     void survivesASharedStoreThatAcceptsWritesButReturnsNothing() {
-        when(values.increment(KEY)).thenReturn(null);
+        when(redis.execute(any(RedisScript.class), eq(List.of(KEY)), eq("900000"))).thenReturn(null);
 
         assertThat(store.increment(KEY, WINDOW)).isEqualTo(1L);
     }
