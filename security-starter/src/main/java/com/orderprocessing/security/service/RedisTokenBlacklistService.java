@@ -58,6 +58,17 @@ public class RedisTokenBlacklistService implements TokenRevocationService {
             return 1
             """, Long.class);
 
+    private static final DefaultRedisScript<Long> ACCESS_VALIDATION_SCRIPT = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[2])
+            if not current or current ~= ARGV[1] then
+              return 0
+            end
+            if redis.call('EXISTS', KEYS[1]) == 1 then
+              return 0
+            end
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate redisTemplate;
 
     public RedisTokenBlacklistService(StringRedisTemplate redisTemplate) {
@@ -107,6 +118,20 @@ public class RedisTokenBlacklistService implements TokenRevocationService {
     public OptionalLong getTokenVersion(UUID userId) {
         String value = redisTemplate.opsForValue().get(versionKey(userId));
         return value == null ? OptionalLong.empty() : OptionalLong.of(parseVersion(value));
+    }
+
+    @Override
+    public boolean isAccessTokenValid(String jti, UUID userId, long expectedTokenVersion) {
+        Long result = redisTemplate.execute(
+                ACCESS_VALIDATION_SCRIPT,
+                List.of(
+                        ACCESS_PREFIX + requiredText(jti, "access token jti"),
+                        versionKey(userId)),
+                Long.toString(expectedTokenVersion));
+        if (result == null) {
+            throw new IllegalStateException("Access-token validation failed");
+        }
+        return result == 1L;
     }
 
     @Override

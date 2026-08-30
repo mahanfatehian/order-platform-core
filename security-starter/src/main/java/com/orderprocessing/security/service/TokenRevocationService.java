@@ -14,6 +14,15 @@ public interface TokenRevocationService extends TokenBlacklistService {
 
     OptionalLong getTokenVersion(UUID userId);
 
+    default boolean isAccessTokenValid(String jti, UUID userId, long expectedTokenVersion) {
+        if (isAccessTokenBlacklisted(jti)) {
+            return false;
+        }
+        OptionalLong currentVersion = getTokenVersion(userId);
+        return currentVersion.isPresent()
+                && currentVersion.getAsLong() == expectedTokenVersion;
+    }
+
     long incrementTokenVersion(UUID userId);
 
     boolean rotateRefreshToken(

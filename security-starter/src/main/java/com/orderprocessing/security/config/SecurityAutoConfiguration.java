@@ -39,7 +39,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.OptionalLong;
 import java.util.UUID;
 
 @AutoConfiguration
@@ -98,11 +97,7 @@ public class SecurityAutoConfiguration {
             try {
                 UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
                 long tokenVersion = ((Number) jwt.getClaim("tokenVersion")).longValue();
-                if (tokenRevocationService.isAccessTokenBlacklisted(jwt.getId())) {
-                    throw new JwtException("Access token has been revoked");
-                }
-                OptionalLong currentVersion = tokenRevocationService.getTokenVersion(userId);
-                if (currentVersion.isEmpty() || currentVersion.getAsLong() != tokenVersion) {
+                if (!tokenRevocationService.isAccessTokenValid(jwt.getId(), userId, tokenVersion)) {
                     throw new JwtException("Access token has been revoked");
                 }
                 return jwt;

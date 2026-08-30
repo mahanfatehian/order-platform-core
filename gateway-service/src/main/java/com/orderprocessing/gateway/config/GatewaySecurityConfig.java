@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -41,6 +43,16 @@ public class GatewaySecurityConfig {
 
     private static final String ACCESS_BLACKLIST_PREFIX = "blacklist:access:";
     private static final String TOKEN_VERSION_PREFIX = "user:token-version:";
+    private static final RedisScript<Long> ACCESS_VALIDATION_SCRIPT = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[2])
+            if not current or current ~= ARGV[1] then
+              return 0
+            end
+            if redis.call('EXISTS', KEYS[1]) == 1 then
+              return 0
+            end
+            return 1
+            """, Long.class);
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
@@ -111,26 +123,21 @@ public class GatewaySecurityConfig {
                 );
     }
 
-    private Mono<Jwt> validateRevocation(Jwt jwt, ReactiveStringRedisTemplate redisTemplate) {
+    Mono<Jwt> validateRevocation(Jwt jwt, ReactiveStringRedisTemplate redisTemplate) {
         UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
         long tokenVersion = ((Number) jwt.getClaim("tokenVersion")).longValue();
-        return redisTemplate.hasKey(ACCESS_BLACKLIST_PREFIX + jwt.getId())
-                .flatMap(blacklisted -> {
-                    if (Boolean.TRUE.equals(blacklisted)) {
-                        return Mono.error(new JwtException("Access token has been revoked"));
-                    }
-                    return redisTemplate.opsForValue().get(TOKEN_VERSION_PREFIX + userId)
-                            .switchIfEmpty(Mono.error(new JwtException("Access token has been revoked")))
-                            .flatMap(current -> {
-                                try {
-                                    return Long.parseLong(current) == tokenVersion
-                                            ? Mono.just(jwt)
-                                            : Mono.error(new JwtException("Access token has been revoked"));
-                                } catch (NumberFormatException exception) {
-                                    return Mono.error(new JwtException("Token revocation state is invalid", exception));
-                                }
-                            });
-                });
+        return redisTemplate.execute(
+                        ACCESS_VALIDATION_SCRIPT,
+                        List.of(
+                                ACCESS_BLACKLIST_PREFIX + jwt.getId(),
+                                TOKEN_VERSION_PREFIX + userId),
+                        List.of(Long.toString(tokenVersion)))
+                .next()
+                .flatMap(result -> result == 1L
+                        ? Mono.just(jwt)
+                        : Mono.error(new JwtException("Access token has been revoked")))
+                .switchIfEmpty(Mono.error(
+                        new JwtException("Token revocation state could not be verified")));
     }
 
     @Bean
