@@ -51,3 +51,6 @@ build/
 
 logs/
 *.log
+
+# Local linked worktrees used for isolated implementation work.
+.worktrees/
