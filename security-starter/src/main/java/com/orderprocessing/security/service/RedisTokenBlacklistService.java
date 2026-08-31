@@ -69,6 +69,21 @@ public class RedisTokenBlacklistService implements TokenRevocationService {
             return 1
             """, Long.class);
 
+    /**
+     * Logout for an access token with no remaining lifetime. Nothing is added to the blacklist, because an
+     * expired token is already refused on its own, but the token version still moves so refresh tokens and other
+     * sessions are revoked. The version match is the single-winner guard here: once it is incremented a repeat
+     * call no longer matches and returns 0.
+     */
+    private static final DefaultRedisScript<Long> EXPIRED_LOGOUT_SCRIPT = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[1])
+            if not current or current ~= ARGV[1] then
+              return 0
+            end
+            redis.call('INCR', KEYS[1])
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate redisTemplate;
 
     public RedisTokenBlacklistService(StringRedisTemplate redisTemplate) {
@@ -180,12 +195,24 @@ public class RedisTokenBlacklistService implements TokenRevocationService {
             UUID userId,
             long expectedTokenVersion
     ) {
-        long ttl = positiveTtlMillis(accessExpiresAt);
+        String jti = requiredText(accessJti, "access token jti");
+        long ttl = remainingTtlMillis(accessExpiresAt);
+        if (ttl <= 0) {
+            // The resource server accepts a token for a further 60s past its expiry, the default clock skew, so
+            // logout legitimately arrives here with nothing left to blacklist. Refusing the whole call would
+            // leave the refresh token and every other session alive, which is the opposite of what logout means.
+            Long expiredResult = redisTemplate.execute(
+                    EXPIRED_LOGOUT_SCRIPT,
+                    List.of(versionKey(userId)),
+                    Long.toString(expectedTokenVersion)
+            );
+            return Objects.equals(expiredResult, 1L);
+        }
         Long result = redisTemplate.execute(
                 LOGOUT_SCRIPT,
                 List.of(
                         versionKey(userId),
-                        ACCESS_PREFIX + requiredText(accessJti, "access token jti")
+                        ACCESS_PREFIX + jti
                 ),
                 Long.toString(expectedTokenVersion),
                 Long.toString(ttl)
