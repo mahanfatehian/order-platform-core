@@ -19,6 +19,11 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      # Bounded so a Redis stall cannot pin a request thread. security-starter validates every access token
+      # against Redis on the request path, so an unbounded command timeout, Lettuce defaults to 60s, would let
+      # one slow Redis exhaust the servlet thread pool while the service itself is healthy.
+      timeout: 2s
+      connect-timeout: 2s
   datasource:
     url: jdbc:postgresql://localhost:${DB_PORT:5432}/storedb
     username: ${DB_USERNAME}

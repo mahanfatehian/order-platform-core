@@ -17,6 +17,11 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      # Bounded so a Redis stall cannot pin a request thread. every request validates token state and
+      # consumes a rate-limit token against Redis, so an unbounded command timeout, Lettuce defaults to 60s,
+      # would hold exchanges open on the edge while the gateway itself is healthy.
+      timeout: 2s
+      connect-timeout: 2s
   cloud:
     gateway:
       # Reactor Netty applies no response timeout unless one is set, so a downstream that accepts a connection
