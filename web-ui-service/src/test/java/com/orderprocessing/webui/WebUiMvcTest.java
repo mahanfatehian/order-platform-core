@@ -14,7 +14,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,6 +27,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -113,10 +116,31 @@ class WebUiMvcTest {
 
     @Test
     void logoutExplicitlyExpiresTheBrowserSessionCookie() throws Exception {
-        mvc.perform(post("/logout").with(user("customer").roles("USER")).with(csrf()))
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("logout-sentinel", "present");
+
+        mvc.perform(post("/logout").with(user("customer").roles("USER")).with(csrf()).session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?logout"))
-                .andExpect(cookie().maxAge("ORDER_PLATFORM_SESSION", 0));
+                .andExpect(cookie().maxAge("ORDER_PLATFORM_SESSION", 0))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")));
+
+        org.assertj.core.api.Assertions.assertThat(session.isInvalid()).isTrue();
+    }
+
+    @Test
+    void logoutKeepsTheSessionReusableWhenRevocationIsUnavailable() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("logout-sentinel", "present");
+        doThrow(new ResourceAccessException("auth service unavailable"))
+                .when(authenticationService).logoutCurrentSession();
+
+        mvc.perform(post("/logout").with(user("customer").roles("USER")).with(csrf()).session(session))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(cookie().doesNotExist("ORDER_PLATFORM_SESSION"));
+
+        org.assertj.core.api.Assertions.assertThat(session.isInvalid()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(session.getAttribute("logout-sentinel")).isEqualTo("present");
     }
 
     @Test

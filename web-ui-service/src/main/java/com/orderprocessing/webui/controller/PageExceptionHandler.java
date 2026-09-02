@@ -1,6 +1,7 @@
 package com.orderprocessing.webui.controller;
 
 import com.orderprocessing.webui.exception.BackendClientException;
+import com.orderprocessing.webui.exception.LogoutRevocationException;
 import com.orderprocessing.webui.exception.RateLimitedException;
 import com.orderprocessing.webui.exception.SessionExpiredException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,14 @@ public class PageExceptionHandler {
 
     @ExceptionHandler(ResourceAccessException.class)
     public ModelAndView unavailable(ResourceAccessException exception, HttpServletRequest request) {
+        ModelAndView view = new ModelAndView("error/service-unavailable", HttpStatus.SERVICE_UNAVAILABLE);
+        view.addObject("serviceMessage", "The platform is temporarily unavailable. Try again shortly.");
+        view.addObject("retryPath", request.getRequestURI());
+        return view;
+    }
+
+    @ExceptionHandler(LogoutRevocationException.class)
+    public ModelAndView logoutUnavailable(LogoutRevocationException exception, HttpServletRequest request) {
         ModelAndView view = new ModelAndView("error/service-unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         view.addObject("serviceMessage", "The platform is temporarily unavailable. Try again shortly.");
         view.addObject("retryPath", request.getRequestURI());

@@ -1,12 +1,10 @@
 package com.orderprocessing.webui.config;
 
-import com.orderprocessing.webui.service.UiAuthenticationService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -16,7 +14,6 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
@@ -24,8 +21,7 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    SecurityFilterChain webSecurityFilterChain(HttpSecurity http, UiAuthenticationService authenticationService)
-            throws Exception {
+    SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .authorizeHttpRequests(auth -> auth
@@ -39,23 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/fragments/**").authenticated()
                         .anyRequest().authenticated())
                 .formLogin(form -> form.loginPage("/login").disable())
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .addLogoutHandler((request, response, authentication) -> authenticationService.logoutCurrentSession())
-                        .logoutSuccessHandler((request, response, authentication) -> {
-                            ResponseCookie expiredSession = ResponseCookie.from("ORDER_PLATFORM_SESSION", "")
-                                    .path("/")
-                                    .httpOnly(true)
-                                    .secure(request.isSecure())
-                                    .sameSite("Lax")
-                                    .maxAge(Duration.ZERO)
-                                    .build();
-                            response.addHeader(HttpHeaders.SET_COOKIE, expiredSession.toString());
-                            response.sendRedirect(request.getContextPath() + "/login?logout");
-                        })
-                        .invalidateHttpSession(true)
-                        .clearAuthentication(true)
-                        .deleteCookies("ORDER_PLATFORM_SESSION"))
+                .logout(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             if ("true".equalsIgnoreCase(request.getHeader("HX-Request"))) {

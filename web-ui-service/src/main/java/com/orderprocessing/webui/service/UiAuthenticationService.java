@@ -3,6 +3,8 @@ package com.orderprocessing.webui.service;
 import com.orderprocessing.webui.client.PlatformClient;
 import com.orderprocessing.webui.config.WebUiProperties;
 import com.orderprocessing.webui.dto.LoginTokens;
+import com.orderprocessing.webui.exception.BackendClientException;
+import com.orderprocessing.webui.exception.LogoutRevocationException;
 import com.orderprocessing.webui.exception.SessionExpiredException;
 import com.orderprocessing.webui.form.LoginForm;
 import com.orderprocessing.webui.model.UiAuthenticatedUser;
@@ -10,8 +12,6 @@ import com.orderprocessing.webui.model.UiSessionTokens;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -32,7 +33,6 @@ import java.util.UUID;
 
 @Service
 public class UiAuthenticationService {
-    private static final Logger log = LoggerFactory.getLogger(UiAuthenticationService.class);
     private final PlatformClient platformClient;
     private final SessionTokenService tokenService;
     private final JwtDecoder jwtDecoder;
@@ -94,9 +94,8 @@ public class UiAuthenticationService {
         tokenService.current().ifPresent(tokens -> {
             try {
                 platformClient.logout(tokens.accessToken());
-            } catch (RuntimeException exception) {
-                log.warn("Backend token revocation did not complete during local logout: {}",
-                        exception.getClass().getSimpleName());
+            } catch (BackendClientException | RestClientException exception) {
+                throw new LogoutRevocationException(exception);
             }
         });
         tokenService.clearCurrent();
