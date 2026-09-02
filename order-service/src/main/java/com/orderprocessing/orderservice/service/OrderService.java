@@ -46,6 +46,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -57,6 +58,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -71,37 +73,53 @@ public class OrderService {
     private final OrderStatusHistoryRepository historyRepository;
     private final StoreServiceClient storeServiceClient;
     private final ObjectMapper objectMapper;
+    private final TransactionOperations orderTransactions;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
                         ProcessedKafkaEventRepository processedEventRepository,
                         OrderStatusHistoryRepository historyRepository,
                         StoreServiceClient storeServiceClient,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper,
+                        TransactionOperations orderTransactions) {
         this.orderRepository = orderRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.processedEventRepository = processedEventRepository;
         this.historyRepository = historyRepository;
         this.storeServiceClient = storeServiceClient;
         this.objectMapper = objectMapper;
+        this.orderTransactions = orderTransactions;
     }
 
-    @Transactional
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
                                      String idempotencyKey, String correlationId) {
         String normalizedCorrelationId = normalizeCorrelationId(correlationId);
         String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
-        if (normalizedKey != null) {
-            orderRepository.acquireIdempotencyLock(userId + ":" + normalizedKey);
-            var existing = orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, normalizedKey);
-            if (existing.isPresent()) {
-                return toResponse(existing.get());
-            }
+        Map<UUID, Integer> quantities = normalizeItems(request.getItems());
+        Optional<Order> existing = findIdempotentOrder(userId, normalizedKey);
+        if (existing.isPresent()) {
+            return replayOrConflict(existing.get(), quantities);
         }
 
-        Map<UUID, Integer> quantities = normalizeItems(request.getItems());
         StoreQuoteResponse quote = loadAuthoritativeQuote(quantities);
         Map<UUID, StoreQuoteItemResponse> quoteByProduct = validateQuote(quantities, quote);
+
+        return Objects.requireNonNull(orderTransactions.execute(status ->
+                persistQuotedOrder(userId, quantities, quoteByProduct, normalizedKey, normalizedCorrelationId)));
+    }
+
+    private OrderResponse persistQuotedOrder(UUID userId,
+                                             Map<UUID, Integer> quantities,
+                                             Map<UUID, StoreQuoteItemResponse> quoteByProduct,
+                                             String normalizedKey,
+                                             String normalizedCorrelationId) {
+        if (normalizedKey != null) {
+            orderRepository.acquireIdempotencyLock(userId + ":" + normalizedKey);
+            Optional<Order> existing = findIdempotentOrder(userId, normalizedKey);
+            if (existing.isPresent()) {
+                return replayOrConflict(existing.get(), quantities);
+            }
+        }
 
         Instant now = Instant.now();
         Order order = new Order();
@@ -425,6 +443,23 @@ public class OrderService {
             quantities.put(item.getProductId(), combined);
         });
         return quantities;
+    }
+
+    private Optional<Order> findIdempotentOrder(UUID userId, String normalizedKey) {
+        if (normalizedKey == null) {
+            return Optional.empty();
+        }
+        return orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, normalizedKey);
+    }
+
+    private OrderResponse replayOrConflict(Order existing, Map<UUID, Integer> quantities) {
+        Map<UUID, Integer> storedQuantities = existing.getItems().stream().collect(Collectors.toMap(
+                OrderItem::getProductId, OrderItem::getQuantity, Math::addExact, LinkedHashMap::new));
+        if (!storedQuantities.equals(quantities)) {
+            throw new IdempotencyConflictException(
+                    "Order was already created with a different order payload for this idempotency key");
+        }
+        return toResponse(existing);
     }
 
     private void addOutbox(UUID orderId, String topic, DomainEvent event) {

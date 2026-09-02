@@ -15,23 +15,30 @@ import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.IdempotencyConflictException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
 import com.orderprocessing.orderservice.exception.OrderTransitionConflictException;
+import com.orderprocessing.orderservice.exception.ServiceUnavailableException;
 import com.orderprocessing.orderservice.model.Order;
+import com.orderprocessing.orderservice.model.OrderItem;
 import com.orderprocessing.orderservice.model.OrderStatusHistory;
 import com.orderprocessing.orderservice.model.OutboxEvent;
 import com.orderprocessing.orderservice.repository.OrderRepository;
 import com.orderprocessing.orderservice.repository.OrderStatusHistoryRepository;
 import com.orderprocessing.orderservice.repository.OutboxEventRepository;
 import com.orderprocessing.orderservice.repository.ProcessedKafkaEventRepository;
+import feign.FeignException;
+import feign.Request;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,7 +50,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,13 +62,14 @@ class OrderServiceTest {
     @Mock private ProcessedKafkaEventRepository processedRepository;
     @Mock private OrderStatusHistoryRepository historyRepository;
     @Mock private StoreServiceClient storeClient;
+    @Mock private TransactionOperations orderTransactions;
 
     private OrderService service;
 
     @BeforeEach
     void setUp() {
         service = new OrderService(orderRepository, outboxRepository, processedRepository, historyRepository,
-                storeClient, new ObjectMapper().findAndRegisterModules());
+                storeClient, new ObjectMapper().findAndRegisterModules(), orderTransactions);
     }
 
     @Test
@@ -67,6 +77,10 @@ class OrderServiceTest {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
         CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        when(orderTransactions.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
         when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-1"))
                 .thenReturn(Optional.empty());
         when(storeClient.quote(any())).thenReturn(new StoreQuoteResponse(List.of(
@@ -92,6 +106,38 @@ class OrderServiceTest {
         assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("OrderPlacedEvent");
         assertThat(outboxCaptor.getValue().getTopic()).isEqualTo("order.events");
         assertThat(outboxCaptor.getValue().getPayload()).contains("corr-1", productId.toString());
+    }
+
+    @Test
+    void rejectsReplayWithDifferentOrderPayload() {
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        Order existing = order(userId, Order.Status.PENDING);
+        existing.setIdempotencyKey("checkout-1");
+        existing.setItems(List.of(orderItem(existing, productId, 1)));
+        CreateOrderRequest changedRequest = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-1"))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.createOrder(userId, changedRequest, "checkout-1", "corr"))
+                .isInstanceOf(IdempotencyConflictException.class)
+                .hasMessageContaining("different order payload");
+
+        verifyNoInteractions(storeClient);
+        verify(outboxRepository, never()).save(any());
+    }
+
+    @Test
+    void doesNotAcquireIdempotencyLockWhenAuthoritativeQuoteFails() {
+        UUID userId = UUID.randomUUID();
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(UUID.randomUUID(), 1)));
+        when(storeClient.quote(any())).thenThrow(new FeignException.ServiceUnavailable(
+                "unavailable", mock(Request.class), null, Map.of()));
+
+        assertThatThrownBy(() -> service.createOrder(userId, request, "checkout-2", "corr"))
+                .isInstanceOf(ServiceUnavailableException.class);
+
+        verify(orderRepository, never()).acquireIdempotencyLock(anyString());
     }
 
     @Test
@@ -278,5 +324,18 @@ class OrderServiceTest {
         order.setUpdatedAt(Instant.now());
         order.setItems(List.of());
         return order;
+    }
+
+    private OrderItem orderItem(Order order, UUID productId, int quantity) {
+        OrderItem item = new OrderItem();
+        item.setId(UUID.randomUUID());
+        item.setOrder(order);
+        item.setProductId(productId);
+        item.setProductName("Stored product");
+        item.setUnitPrice(BigDecimal.TEN);
+        item.setQuantity(quantity);
+        item.setCreatedAt(Instant.now());
+        item.setUpdatedAt(Instant.now());
+        return item;
     }
 }
