@@ -1,6 +1,7 @@
 package com.orderprocessing.storeservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.storeservice.model.Inventory;
@@ -250,7 +251,8 @@ class InventoryLifecycleConcurrencyIntegrationTest {
                                           StoreOutboxEventRepository outboxEventRepository) {
             return new InventoryService(inventoryRepository, lifecycleRepository, reservationRepository,
                     productRepository, processedEventRepository, outboxEventRepository,
-                    new ObjectMapper().findAndRegisterModules());
+                    new ObjectMapper().findAndRegisterModules(),
+                    new KafkaTopicNames("order.events", "store.events"));
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.orderprocessing.storeservice.kafka;
 
 import com.orderprocessing.kafkacommon.EventCorrelationContext;
-import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
@@ -19,7 +18,7 @@ import org.springframework.stereotype.Service;
 public class StoreKafkaConsumer {
     private final InventoryService inventoryService;
 
-    @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "store-service")
+    @KafkaListener(topics = "#{@kafkaTopicNames.orderEvents()}", groupId = "store-service")
     public void handleOrderEvent(ConsumerRecord<String, Object> record) {
         EventCorrelationContext.run(record, () -> dispatchOrderEvent(record));
     }

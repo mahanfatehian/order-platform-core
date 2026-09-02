@@ -1,7 +1,6 @@
 package com.orderprocessing.orderservice.kafka;
 
 import com.orderprocessing.kafkacommon.EventCorrelationContext;
-import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
@@ -20,12 +19,12 @@ import org.springframework.stereotype.Service;
 public class OrderKafkaConsumer {
     private final OrderService orderService;
 
-    @KafkaListener(topics = KafkaTopics.STORE_EVENTS, groupId = "order-service")
+    @KafkaListener(topics = "#{@kafkaTopicNames.storeEvents()}", groupId = "order-service")
     public void handleStoreEvent(ConsumerRecord<String, Object> record) {
         EventCorrelationContext.run(record, () -> dispatchStoreEvent(record));
     }
 
-    @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = "order-service")
+    @KafkaListener(topics = "#{@kafkaTopicNames.orderEvents()}", groupId = "order-service")
     public void handleOrderEvent(ConsumerRecord<String, Object> record) {
         EventCorrelationContext.run(record, () -> dispatchOrderEvent(record));
     }

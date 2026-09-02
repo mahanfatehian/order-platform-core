@@ -1,6 +1,7 @@
 package com.orderprocessing.storeservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
@@ -40,7 +41,7 @@ class InventoryLifecycleGuardTest {
         StoreOutboxEventRepository outbox = mock(StoreOutboxEventRepository.class);
         InventoryOrderLifecycleRepository lifecycleRepository = mock(InventoryOrderLifecycleRepository.class);
         InventoryService service = new InventoryService(inventory, lifecycleRepository, reservations, products, inbox,
-                outbox, new ObjectMapper());
+                outbox, new ObjectMapper(), new KafkaTopicNames("order.events", "store.events"));
         UUID orderId = UUID.randomUUID();
         AtomicReference<InventoryOrderLifecycle> lifecycle = new AtomicReference<>(lifecycle(orderId,
                 InventoryOrderLifecycle.State.RELEASED));
@@ -70,7 +71,7 @@ class InventoryLifecycleGuardTest {
         StoreOutboxEventRepository outbox = mock(StoreOutboxEventRepository.class);
         InventoryOrderLifecycleRepository lifecycleRepository = mock(InventoryOrderLifecycleRepository.class);
         InventoryService service = new InventoryService(inventory, lifecycleRepository, reservations, products, inbox,
-                outbox, new ObjectMapper());
+                outbox, new ObjectMapper(), new KafkaTopicNames("order.events", "store.events"));
         UUID orderId = UUID.randomUUID();
         when(inbox.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
         when(lifecycleRepository.findByOrderIdForUpdate(orderId))
@@ -94,7 +95,7 @@ class InventoryLifecycleGuardTest {
         StoreOutboxEventRepository outbox = mock(StoreOutboxEventRepository.class);
         InventoryOrderLifecycleRepository lifecycleRepository = mock(InventoryOrderLifecycleRepository.class);
         InventoryService service = new InventoryService(inventory, lifecycleRepository, reservations, products, inbox,
-                outbox, new ObjectMapper());
+                outbox, new ObjectMapper(), new KafkaTopicNames("order.events", "store.events"));
         UUID orderId = UUID.randomUUID();
         when(inbox.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
         when(lifecycleRepository.findByOrderIdForUpdate(orderId))

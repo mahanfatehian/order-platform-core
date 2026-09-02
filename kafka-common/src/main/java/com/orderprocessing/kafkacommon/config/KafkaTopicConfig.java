@@ -9,10 +9,9 @@ import org.springframework.kafka.config.TopicBuilder;
 
 @Configuration
 public class KafkaTopicConfig {
-    private final String orderEventsTopic;
+    private final KafkaTopicNames topicNames;
     private final int orderEventsPartitions;
     private final int orderEventsReplicas;
-    private final String storeEventsTopic;
     private final int storeEventsPartitions;
     private final int storeEventsReplicas;
 
@@ -23,17 +22,21 @@ public class KafkaTopicConfig {
             @Value("${kafka.topics.store-events:store.events}") String storeEventsTopic,
             @Value("${kafka.topics.store-events-partitions:3}") int storeEventsPartitions,
             @Value("${kafka.topics.store-events-replicas:1}") int storeEventsReplicas) {
-        this.orderEventsTopic = orderEventsTopic;
+        this.topicNames = new KafkaTopicNames(orderEventsTopic, storeEventsTopic);
         this.orderEventsPartitions = orderEventsPartitions;
         this.orderEventsReplicas = orderEventsReplicas;
-        this.storeEventsTopic = storeEventsTopic;
         this.storeEventsPartitions = storeEventsPartitions;
         this.storeEventsReplicas = storeEventsReplicas;
     }
 
     @Bean
+    public KafkaTopicNames kafkaTopicNames() {
+        return topicNames;
+    }
+
+    @Bean
     public NewTopic orderEventsTopic() {
-        return TopicBuilder.name(orderEventsTopic)
+        return TopicBuilder.name(topicNames.orderEvents())
                 .partitions(orderEventsPartitions)
                 .replicas(orderEventsReplicas)
                 .build();
@@ -41,7 +44,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic storeEventsTopic() {
-        return TopicBuilder.name(storeEventsTopic)
+        return TopicBuilder.name(topicNames.storeEvents())
                 .partitions(storeEventsPartitions)
                 .replicas(storeEventsReplicas)
                 .build();
@@ -49,7 +52,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic orderEventsOrderServiceDltTopic() {
-        return TopicBuilder.name(KafkaTopics.deadLetterTopic(orderEventsTopic, KafkaTopics.ORDER_SERVICE))
+        return TopicBuilder.name(KafkaTopics.deadLetterTopic(topicNames.orderEvents(), KafkaTopics.ORDER_SERVICE))
                 .partitions(orderEventsPartitions)
                 .replicas(orderEventsReplicas)
                 .build();
@@ -57,7 +60,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic orderEventsStoreServiceDltTopic() {
-        return TopicBuilder.name(KafkaTopics.deadLetterTopic(orderEventsTopic, KafkaTopics.STORE_SERVICE))
+        return TopicBuilder.name(KafkaTopics.deadLetterTopic(topicNames.orderEvents(), KafkaTopics.STORE_SERVICE))
                 .partitions(orderEventsPartitions)
                 .replicas(orderEventsReplicas)
                 .build();
@@ -65,7 +68,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic storeEventsOrderServiceDltTopic() {
-        return TopicBuilder.name(KafkaTopics.deadLetterTopic(storeEventsTopic, KafkaTopics.ORDER_SERVICE))
+        return TopicBuilder.name(KafkaTopics.deadLetterTopic(topicNames.storeEvents(), KafkaTopics.ORDER_SERVICE))
                 .partitions(storeEventsPartitions)
                 .replicas(storeEventsReplicas)
                 .build();
@@ -73,7 +76,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic orderEventsDltTopic() {
-        return TopicBuilder.name(KafkaTopics.ORDER_EVENTS_DLT)
+        return TopicBuilder.name(KafkaTopics.deadLetterTopic(topicNames.orderEvents()))
                 .partitions(orderEventsPartitions)
                 .replicas(orderEventsReplicas)
                 .build();
@@ -81,7 +84,7 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic storeEventsDltTopic() {
-        return TopicBuilder.name(KafkaTopics.STORE_EVENTS_DLT)
+        return TopicBuilder.name(KafkaTopics.deadLetterTopic(topicNames.storeEvents()))
                 .partitions(storeEventsPartitions)
                 .replicas(storeEventsReplicas)
                 .build();

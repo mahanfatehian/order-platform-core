@@ -2,6 +2,7 @@ package com.orderprocessing.orderservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.KafkaTopics;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
@@ -69,7 +70,8 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         service = new OrderService(orderRepository, outboxRepository, processedRepository, historyRepository,
-                storeClient, new ObjectMapper().findAndRegisterModules(), orderTransactions);
+                storeClient, new ObjectMapper().findAndRegisterModules(), orderTransactions,
+                new KafkaTopicNames("orders.v2", "stores.v2"));
     }
 
     @Test
@@ -104,7 +106,7 @@ class OrderServiceTest {
         ArgumentCaptor<OutboxEvent> outboxCaptor = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outboxRepository).save(outboxCaptor.capture());
         assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("OrderPlacedEvent");
-        assertThat(outboxCaptor.getValue().getTopic()).isEqualTo("order.events");
+        assertThat(outboxCaptor.getValue().getTopic()).isEqualTo("orders.v2");
         assertThat(outboxCaptor.getValue().getPayload()).contains("corr-1", productId.toString());
     }
 

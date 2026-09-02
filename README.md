@@ -244,6 +244,7 @@ Important runtime switches:
 | `RATE_LIMIT_SUBMISSIONS_PER_WINDOW` | `10` | Sign-in and registration submissions allowed per address per window |
 | `RATE_LIMIT_CHALLENGES_PER_WINDOW` | `30` | Captcha images allowed per address per window |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
+| `KAFKA_TOPICS_ORDER_EVENTS` / `KAFKA_TOPICS_STORE_EVENTS` | `order.events` / `store.events` | Shared Kafka routes; set both values identically for `order-service` and `store-service` |
 | `ORDER_PENDING_TIMEOUT` | `PT10M` | Deadline before an unfinished inventory handshake is reconciled to `FAILED` |
 | `ORDER_OUTBOX_MAX_ATTEMPTS` / `STORE_OUTBOX_MAX_ATTEMPTS` | `5` | Database outbox publish attempts before operator intervention |
 | `ORDER_OUTBOX_RETENTION` / `STORE_OUTBOX_RETENTION` | `P30D` | Retention for successfully published outbox rows |
@@ -252,7 +253,7 @@ Important runtime switches:
 | `ORDER_EVENT_CLEANUP_BATCH_SIZE` / `STORE_EVENT_CLEANUP_BATCH_SIZE` | `500` | Rows deleted per source and independently committed transaction |
 | `ORDER_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` / `STORE_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` | `20` | Maximum delete batches per source and scheduled run |
 
-Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to consumer-owned DLTs: `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`. The source-only `order.events.dlt` and `store.events.dlt` remain provisioned as legacy compatibility topics but receive no new failures.
+Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to consumer-owned DLTs: `<order-events>.order-service.dlt`, `<order-events>.store-service.dlt`, and `<store-events>.order-service.dlt`. The source-only `<order-events>.dlt` and `<store-events>.dlt` remain provisioned as legacy compatibility topics but receive no new failures. `KAFKA_TOPICS_ORDER_EVENTS` and `KAFKA_TOPICS_STORE_EVENTS` must be identical in the Order and Store service environments.
 
 ## Build and test
 

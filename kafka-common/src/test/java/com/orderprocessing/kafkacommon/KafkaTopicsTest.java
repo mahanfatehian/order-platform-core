@@ -12,6 +12,21 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class KafkaTopicsTest {
 
     @org.junit.jupiter.api.Test
+    void acceptsTopicNamesAtThePersistedRouteBoundary() {
+        String topic = "a".repeat(200);
+
+        assertThat(KafkaTopics.requireValidTopic(topic, "sourceTopic")).isEqualTo(topic);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidConfiguredSourceTopics")
+    void rejectsConfiguredSourceTopicsThatKafkaOrTheEventTablesCannotStore(String topic) {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> KafkaTopics.requireValidTopic(topic, "sourceTopic"))
+                .withMessageContaining("sourceTopic");
+    }
+
+    @org.junit.jupiter.api.Test
     void deadLetterTopicDerivesDistinctConsumerOwnedDestinationsInsteadOfSharedSourceDlt() {
         assertThat(KafkaTopics.deadLetterTopic("order.events", "order-service"))
                 .isEqualTo("order.events.order-service.dlt");
@@ -40,6 +55,10 @@ class KafkaTopicsTest {
                 Arguments.of("order.events", "   ", "consumerOwner"),
                 Arguments.of("order.events", "order/service", "consumerOwner"),
                 Arguments.of("order.events", "order:service", "consumerOwner"),
-                Arguments.of("a".repeat(240), "owner", "249-character limit"));
+                Arguments.of("a".repeat(240), "owner", "200-character persistence limit"));
+    }
+
+    private static Stream<String> invalidConfiguredSourceTopics() {
+        return Stream.of("a".repeat(201), ".", "..");
     }
 }

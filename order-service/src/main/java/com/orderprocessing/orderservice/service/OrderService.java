@@ -3,7 +3,7 @@ package com.orderprocessing.orderservice.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.KafkaEventRegistry;
-import com.orderprocessing.kafkacommon.KafkaTopics;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
@@ -74,6 +74,7 @@ public class OrderService {
     private final StoreServiceClient storeServiceClient;
     private final ObjectMapper objectMapper;
     private final TransactionOperations orderTransactions;
+    private final KafkaTopicNames kafkaTopicNames;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
@@ -81,7 +82,8 @@ public class OrderService {
                         OrderStatusHistoryRepository historyRepository,
                         StoreServiceClient storeServiceClient,
                         ObjectMapper objectMapper,
-                        TransactionOperations orderTransactions) {
+                        TransactionOperations orderTransactions,
+                        KafkaTopicNames kafkaTopicNames) {
         this.orderRepository = orderRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.processedEventRepository = processedEventRepository;
@@ -89,6 +91,7 @@ public class OrderService {
         this.storeServiceClient = storeServiceClient;
         this.objectMapper = objectMapper;
         this.orderTransactions = orderTransactions;
+        this.kafkaTopicNames = kafkaTopicNames;
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
@@ -158,7 +161,7 @@ public class OrderService {
         placed.setCorrelationId(normalizedCorrelationId);
         recordHistory(order, placed, null, Order.Status.PENDING, userId, "ROLE_CUSTOMER",
                 "Order submitted by customer");
-        addOutbox(order.getId(), KafkaTopics.ORDER_EVENTS, placed);
+        addOutbox(order.getId(), kafkaTopicNames.orderEvents(), placed);
         return toResponse(order);
     }
 
@@ -286,7 +289,7 @@ public class OrderService {
         cancelled.setSchemaVersion(2);
         cancelled.setCorrelationId(normalizedCorrelationId);
         recordHistory(order, cancelled, previousStatus, Order.Status.CANCELLED, actorUserId, actorRole, reason);
-        addOutbox(order.getId(), KafkaTopics.ORDER_EVENTS, cancelled);
+        addOutbox(order.getId(), kafkaTopicNames.orderEvents(), cancelled);
         return toResponse(order);
     }
 
@@ -339,7 +342,7 @@ public class OrderService {
             failed.setCorrelationId(UUID.randomUUID().toString());
             recordHistory(order, failed, Order.Status.PENDING, Order.Status.FAILED, null,
                     "SYSTEM_RECONCILIATION", reason);
-            addOutbox(order.getId(), KafkaTopics.ORDER_EVENTS, failed);
+            addOutbox(order.getId(), kafkaTopicNames.orderEvents(), failed);
         }
         return staleOrders.size();
     }
@@ -543,7 +546,7 @@ public class OrderService {
         order.setUpdatedAt(occurredAt);
         orderRepository.save(order);
         recordHistory(order, event, expectedStatus, nextStatus, actorUserId, actorRole, reason);
-        addOutbox(orderId, KafkaTopics.ORDER_EVENTS, event);
+        addOutbox(orderId, kafkaTopicNames.orderEvents(), event);
         return toResponse(order);
     }
 

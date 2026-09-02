@@ -1,6 +1,7 @@
 package com.orderprocessing.storeservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
@@ -53,7 +54,8 @@ class InventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new InventoryService(inventoryRepository, lifecycleRepository, reservationRepository, productRepository,
-                processedRepository, outboxRepository, new ObjectMapper().findAndRegisterModules());
+                processedRepository, outboxRepository, new ObjectMapper().findAndRegisterModules(),
+                new KafkaTopicNames("orders.v2", "stores.v2"));
         when(lifecycleRepository.findByOrderIdForUpdate(any())).thenAnswer(invocation -> {
             InventoryOrderLifecycle lifecycle = new InventoryOrderLifecycle();
             lifecycle.setOrderId(invocation.getArgument(0));
@@ -84,6 +86,7 @@ class InventoryServiceTest {
         verify(outboxRepository).save(outbox.capture());
         assertThat(outbox.getValue().getEventType()).isEqualTo("StockReservedEvent");
         assertThat(outbox.getValue().getAggregateId()).isEqualTo(orderId.toString());
+        assertThat(outbox.getValue().getTopic()).isEqualTo("stores.v2");
     }
 
     @Test
@@ -106,6 +109,7 @@ class InventoryServiceTest {
         verify(outboxRepository).save(outbox.capture());
         assertThat(outbox.getValue().getEventType()).isEqualTo("StockInsufficientEvent");
         assertThat(outbox.getValue().getPayload()).contains("Insufficient inventory");
+        assertThat(outbox.getValue().getTopic()).isEqualTo("stores.v2");
     }
 
     @Test

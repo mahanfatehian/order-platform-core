@@ -3,7 +3,7 @@ package com.orderprocessing.storeservice.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.KafkaEventRegistry;
-import com.orderprocessing.kafkacommon.KafkaTopics;
+import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
@@ -51,6 +51,7 @@ public class InventoryService {
     private final ProcessedKafkaEventRepository processedEventRepository;
     private final StoreOutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
+    private final KafkaTopicNames kafkaTopicNames;
 
     public InventoryService(InventoryRepository inventoryRepository,
                             InventoryOrderLifecycleRepository lifecycleRepository,
@@ -58,7 +59,8 @@ public class InventoryService {
                             ProductRepository productRepository,
                             ProcessedKafkaEventRepository processedEventRepository,
                             StoreOutboxEventRepository outboxEventRepository,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper,
+                            KafkaTopicNames kafkaTopicNames) {
         this.inventoryRepository = inventoryRepository;
         this.lifecycleRepository = lifecycleRepository;
         this.reservationRepository = reservationRepository;
@@ -66,6 +68,7 @@ public class InventoryService {
         this.processedEventRepository = processedEventRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
+        this.kafkaTopicNames = kafkaTopicNames;
     }
 
     @Transactional(readOnly = true)
@@ -159,7 +162,7 @@ public class InventoryService {
             result.setSuccess(false);
             result.setReason(rejectionReason);
             result.setCorrelationId(event.getCorrelationId());
-            addOutbox(event.getOrderId(), KafkaTopics.STORE_EVENTS, result);
+            addOutbox(event.getOrderId(), kafkaTopicNames.storeEvents(), result);
             return;
         }
 
@@ -187,7 +190,7 @@ public class InventoryService {
         result.setOrderId(event.getOrderId());
         result.setSuccess(true);
         result.setCorrelationId(event.getCorrelationId());
-        addOutbox(event.getOrderId(), KafkaTopics.STORE_EVENTS, result);
+        addOutbox(event.getOrderId(), kafkaTopicNames.storeEvents(), result);
     }
 
     @Transactional
