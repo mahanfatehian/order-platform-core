@@ -224,11 +224,11 @@ Only a genuine `401` counts towards the captcha threshold; a `503` from a degrad
 
 Counters are shared through Redis. If Redis is unreachable they fall back to bounded per-instance counting rather than reporting zero, so the controls degrade instead of switching themselves off.
 
-To watch it happen locally, submit a wrong password three times at http://localhost:8085/login.
+To watch it happen locally, submit a wrong password three times at http://localhost:8080/login.
 
 ## Configuration
 
-`.env.example` contains local-development values and documents every required secret/port. The start scripts use it directly. To customize the environment, copy it to `.env`, change the values, and omit `--env-file .env.example` from Compose commands.
+`.env.example` contains local-development values and documents every required secret/port. Demo lifecycle scripts select their environment file in this order: `ORDER_PLATFORM_ENV_FILE` (which must name an existing file), `.env` when it exists, then `.env.example` (which must exist). Each script prints the selected path before invoking Compose. To customize the environment, copy `.env.example` to `.env` and change the values; use `ORDER_PLATFORM_ENV_FILE=config/demo.env` when a different existing file should take precedence.
 
 Important runtime switches:
 

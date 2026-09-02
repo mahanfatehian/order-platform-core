@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -27,6 +27,8 @@ jobs:
           cache: maven
       - name: Verify all modules
         run: mvn -B -ntp clean verify
+      - name: Verify demo lifecycle environment selection
+        run: python3 -m unittest scripts/acceptance/test_demo_script_env.py -v
       - name: Validate Compose model
         run: docker compose --env-file .env.example config --quiet
       - name: Upload test reports
