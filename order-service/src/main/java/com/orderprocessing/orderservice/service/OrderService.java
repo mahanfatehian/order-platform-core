@@ -613,13 +613,19 @@ public class OrderService {
         return key;
     }
 
+    /** Width of order_status_history.correlation_id; the edge itself allows up to 128 characters. */
+    private static final int MAX_CORRELATION_ID_LENGTH = 100;
+
     private String normalizeCorrelationId(String value) {
         if (value == null || value.isBlank()) {
             return UUID.randomUUID().toString();
         }
         String correlationId = value.trim();
-        if (correlationId.length() > 100) {
-            throw new IllegalArgumentException("Correlation id cannot exceed 100 characters");
+        if (correlationId.length() > MAX_CORRELATION_ID_LENGTH) {
+            // The edge accepts up to 128 characters and forwards them verbatim, so an id longer than the history
+            // column is a value this service is expected to receive, not a malformed request. Truncate it the way
+            // historyCorrelationId already does rather than failing the command it merely labels.
+            correlationId = correlationId.substring(0, MAX_CORRELATION_ID_LENGTH);
         }
         return correlationId;
     }
@@ -630,8 +636,8 @@ public class OrderService {
             value = UUID.randomUUID().toString();
         } else {
             value = value.trim();
-            if (value.length() > 100) {
-                value = value.substring(0, 100);
+            if (value.length() > MAX_CORRELATION_ID_LENGTH) {
+                value = value.substring(0, MAX_CORRELATION_ID_LENGTH);
             }
         }
         event.setCorrelationId(value);

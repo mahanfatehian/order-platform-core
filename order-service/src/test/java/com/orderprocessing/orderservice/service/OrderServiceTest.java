@@ -340,4 +340,31 @@ class OrderServiceTest {
         item.setUpdatedAt(Instant.now());
         return item;
     }
+
+    @Test
+    void acceptsTheLongestCorrelationIdTheEdgeForwardsAndTruncatesItForStorage() {
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        when(orderTransactions.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-long"))
+                .thenReturn(Optional.empty());
+        when(storeClient.quote(any())).thenReturn(new StoreQuoteResponse(List.of(
+                new StoreQuoteItemResponse(productId, "Authoritative product", new BigDecimal("12.50"),
+                        true, 2, 10, true))));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        // The gateway, security-starter, web-ui and kafka-common all accept [A-Za-z0-9._-]{1,128} and forward it
+        // verbatim, so a 128-character id is a value this service is expected to receive.
+        String edgeMaximum = "c".repeat(128);
+
+        OrderResponse response = service.createOrder(userId, request, "checkout-long", edgeMaximum);
+
+        assertThat(response).isNotNull();
+        ArgumentCaptor<OutboxEvent> outboxCaptor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getPayload()).contains("c".repeat(100));
+    }
 }
