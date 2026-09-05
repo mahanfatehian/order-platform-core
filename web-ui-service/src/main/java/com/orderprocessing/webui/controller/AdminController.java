@@ -2,6 +2,7 @@ package com.orderprocessing.webui.controller;
 
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
 import com.orderprocessing.webui.dto.*;
+import com.orderprocessing.webui.exception.SessionExpiredException;
 import com.orderprocessing.webui.form.InventoryForm;
 import com.orderprocessing.webui.form.ProductForm;
 import jakarta.validation.Valid;
@@ -25,11 +26,13 @@ public class AdminController {
 
     @GetMapping
     public String dashboard(Model model) {
-        PageResponse<UserView> users = safe(() -> client.adminUsers(0, 1, ""), PageResponse.empty(0, 1));
-        PageResponse<ProductView> products = safe(() -> client.adminProducts(0, 50, ""), PageResponse.empty(0, 50));
-        PageResponse<InventoryView> inventory = safe(() -> client.inventory(0, 50, ""), PageResponse.empty(0, 50));
-        PageResponse<OrderView> pending = safe(() -> client.adminOrders(0, 1, "PENDING", ""), PageResponse.empty(0, 1));
-        PageResponse<OrderView> failed = safe(() -> client.adminOrders(0, 1, "FAILED", ""), PageResponse.empty(0, 1));
+        Set<String> unavailable = new LinkedHashSet<>();
+        PageResponse<UserView> users = safe("users", unavailable, () -> client.adminUsers(0, 1, ""), PageResponse.empty(0, 1));
+        PageResponse<ProductView> products = safe("products", unavailable, () -> client.adminProducts(0, 50, ""), PageResponse.empty(0, 50));
+        PageResponse<InventoryView> inventory = safe("inventory", unavailable, () -> client.inventory(0, 50, ""), PageResponse.empty(0, 50));
+        PageResponse<OrderView> pending = safe("orders", unavailable, () -> client.adminOrders(0, 1, "PENDING", ""), PageResponse.empty(0, 1));
+        PageResponse<OrderView> failed = safe("orders", unavailable, () -> client.adminOrders(0, 1, "FAILED", ""), PageResponse.empty(0, 1));
+        model.addAttribute("unavailableMetrics", unavailable);
         model.addAttribute("userCount", users.totalElements());
         model.addAttribute("activeProducts", products.content().stream().filter(ProductView::active).count());
         model.addAttribute("lowStockProducts", inventory.content().stream().filter(item -> item.availableQuantity() <= 5).count());
@@ -172,7 +175,23 @@ public class AdminController {
         model.addAttribute("cancelEndpoint", "/admin/orders/" + id + "/cancel");
     }
 
-    private static <T> T safe(java.util.function.Supplier<T> supplier, T fallback) {
-        try { return supplier.get(); } catch (RuntimeException ignored) { return fallback; }
+    /**
+     * Keeps one failing panel from taking the whole dashboard down, while recording that it failed. A metric that
+     * could not be read is not a metric that is zero, and on this page the difference matters: an administrator
+     * looking at it during an incident would otherwise read "0 failed orders" as reassurance when the truth is
+     * that nothing could be asked.
+     */
+    private static <T> T safe(String metric, Set<String> unavailable,
+                              java.util.function.Supplier<T> supplier, T fallback) {
+        try {
+            return supplier.get();
+        } catch (SessionExpiredException expired) {
+            // Not a panel failure. The caller has to sign in again, and swallowing this renders a dashboard of
+            // zeros to somebody who is no longer authenticated.
+            throw expired;
+        } catch (RuntimeException exception) {
+            unavailable.add(metric);
+            return fallback;
+        }
     }
 }
