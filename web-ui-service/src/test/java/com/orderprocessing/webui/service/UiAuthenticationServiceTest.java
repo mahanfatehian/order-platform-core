@@ -5,6 +5,7 @@ import com.orderprocessing.webui.config.WebUiProperties;
 import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.model.UiSessionTokens;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -63,5 +64,23 @@ class UiAuthenticationServiceTest {
                 Arguments.of("backend missing", new BackendClientException(
                         HttpStatus.NOT_FOUND, "NOT_FOUND", "Token is not found", Map.of())),
                 Arguments.of("transport unavailable", new ResourceAccessException("auth service unavailable")));
+    }
+
+    @Test
+    void clearsTheSessionWhenThePlatformAlreadyRefusesTheToken() {
+        MockHttpSession session = new MockHttpSession();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(session);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request, new MockHttpServletResponse()));
+        UiSessionTokens tokens = new UiSessionTokens("access-token", "refresh-token",
+                Instant.parse("2026-01-02T03:04:05Z"), Instant.parse("2026-01-02T04:04:05Z"));
+        tokenService.save(request, tokens);
+        doThrow(new BackendClientException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Token is not valid", Map.of()))
+                .when(platformClient).logout("access-token");
+
+        // 401 means the platform already refuses this token: revoked from another device, or expired. Revocation
+        // has nothing left to achieve, so refusing to sign out locally would strand the browser signed in.
+        assertThat(catchThrowable(service::logoutCurrentSession)).isNull();
+        assertThat(tokenService.current()).isEmpty();
     }
 }

@@ -94,7 +94,14 @@ public class UiAuthenticationService {
         tokenService.current().ifPresent(tokens -> {
             try {
                 platformClient.logout(tokens.accessToken());
-            } catch (BackendClientException | RestClientException exception) {
+            } catch (BackendClientException exception) {
+                // 401 is not a failure to revoke, it is proof the token is already refused: revoked from another
+                // device, expired, or its user disabled. Revocation has nothing left to achieve, and refusing to
+                // sign out locally would strand the browser in a session it cannot leave.
+                if (exception.getStatus().value() != 401) {
+                    throw new LogoutRevocationException(exception);
+                }
+            } catch (RestClientException exception) {
                 throw new LogoutRevocationException(exception);
             }
         });

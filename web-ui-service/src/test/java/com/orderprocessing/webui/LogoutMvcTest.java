@@ -6,6 +6,7 @@ import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.model.UiSessionTokens;
 import com.orderprocessing.webui.service.SessionTokenService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -32,6 +33,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -91,5 +93,26 @@ class LogoutMvcTest {
                 Arguments.of("backend missing", new BackendClientException(
                         HttpStatus.NOT_FOUND, "NOT_FOUND", "Token is not found", Map.of())),
                 Arguments.of("transport unavailable", new ResourceAccessException("auth service unavailable")));
+    }
+
+    @Test
+    void signsOutLocallyWhenThePlatformAlreadyRefusesTheToken() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        UiSessionTokens tokens = new UiSessionTokens("access-token", "refresh-token",
+                Instant.parse("2026-01-02T03:04:05Z"), Instant.parse("2026-01-02T04:04:05Z"));
+        MockHttpServletRequest tokenRequest = new MockHttpServletRequest();
+        tokenRequest.setSession(session);
+        tokenService.save(tokenRequest, tokens);
+        doThrow(new BackendClientException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Token is not valid", Map.of()))
+                .when(platformClient).logout(tokens.accessToken());
+
+        // Revoked from another device, or simply expired. There is nothing left to revoke, so sign-out must
+        // complete rather than stranding an authenticated browser that cannot be signed out.
+        mvc.perform(post("/logout").with(user("customer").roles("USER")).with(csrf()).session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?logout"))
+                .andExpect(cookie().maxAge("ORDER_PLATFORM_SESSION", 0));
+
+        assertThat(session.isInvalid()).isTrue();
     }
 }
