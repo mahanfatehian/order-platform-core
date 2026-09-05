@@ -140,7 +140,10 @@ public class UserService {
             throw new IllegalArgumentException("Unsupported user sort field: " + sort);
         }
         String query = search == null || search.isBlank() ? "" : search.strip();
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        // The sort columns are not unique, and LIMIT/OFFSET over a non-unique sort has no defined order inside a
+        // tie, so two pages can repeat a row and skip another. id breaks every tie.
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(direction, sortField).and(Sort.by(direction, "id")));
 
         // Page the identifiers first so the database applies the limit, then load just that page with its roles.
         // Doing both in one fetch-joined query would force Hibernate to read every match and page in memory.

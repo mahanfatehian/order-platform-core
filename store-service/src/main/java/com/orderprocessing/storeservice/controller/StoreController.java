@@ -46,6 +46,8 @@ public class StoreController {
         String property = parts.length == 0 || !SORT_FIELDS.contains(parts[0]) ? "createdAt" : parts[0];
         Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1])
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
-        return PageRequest.of(page, size, Sort.by(direction, property));
+        // created_at is not unique, and LIMIT/OFFSET over a non-unique sort has no defined order inside a tie.
+        // Two pages served by different plans can then repeat a row and skip another. id breaks every tie.
+        return PageRequest.of(page, size, Sort.by(direction, property).and(Sort.by(direction, "id")));
     }
 }
