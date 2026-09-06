@@ -119,8 +119,11 @@
 
   let lastOrderState = document.getElementById('order-status')?.dataset.orderState || null;
 
-  document.addEventListener('htmx:afterSwap', event => {
-    syncCartCount(event.detail.target);
+  document.addEventListener('htmx:afterSwap', () => {
+    // event.detail.target is the node htmx swapped OUT, captured before the swap and already detached by the
+    // time this fires, so it still carries the pre-change count. Read the node that is now in the document,
+    // the same way the order-status lookup below does.
+    syncCartCount(document.getElementById('cart-content') || document);
     updateDocumentTitle();
     const statusRegion = document.getElementById('order-status');
     const nextOrderState = statusRegion?.dataset.orderState || null;
