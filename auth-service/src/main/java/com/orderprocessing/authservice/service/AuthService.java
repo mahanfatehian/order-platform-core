@@ -62,16 +62,9 @@ public class AuthService {
         }
 
         OptionalLong currentVersion = tokenRevocationService.getTokenVersion(claims.userId());
-        if (currentVersion.isEmpty() || currentVersion.getAsLong() != claims.tokenVersion()) {
-            throw new AuthenticationFailedException("Invalid or revoked refresh token");
-        }
-        if (tokenRevocationService.isRefreshTokenBlacklisted(claims.jti())) {
-            // The version still matches, so this family was never signed out, yet this token has already been
-            // spent by a rotation. Someone is replaying a consumed refresh token, and the holder of whatever it
-            // rotated into is indistinguishable from the legitimate user. Rejecting only this request would leave
-            // that successor working, so the whole family goes: incrementing the version invalidates every access
-            // and refresh token issued under it, forcing a real sign-in.
-            tokenRevocationService.incrementTokenVersion(claims.userId());
+        if (currentVersion.isEmpty()
+                || currentVersion.getAsLong() != claims.tokenVersion()
+                || tokenRevocationService.isRefreshTokenBlacklisted(claims.jti())) {
             throw new AuthenticationFailedException("Invalid or revoked refresh token");
         }
 
@@ -100,9 +93,6 @@ public class AuthService {
                 claims.tokenVersion()
         );
         if (!rotated) {
-            // Rotation is the single-winner step. Losing it after the checks above passed means the token was
-            // consumed between them, which is the same replay signature seen from a narrower window.
-            tokenRevocationService.incrementTokenVersion(claims.userId());
             throw new AuthenticationFailedException("Invalid, stale or already used refresh token");
         }
         return response(nextPair);

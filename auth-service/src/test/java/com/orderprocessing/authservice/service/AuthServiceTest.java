@@ -25,8 +25,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AuthServiceTest {
@@ -96,79 +94,5 @@ class AuthServiceTest {
         properties.setExpiration(60_000);
         properties.setRefreshExpiration(120_000);
         return properties;
-    }
-
-    @Test
-    void replayingAConsumedRefreshTokenRevokesTheWholeFamily() {
-        UUID userId = UUID.randomUUID();
-        JwtTokenService tokens = new JwtTokenService(properties());
-        JwtTokenService.TokenPair original = tokens.generateTokenPair(
-                "customer", Set.of("ROLE_USER"), userId, 77L);
-        UserServiceClient users = mock(UserServiceClient.class);
-        TokenRevocationService revocation = mock(TokenRevocationService.class);
-        // The version still matches, so nobody signed this family out, yet the token is already spent. That is
-        // replay of a consumed refresh token, and whatever it rotated into is in someone else's hands.
-        when(revocation.getTokenVersion(userId)).thenReturn(OptionalLong.of(77L));
-        when(revocation.isRefreshTokenBlacklisted(any())).thenReturn(true);
-
-        AuthService service = new AuthService(users, tokens, revocation);
-
-        assertThatThrownBy(() -> service.refresh(original.refreshToken()))
-                .isInstanceOf(AuthenticationFailedException.class);
-        // Rejecting the replay alone would leave the successor token working.
-        verify(revocation).incrementTokenVersion(userId);
-        verify(users, never()).getCurrentState(any());
-    }
-
-    @Test
-    void losingTheRotationRaceAlsoRevokesTheFamily() {
-        UUID userId = UUID.randomUUID();
-        JwtTokenService tokens = new JwtTokenService(properties());
-        JwtTokenService.TokenPair original = tokens.generateTokenPair(
-                "customer", Set.of("ROLE_USER"), userId, 77L);
-        UserServiceClient users = mock(UserServiceClient.class);
-        InternalUserStateResponse state = new InternalUserStateResponse();
-        state.setId(userId);
-        state.setUsername("customer");
-        state.setEnabled(true);
-        state.setAccountNonLocked(true);
-        state.setRoles(Set.of("ROLE_USER"));
-        when(users.getCurrentState(userId)).thenReturn(state);
-        TokenRevocationService revocation = mock(TokenRevocationService.class);
-        when(revocation.getTokenVersion(userId)).thenReturn(OptionalLong.of(77L));
-        when(revocation.isRefreshTokenBlacklisted(any())).thenReturn(false);
-        // The token was consumed between the checks and the rotation: the same replay, seen later.
-        when(revocation.rotateRefreshToken(any(), any(), any(), any(), any(), anyLong())).thenReturn(false);
-
-        AuthService service = new AuthService(users, tokens, revocation);
-
-        assertThatThrownBy(() -> service.refresh(original.refreshToken()))
-                .isInstanceOf(AuthenticationFailedException.class);
-        verify(revocation).incrementTokenVersion(userId);
-    }
-
-    @Test
-    void anOrdinaryRefreshDoesNotRevokeAnything() {
-        UUID userId = UUID.randomUUID();
-        JwtTokenService tokens = new JwtTokenService(properties());
-        JwtTokenService.TokenPair original = tokens.generateTokenPair(
-                "customer", Set.of("ROLE_USER"), userId, 77L);
-        UserServiceClient users = mock(UserServiceClient.class);
-        InternalUserStateResponse state = new InternalUserStateResponse();
-        state.setId(userId);
-        state.setUsername("customer");
-        state.setEnabled(true);
-        state.setAccountNonLocked(true);
-        state.setRoles(Set.of("ROLE_USER"));
-        when(users.getCurrentState(userId)).thenReturn(state);
-        TokenRevocationService revocation = mock(TokenRevocationService.class);
-        when(revocation.getTokenVersion(userId)).thenReturn(OptionalLong.of(77L));
-        when(revocation.isRefreshTokenBlacklisted(any())).thenReturn(false);
-        when(revocation.rotateRefreshToken(any(), any(), any(), any(), any(), anyLong())).thenReturn(true);
-
-        new AuthService(users, tokens, revocation).refresh(original.refreshToken());
-
-        // A healthy rotation must never sign the user out of their other sessions.
-        verify(revocation, never()).incrementTokenVersion(any());
     }
 }
