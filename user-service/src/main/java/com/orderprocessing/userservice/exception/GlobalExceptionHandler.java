@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -106,6 +107,17 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "HTTP method is not supported", request);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> authorizationDenied(
+            AuthorizationDeniedException exception,
+            HttpServletRequest request
+    ) {
+        // Without this the catch-all below claims it first, and a denial that Spring Security would have
+        // translated into 403 leaves as 500 INTERNAL_ERROR instead.
+        return error(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                "You do not have permission to perform this operation", request);
     }
 
     @ExceptionHandler(Exception.class)

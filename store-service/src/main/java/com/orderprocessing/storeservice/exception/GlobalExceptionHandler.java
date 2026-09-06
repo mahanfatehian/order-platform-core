@@ -3,6 +3,7 @@ package com.orderprocessing.storeservice.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
                                                             HttpServletRequest request) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "HTTP method is not supported",
+                request, Map.of());
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ApiError> authorizationDenied(AuthorizationDeniedException ex, HttpServletRequest request) {
+        // Without this the catch-all below claims it first, and a denial that Spring Security would have
+        // translated into 403 leaves as 500 INTERNAL_ERROR instead.
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to perform this operation",
                 request, Map.of());
     }
 
