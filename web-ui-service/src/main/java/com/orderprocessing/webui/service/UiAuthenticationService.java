@@ -37,18 +37,6 @@ public class UiAuthenticationService {
     private final SessionTokenService tokenService;
     private final JwtDecoder jwtDecoder;
     private final WebUiProperties properties;
-    /**
-     * Refresh has to be serialised per session because the refresh token is single use: two requests that both
-     * present it produce one winner and one holder of a token the platform has already consumed.
-     *
-     * <p>Locking the HttpSession object cannot do that. Spring Session hands out a fresh HttpSessionWrapper on
-     * every getSession() call, so concurrent requests for one session hold different objects and synchronize on
-     * different monitors. Striping on the session id gives every session a stable monitor instead.
-     */
-    private static final int REFRESH_LOCK_STRIPES = 64;
-    private final Object[] refreshLocks = java.util.stream.IntStream.range(0, REFRESH_LOCK_STRIPES)
-            .mapToObj(stripe -> new Object()).toArray();
-
     private final HttpSessionSecurityContextRepository contextRepository = new HttpSessionSecurityContextRepository();
 
     public UiAuthenticationService(PlatformClient platformClient, SessionTokenService tokenService,
@@ -78,12 +66,10 @@ public class UiAuthenticationService {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
         HttpSession session = attributes.getRequest().getSession(false);
         if (session == null) throw new SessionExpiredException("Your session expired", null);
-        synchronized (refreshLockFor(session.getId())) {
+        synchronized (session) {
             UiSessionTokens current = tokenService.current()
                     .orElseThrow(() -> new SessionExpiredException("Your session expired", null));
             Instant threshold = Instant.now().plus(properties.getSecurity().getRefreshSkew());
-            // Re-read inside the lock: whoever held it before us may already have rotated, in which case the
-            // stored pair is fresh and calling the platform again would spend a token that is now single use.
             if (!current.accessExpiresWithin(threshold)) return current;
             try {
                 DecodedPair pair = decodePair(platformClient.refresh(current.refreshToken()));
@@ -98,21 +84,10 @@ public class UiAuthenticationService {
                         SecurityContextHolder.getContext());
                 return pair.tokens();
             } catch (RuntimeException exception) {
-                // Another instance may have rotated between our read and our call, which consumes the token we
-                // sent. That is a lost race, not a dead session, and the winner has already stored a usable pair.
-                UiSessionTokens rotatedElsewhere = tokenService.current().orElse(null);
-                if (rotatedElsewhere != null && !rotatedElsewhere.refreshToken().equals(current.refreshToken())
-                        && !rotatedElsewhere.accessExpiresWithin(Instant.now())) {
-                    return rotatedElsewhere;
-                }
                 expireCurrentSession();
                 throw new SessionExpiredException("Your session expired. Please sign in again.", exception);
             }
         }
-    }
-
-    private Object refreshLockFor(String sessionId) {
-        return refreshLocks[Math.floorMod(sessionId.hashCode(), REFRESH_LOCK_STRIPES)];
     }
 
     public void logoutCurrentSession() {
