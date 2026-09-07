@@ -1,6 +1,7 @@
 package com.orderprocessing.webui.form;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -11,7 +12,10 @@ public class ProductForm {
     @NotBlank @Size(max = 255) private String name;
     @Size(max = 64) private String sku;
     @Size(max = 4000) private String description;
-    @NotNull @DecimalMin(value = "0.00") private BigDecimal price;
+    // Mirrors the @Digits bound store-service enforces on ProductRequest.price. Without it an over-precision
+    // price passes binding, is rejected by the backend, and surfaces as a service-unavailable page that loses
+    // everything the administrator typed.
+    @NotNull @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) private BigDecimal price;
     @NotBlank private String category = "OTHER";
     private boolean active = true;
     public String getName() { return name; }
