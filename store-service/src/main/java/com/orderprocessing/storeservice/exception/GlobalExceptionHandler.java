@@ -75,8 +75,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<ApiError> authorizationDenied(AuthorizationDeniedException ex, HttpServletRequest request) {
-        // Without this the catch-all below claims it first, and a denial that Spring Security would have
-        // translated into 403 leaves as 500 INTERNAL_ERROR instead.
+        // The live path here: nothing in the filter chain matches /api/store/admin/**, so @PreAuthorize on
+        // AdminStoreController is the only guard and its denial is raised inside the dispatcher. Without this
+        // the catch-all below claims it first and answers 500 instead of 403.
         return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to perform this operation",
                 request, Map.of());
     }

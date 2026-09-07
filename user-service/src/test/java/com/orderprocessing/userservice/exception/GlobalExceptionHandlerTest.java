@@ -2,6 +2,9 @@ package com.orderprocessing.userservice.exception;
 
 import com.orderprocessing.security.web.ApiErrorResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import java.lang.reflect.Method;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,5 +34,18 @@ class GlobalExceptionHandlerTest {
             assertThat(body.path()).isEqualTo("/api/users/admin");
             assertThat(body.correlationId()).isEqualTo("correlation-forbidden-2");
         });
+    }
+
+    @Test
+    void theDenialIsRoutedToThatHandlerRatherThanTheCatchAll() {
+        // Calling the method directly proves only what the method does. This resolves the exception the way
+        // Spring does, so dropping @ExceptionHandler would fall through to the catch-all and fail here.
+        ExceptionHandlerMethodResolver resolver = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+
+        Method resolved = resolver.resolveMethod(
+                new AuthorizationDeniedException("ROLE_ADMIN is required", new AuthorizationDecision(false)));
+
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getName()).isEqualTo("authorizationDenied");
     }
 }

@@ -114,8 +114,10 @@ public class GlobalExceptionHandler {
             AuthorizationDeniedException exception,
             HttpServletRequest request
     ) {
-        // Without this the catch-all below claims it first, and a denial that Spring Security would have
-        // translated into 403 leaves as 500 INTERNAL_ERROR instead.
+        // A backstop, not the live path. UserServiceSecurityConfig already gates /api/users/admin/** with
+        // hasRole("ADMIN"), so the filter chain answers 403 before a request reaches @PreAuthorize here. This
+        // matters only if that rule is ever narrowed, at which point method security becomes the sole guard and
+        // the catch-all below would otherwise turn its denial into 500.
         return error(HttpStatus.FORBIDDEN, "FORBIDDEN",
                 "You do not have permission to perform this operation", request);
     }
