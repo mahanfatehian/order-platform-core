@@ -57,7 +57,12 @@ public class DevDataInitializer implements ApplicationRunner {
 
     private void seedUser(String username, String email, String password, String firstName, String lastName,
                           RoleEntity... roles) {
-        if (userRepository.findByUsernameIgnoreCase(username).isPresent()) {
+        // Both columns are unique, so either one already being taken means this identity cannot be inserted.
+        // Checking the username alone let a row that owns the email through to save(), where the constraint
+        // rejects it and the failure escapes the runner, leaving the service unable to start. Registration is
+        // open, so any visitor can claim one of these emails under a different username and cause exactly that.
+        if (userRepository.findByUsernameIgnoreCase(username).isPresent()
+                || userRepository.findByEmailIgnoreCase(email).isPresent()) {
             return;
         }
         userRepository.save(UserEntity.builder()

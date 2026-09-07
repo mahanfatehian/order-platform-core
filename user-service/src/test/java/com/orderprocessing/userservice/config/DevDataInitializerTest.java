@@ -34,6 +34,7 @@ class DevDataInitializerTest {
         when(roles.findByName("ROLE_WAREHOUSE")).thenReturn(Optional.of(warehouseRole));
         when(roles.findByName("ROLE_DELIVERY")).thenReturn(Optional.of(deliveryRole));
         when(users.findByUsernameIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(users.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
         when(encoder.encode(anyString())).thenAnswer(invocation -> "encoded:" + invocation.getArgument(0));
 
         new DevDataInitializer(users, roles, encoder).run(null);
@@ -58,5 +59,29 @@ class DevDataInitializerTest {
                 .filter(user -> username.equals(user.getUsername()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    @Test
+    void skipsASeedIdentityWhoseEmailIsAlreadyTaken() throws Exception {
+        UserRepository users = mock(UserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(roles.findByName("ROLE_USER")).thenReturn(Optional.of(role("ROLE_USER")));
+        when(roles.findByName("ROLE_ADMIN")).thenReturn(Optional.of(role("ROLE_ADMIN")));
+        when(roles.findByName("ROLE_WAREHOUSE")).thenReturn(Optional.of(role("ROLE_WAREHOUSE")));
+        when(roles.findByName("ROLE_DELIVERY")).thenReturn(Optional.of(role("ROLE_DELIVERY")));
+        when(users.findByUsernameIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(users.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
+        // Registration is open, so a visitor can hold a seed email under a username of their own choosing.
+        when(users.findByEmailIgnoreCase("admin@example.com"))
+                .thenReturn(Optional.of(UserEntity.builder().username("someone_else").build()));
+        when(encoder.encode(anyString())).thenAnswer(invocation -> "encoded:" + invocation.getArgument(0));
+
+        new DevDataInitializer(users, roles, encoder).run(null);
+
+        // Three seeded, not four, and no insert attempted against the unique email constraint.
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(users, times(3)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(UserEntity::getUsername).doesNotContain("admin");
     }
 }
