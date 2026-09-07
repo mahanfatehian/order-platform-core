@@ -47,6 +47,8 @@ public class CartService {
 
     public int maximumLineItems() { return properties.getCart().getMaximumLineItems(); }
 
+    public int maximumQuantity() { return properties.getCart().getMaximumQuantity(); }
+
     public void remove(HttpSession session, UUID productId) { get(session).remove(productId); session.setAttribute(CART, get(session)); }
     public void clear(HttpSession session) { get(session).clear(); session.setAttribute(CART, get(session)); }
     public Map<UUID, Integer> checkoutSnapshot(HttpSession session) {
