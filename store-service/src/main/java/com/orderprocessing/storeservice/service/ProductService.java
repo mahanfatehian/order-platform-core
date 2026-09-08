@@ -72,7 +72,7 @@ public class ProductService {
         Product product = new Product();
         product.setId(UUID.randomUUID());
         apply(product, request, sku);
-        product.setActive(true);
+        product.setActive(request.getActive() == null || request.getActive());
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
         productRepository.save(product);
@@ -92,6 +92,9 @@ public class ProductService {
         String sku = normalizeSku(request.getSku());
         assertSkuAvailable(sku, id);
         apply(product, request, sku);
+        if (request.getActive() != null) {
+            product.setActive(request.getActive());
+        }
         product.setUpdatedAt(Instant.now());
         productRepository.save(product);
         return toDto(product, inventoryRepository.findById(id).orElse(null));

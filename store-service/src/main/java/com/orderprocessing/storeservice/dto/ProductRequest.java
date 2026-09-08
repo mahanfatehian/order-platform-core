@@ -31,4 +31,10 @@ public class ProductRequest {
 
     @NotNull(message = "Category is required")
     private Product.Category category;
+
+    /**
+     * Nullable on purpose: a caller that does not mention the flag leaves it to the service, which activates a new
+     * product and leaves an existing one as it was. The admin form always sends it.
+     */
+    private Boolean active;
 }
