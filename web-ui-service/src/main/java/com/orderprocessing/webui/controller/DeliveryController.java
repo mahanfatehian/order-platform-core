@@ -61,6 +61,28 @@ public class DeliveryController {
         return "redirect:/admin/delivery";
     }
 
+    /**
+     * The tracking number often arrives from the carrier after the handoff, so the ship form leaves the field
+     * optional. This lets the in-transit lane fill that blank in later without pretending to ship the order again.
+     */
+    @PostMapping("/orders/{id}/tracking")
+    public String recordTracking(@PathVariable UUID id,
+                                 @RequestParam(required = false) String trackingReference,
+                                 RedirectAttributes redirect) {
+        if (trackingReference == null || trackingReference.isBlank()) {
+            redirect.addFlashAttribute("warning", "Enter a tracking reference before saving it.");
+            return "redirect:/admin/delivery";
+        }
+        try {
+            client.shipOrder(id, trackingReference.trim());
+            redirect.addFlashAttribute("success", "Tracking reference recorded.");
+        } catch (BackendClientException exception) {
+            handleConflict(exception, redirect,
+                    "This order already carries a different tracking reference.");
+        }
+        return "redirect:/admin/delivery";
+    }
+
     @PostMapping("/orders/{id}/deliver")
     public String deliver(@PathVariable UUID id, RedirectAttributes redirect) {
         try {

@@ -186,6 +186,25 @@ class WebUiMvcTest {
     }
 
     @Test
+    void theInTransitLaneOffersTrackingOnlyWhileTheReferenceIsStillBlank() throws Exception {
+        Instant now = Instant.parse("2026-01-02T03:04:05Z");
+        OrderView untracked = new OrderView(ORDER_ID, USER_ID, "SHIPPED", new BigDecimal("59.80"), null,
+                List.of(), now, now, false, null);
+        OrderView tracked = new OrderView(UUID.randomUUID(), USER_ID, "SHIPPED", new BigDecimal("59.80"), null,
+                List.of(), now, now, false, "TRACK-9");
+        when(authenticatedClient.fulfillmentOrders(anyInt(), anyInt(), org.mockito.ArgumentMatchers.eq("PACKAGED")))
+                .thenReturn(PageResponse.empty(0, 20));
+        when(authenticatedClient.fulfillmentOrders(anyInt(), anyInt(), org.mockito.ArgumentMatchers.eq("SHIPPED")))
+                .thenReturn(new PageResponse<>(List.of(untracked, tracked), 0, 20, 2, 1, true, true));
+
+        mvc.perform(get("/admin/delivery").with(user("delivery_driver").roles("DELIVERY")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "/admin/delivery/orders/" + ORDER_ID + "/tracking")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Tracking TRACK-9")));
+    }
+
+    @Test
     void homeRedirectsEachPersonaToItsOwnWorkspace() throws Exception {
         mvc.perform(get("/").with(user("warehouse_worker").roles("WAREHOUSE")))
                 .andExpect(redirectedUrl("/admin/warehouse"));

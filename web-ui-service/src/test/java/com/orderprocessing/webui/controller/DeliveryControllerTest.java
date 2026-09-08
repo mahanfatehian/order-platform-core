@@ -10,10 +10,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,5 +48,27 @@ class DeliveryControllerTest {
         assertEquals("/admin/delivery?shippedPage=1&packagedPage=3", packagedLinks.nextUrl());
         assertEquals("/admin/delivery?packagedPage=2&shippedPage=0", shippedLinks.previousUrl());
         assertEquals("/admin/delivery?packagedPage=2&shippedPage=2", shippedLinks.nextUrl());
+    }
+
+    @Test
+    void recordsALateTrackingReferenceAgainstTheShippedOrder() {
+        UUID id = UUID.randomUUID();
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertEquals("redirect:/admin/delivery", controller.recordTracking(id, "  TRACK-9  ", redirect));
+
+        verify(client).shipOrder(id, "TRACK-9");
+        assertEquals("Tracking reference recorded.", redirect.getFlashAttributes().get("success"));
+    }
+
+    @Test
+    void doesNotCallTheBackendForABlankTrackingReference() {
+        UUID id = UUID.randomUUID();
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertEquals("redirect:/admin/delivery", controller.recordTracking(id, "   ", redirect));
+
+        verify(client, never()).shipOrder(any(), any());
+        assertEquals("Enter a tracking reference before saving it.", redirect.getFlashAttributes().get("warning"));
     }
 }

@@ -76,6 +76,19 @@
                         <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
                     </div>
                 </div>
+                <form class="queue-card__action" th:if="${#strings.isEmpty(order.trackingReference())}"
+                      th:action="@{/admin/delivery/orders/{id}/tracking(id=${order.id()})}" method="post">
+                    <div>
+                        <label class="visually-hidden" th:for="|late-tracking-${order.id()}|">Tracking reference</label>
+                        <input class="form-control form-control-sm mono" th:id="|late-tracking-${order.id()}|"
+                               name="trackingReference" maxlength="100" placeholder="Add tracking reference">
+                    </div>
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="bi bi-upc-scan" aria-hidden="true"></i> Save tracking
+                    </button>
+                </form>
+                <p class="queue-card__meta mono mb-0" th:unless="${#strings.isEmpty(order.trackingReference())}"
+                   th:text="|Tracking ${order.trackingReference()}|">Tracking</p>
                 <form class="queue-card__action" th:action="@{/admin/delivery/orders/{id}/deliver(id=${order.id()})}"
                       method="post" data-confirm="Confirm that this order was delivered to the customer?">
                     <button class="btn btn-success" type="submit">
