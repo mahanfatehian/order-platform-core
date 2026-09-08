@@ -54,3 +54,9 @@ logs/
 
 # Local linked worktrees used for isolated implementation work.
 .worktrees/
+
+### Python ###
+# scripts/acceptance is a pytest suite; running it leaves bytecode caches behind.
+__pycache__/
+*.py[cod]
+.pytest_cache/
