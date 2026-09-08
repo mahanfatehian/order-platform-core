@@ -34,7 +34,7 @@ public class CheckoutController {
         Map<UUID, Integer> quantities = cartService.checkoutSnapshot(session);
         if (quantities.isEmpty()) { redirect.addFlashAttribute("warning", "Your cart is empty"); return "redirect:/app/cart"; }
         CartView quote = client.quote(quantities);
-        String key = UUID.randomUUID().toString();
+        String key = checkoutKeyFor(session, quantities);
         session.setAttribute(KEY, key);
         session.setAttribute(REVIEWED_CART, new LinkedHashMap<>(quantities));
         model.addAttribute("cart", quote); model.addAttribute("idempotencyKey", key);
@@ -80,6 +80,27 @@ public class CheckoutController {
         clearCheckoutAttempt(session);
         redirect.addFlashAttribute("success", "Order received. Inventory confirmation is in progress.");
         return "redirect:/app/orders/" + order.id();
+    }
+
+    /**
+     * Keeps the outstanding key while the cart is unchanged.
+     *
+     * <p>Minting a fresh one on every render defeats the key's purpose. Only a 409 is handled around
+     * createOrder, so a lost response, a read timeout against an order-service that already committed, leaves
+     * the cart and the key in place and the shopper on an error page. Re-rendering the review page with a new
+     * key makes the retry look like fresh intent, and order-service writes a second order for a cart that was
+     * already placed. Reusing the key means the retry replays the original order instead.
+     *
+     * <p>A changed cart is genuinely different intent and earns a new key, which is also what order-service
+     * requires: replaying a key with different quantities is an idempotency conflict, not a replay.
+     */
+    private String checkoutKeyFor(HttpSession session, Map<UUID, Integer> quantities) {
+        if (session.getAttribute(KEY) instanceof String outstanding
+                && session.getAttribute(REVIEWED_CART) instanceof Map<?, ?> reviewed
+                && reviewed.equals(quantities)) {
+            return outstanding;
+        }
+        return UUID.randomUUID().toString();
     }
 
     private void clearCheckoutAttempt(HttpSession session) {
