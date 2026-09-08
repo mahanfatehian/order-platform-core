@@ -5,6 +5,7 @@ import com.netflix.discovery.EurekaClient;
 import com.orderprocessing.webui.dto.*;
 import com.orderprocessing.webui.form.*;
 import com.orderprocessing.webui.service.CartQuoteValidator;
+import org.slf4j.MDC;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 @Component
 public class PlatformClient {
@@ -238,15 +243,48 @@ public class PlatformClient {
         }
     }
 
+    /**
+     * Probes the four backends at the same time. Run one after another, an unreachable service costs the caller a
+     * full connect-plus-read timeout before the next probe even starts, so the admin dashboard - which renders this
+     * on every load - stalled for the sum of all four. Overlapping them makes the worst case one timeout instead of
+     * four. Each probe already swallows its own failure, so no task can break the others.
+     */
     public List<ServiceStatusView> serviceHealth() {
-        return List.of(
-                registryHealth(),
-                new ServiceStatusView("Web UI + Redis session", true, "Available"),
-                health("Authentication + Redis", auth),
-                health("Users + PostgreSQL", users),
-                health("Store + PostgreSQL/Kafka", store),
-                health("Orders + PostgreSQL/Kafka", orders)
-        );
+        Map<String, String> callerContext = MDC.getCopyOfContextMap();
+        List<ServiceStatusView> probed;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<CompletableFuture<ServiceStatusView>> probes = Stream.of(
+                            Map.entry("Authentication + Redis", auth),
+                            Map.entry("Users + PostgreSQL", users),
+                            Map.entry("Store + PostgreSQL/Kafka", store),
+                            Map.entry("Orders + PostgreSQL/Kafka", orders))
+                    .map(probe -> CompletableFuture.supplyAsync(
+                            () -> healthWithContext(probe.getKey(), probe.getValue(), callerContext), executor))
+                    .toList();
+            probed = probes.stream().map(CompletableFuture::join).toList();
+        }
+        List<ServiceStatusView> statuses = new java.util.ArrayList<>();
+        statuses.add(registryHealth());
+        statuses.add(new ServiceStatusView("Web UI + Redis session", true, "Available"));
+        statuses.addAll(probed);
+        return List.copyOf(statuses);
+    }
+
+    /**
+     * The correlation ID lives in a plain thread local, so a probe running off the request thread would otherwise
+     * mint a fresh one and the backend access logs would no longer join up with the dashboard request.
+     */
+    private ServiceStatusView healthWithContext(String baseName, RestClient client, Map<String, String> context) {
+        if (context == null) {
+            MDC.clear();
+        } else {
+            MDC.setContextMap(context);
+        }
+        try {
+            return health(baseName, client);
+        } finally {
+            MDC.clear();
+        }
     }
 
     private ServiceStatusView registryHealth() {
