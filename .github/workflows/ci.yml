@@ -27,8 +27,9 @@ jobs:
           cache: maven
       - name: Verify all modules
         run: mvn -B -ntp clean verify
-      - name: Verify demo lifecycle environment selection
-        run: python3 -m unittest scripts/acceptance/test_demo_script_env.py -v
+      # Naming a single module here silently skipped the other six; discovery keeps new ones from being missed.
+      - name: Run the acceptance test suite
+        run: python3 -m unittest discover -s scripts/acceptance -p 'test_*.py' -v
       - name: Validate Compose model
         run: docker compose --env-file .env.example config --quiet
       - name: Upload test reports
