@@ -299,6 +299,40 @@ class OrderServiceTest {
     }
 
     @Test
+    void aTrackingReferenceCanStillBeRecordedAfterShippingWithoutOne() {
+        // The ship endpoint accepts no body at all and the delivery UI labels the field optional, so an order
+        // legitimately reaches SHIPPED with no reference. Nothing else in the system can write one afterwards.
+        Order order = order(UUID.randomUUID(), Order.Status.SHIPPED);
+        order.setTrackingReference(null);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderResponse recorded = service.shipOrder(order.getId(), UUID.randomUUID(), "late-tracking", "TRACK-9");
+
+        assertThat(recorded.getStatus()).isEqualTo("SHIPPED");
+        assertThat(order.getTrackingReference()).isEqualTo("TRACK-9");
+        verify(orderRepository).save(order);
+        // Recording the reference is not a second shipment: no new fact and no new status transition.
+        verify(outboxRepository, never()).save(any());
+        verify(historyRepository, never()).save(any());
+    }
+
+    @Test
+    void recordingTheTrackingReferenceTwiceStaysIdempotent() {
+        Order order = order(UUID.randomUUID(), Order.Status.SHIPPED);
+        order.setTrackingReference(null);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        service.shipOrder(order.getId(), UUID.randomUUID(), "late-tracking", "TRACK-9");
+        OrderResponse replay = service.shipOrder(order.getId(), UUID.randomUUID(), "late-tracking", "TRACK-9");
+
+        assertThat(replay.getTrackingReference()).isEqualTo("TRACK-9");
+        assertThatThrownBy(() -> service.shipOrder(
+                order.getId(), UUID.randomUUID(), "late-tracking", "TRACK-OTHER"))
+                .isInstanceOf(IdempotencyConflictException.class)
+                .hasMessageContaining("different tracking reference");
+    }
+
+    @Test
     void stalePendingOrderFailsAndEmitsCompensationFact() {
         Order order = order(UUID.randomUUID(), Order.Status.PENDING);
         when(orderRepository.lockStalePendingOrders(any(), anyInt())).thenReturn(List.of(order));
