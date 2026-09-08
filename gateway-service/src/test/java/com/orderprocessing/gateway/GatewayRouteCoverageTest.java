@@ -3,10 +3,13 @@ package com.orderprocessing.gateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import com.orderprocessing.gateway.config.JwtSecurityProperties;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.http.server.PathContainer;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.web.util.pattern.PathPatternParser;
 import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,12 +30,38 @@ class GatewayRouteCoverageTest {
     @Autowired
     RouteLocator routeLocator;
 
+    @Autowired
+    JwtSecurityProperties jwtSecurityProperties;
+
     private boolean isRouted(HttpMethod method, String path) {
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.method(method, path));
         return Boolean.TRUE.equals(routeLocator.getRoutes()
                 .filterWhen(route -> Mono.from(route.getPredicate().apply(exchange)))
                 .hasElements()
                 .block());
+    }
+
+    /**
+     * Being routed is only half of reachable. Anything outside public-paths falls through to
+     * anyExchange().authenticated(), so the gateway answers 401 before the route is ever used.
+     */
+    private boolean isAnonymouslyAllowed(String path) {
+        PathPatternParser parser = new PathPatternParser();
+        return jwtSecurityProperties.getPublicPaths().stream()
+                .anyMatch(pattern -> parser.parse(pattern).matches(PathContainer.parsePath(path)));
+    }
+
+    @Test
+    void servesTheCaptchaChallengeToAnAnonymousVisitor() {
+        // The whole point of the challenge is that it is shown to someone who has not signed in, so requiring a
+        // token to fetch it makes the sign-in page unusable exactly when the threshold has been crossed.
+        assertThat(isAnonymouslyAllowed("/captcha/image")).isTrue();
+    }
+
+    @Test
+    void leavesAnAuthenticatedPathOutOfThePublicSet() {
+        // Guards the helper: if every path were public, the assertion above would prove nothing.
+        assertThat(isAnonymouslyAllowed("/api/orders/summary")).isFalse();
     }
 
     @Test

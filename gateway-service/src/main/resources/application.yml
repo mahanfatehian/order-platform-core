@@ -237,6 +237,8 @@ app:
         - /login
         - /logout
         - /register
+        # The challenge is shown to a visitor who has not signed in yet, so it has to be fetchable without a token.
+        - /captcha/**
         - /app/**
         - /admin/**
         - /fragments/**
