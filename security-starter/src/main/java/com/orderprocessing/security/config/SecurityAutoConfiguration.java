@@ -40,6 +40,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @AutoConfiguration
 @AutoConfigureAfter(RedisAutoConfiguration.class)
@@ -92,6 +93,10 @@ public class SecurityAutoConfiguration {
                 new AccessTokenClaimsValidator()
         ));
 
+        // Logged on transition rather than per request. This runs on every authenticated call, so a warning per
+        // failure would bury the incident it is reporting under thousands of copies of itself.
+        AtomicBoolean revocationUnreadable = new AtomicBoolean();
+
         return token -> {
             Jwt jwt = delegate.decode(token);
             try {
@@ -100,10 +105,22 @@ public class SecurityAutoConfiguration {
                 if (!tokenRevocationService.isAccessTokenValid(jwt.getId(), userId, tokenVersion)) {
                     throw new JwtException("Access token has been revoked");
                 }
+                if (revocationUnreadable.compareAndSet(true, false)) {
+                    log.info("Token revocation state is readable again; authenticated requests are being accepted");
+                }
                 return jwt;
             } catch (JwtException exception) {
+                // A revoked or malformed token. Expected, caller-caused, and not worth a log line per request.
                 throw exception;
             } catch (RuntimeException exception) {
+                // Failing closed is right, but silence is not. Without this an unreachable revocation store
+                // rejects every authenticated request as if each token had been revoked individually, users see
+                // nothing but "session expired", and the logs of a service that is otherwise healthy say nothing
+                // about why.
+                if (revocationUnreadable.compareAndSet(false, true)) {
+                    log.warn("Token revocation state cannot be read; rejecting authenticated requests until it recovers",
+                            exception);
+                }
                 throw new JwtException("Token revocation state could not be verified", exception);
             }
         };

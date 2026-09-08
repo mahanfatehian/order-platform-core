@@ -1,6 +1,10 @@
 package com.orderprocessing.security.config;
 
 import com.orderprocessing.security.service.TokenRevocationService;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -18,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -90,5 +95,66 @@ class SecurityAutoConfigurationTest {
         JwtSecurityProperties properties = new JwtSecurityProperties();
         properties.setSecret(SECRET);
         return properties;
+    }
+
+    private static ListAppender<ILoggingEvent> captureLogs() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(SecurityAutoConfiguration.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    @Test
+    void anUnreadableRevocationStoreIsReportedOnceRatherThanPerRequest() {
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UUID userId = UUID.randomUUID();
+        when(revocation.isAccessTokenValid(anyString(), any(), anyLong()))
+                .thenThrow(new RedisConnectionFailureException("redis is unreachable"));
+        ListAppender<ILoggingEvent> logs = captureLogs();
+        JwtDecoder decoder = decoder(revocation);
+
+        for (int request = 0; request < 5; request++) {
+            assertThatThrownBy(() -> decoder.decode(signedAccessToken("jti", userId)))
+                    .isInstanceOf(JwtException.class);
+        }
+
+        // Five rejected requests, one incident. Logging per request would bury the cause in its own noise.
+        assertThat(logs.list).filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains("revocation state cannot be read"));
+    }
+
+    @Test
+    void anOrdinaryRevokedTokenIsNotReportedAsAnIncident() {
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UUID userId = UUID.randomUUID();
+        when(revocation.isAccessTokenValid(anyString(), any(), anyLong())).thenReturn(false);
+        ListAppender<ILoggingEvent> logs = captureLogs();
+
+        assertThatThrownBy(() -> decoder(revocation).decode(signedAccessToken("jti", userId)))
+                .isInstanceOf(JwtException.class);
+
+        // A revoked token is the control working, not an outage.
+        assertThat(logs.list).noneMatch(event -> event.getLevel() == Level.WARN);
+    }
+
+    @Test
+    void recoveryIsReportedSoTheIncidentHasAnEnd() {
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UUID userId = UUID.randomUUID();
+        when(revocation.isAccessTokenValid(anyString(), any(), anyLong()))
+                .thenThrow(new RedisConnectionFailureException("redis is unreachable"))
+                .thenReturn(true);
+        ListAppender<ILoggingEvent> logs = captureLogs();
+        JwtDecoder decoder = decoder(revocation);
+
+        assertThatThrownBy(() -> decoder.decode(signedAccessToken("jti", userId)))
+                .isInstanceOf(JwtException.class);
+        decoder.decode(signedAccessToken("jti", userId));
+
+        assertThat(logs.list).anyMatch(event -> event.getLevel() == Level.INFO
+                && event.getFormattedMessage().contains("readable again"));
     }
 }
