@@ -408,19 +408,27 @@ public class OrderService {
         } catch (FeignException.NotFound ex) {
             throw new ResourceNotFoundException("One or more products were not found");
         } catch (FeignException ex) {
-            throw new ServiceUnavailableException("Product pricing is temporarily unavailable");
+            // ServiceUnavailableException is a DomainException, and that handler does not log, so without this
+            // a store-service outage fails every checkout while order-service records nothing about why.
+            // Discarding ex as well left the actual cause, refused connection, timeout, upstream 500,
+            // unrecoverable even in a debugger.
+            log.warn("Store quote failed, rejecting order placement: status={} message={}",
+                    ex.status(), ex.getMessage(), ex);
+            throw new ServiceUnavailableException("Product pricing is temporarily unavailable", ex);
         }
     }
 
     private Map<UUID, StoreQuoteItemResponse> validateQuote(Map<UUID, Integer> quantities,
                                                             StoreQuoteResponse response) {
         if (response == null || response.items() == null) {
+            log.warn("Store quote response had no items for {} requested products", quantities.size());
             throw new ServiceUnavailableException("Store quote response was invalid");
         }
         Map<UUID, StoreQuoteItemResponse> byProduct = response.items().stream()
                 .collect(Collectors.toMap(StoreQuoteItemResponse::productId, Function.identity(),
                         (left, right) -> left));
         if (byProduct.size() != quantities.size()) {
+            log.warn("Store quote covered {} of {} requested products", byProduct.size(), quantities.size());
             throw new ServiceUnavailableException("Store quote response was incomplete");
         }
         for (Map.Entry<UUID, Integer> requested : quantities.entrySet()) {

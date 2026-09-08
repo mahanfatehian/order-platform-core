@@ -27,6 +27,7 @@ import com.orderprocessing.orderservice.repository.OutboxEventRepository;
 import com.orderprocessing.orderservice.repository.ProcessedKafkaEventRepository;
 import feign.FeignException;
 import feign.Request;
+import feign.RequestTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -366,5 +368,25 @@ class OrderServiceTest {
         ArgumentCaptor<OutboxEvent> outboxCaptor = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outboxRepository).save(outboxCaptor.capture());
         assertThat(outboxCaptor.getValue().getPayload()).contains("c".repeat(100));
+    }
+
+    @Test
+    void aFailedStoreQuoteKeepsTheUpstreamCauseOnTheRejection() {
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-down"))
+                .thenReturn(Optional.empty());
+        Request feignRequest = Request.create(Request.HttpMethod.POST, "/api/store/internal/products/quote",
+                Map.of(), new byte[0], java.nio.charset.StandardCharsets.UTF_8, new RequestTemplate());
+        FeignException upstream = new FeignException.ServiceUnavailable(
+                "store-service is down", feignRequest, null, Map.of());
+        when(storeClient.quote(any())).thenThrow(upstream);
+
+        Throwable thrown = catchThrowable(() -> service.createOrder(userId, request, "checkout-down", "corr"));
+
+        assertThat(thrown).isInstanceOf(ServiceUnavailableException.class);
+        // Dropping the cause left nothing anywhere to say which dependency failed or how.
+        assertThat(thrown).hasCause(upstream);
     }
 }
