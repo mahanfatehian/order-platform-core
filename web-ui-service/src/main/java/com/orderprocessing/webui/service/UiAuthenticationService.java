@@ -28,6 +28,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -50,8 +51,7 @@ public class UiAuthenticationService {
     public UiAuthenticatedUser authenticate(LoginForm form, HttpServletRequest request, HttpServletResponse response) {
         LoginTokens responseTokens = platformClient.login(form.getUsername().trim(), form.getPassword());
         DecodedPair pair = decodePair(responseTokens);
-        HttpSession session = request.getSession(true);
-        request.changeSessionId();
+        HttpSession session = startSessionFor(pair.user(), request);
         tokenService.save(request, pair.tokens());
         Authentication authentication = authentication(pair.user());
         SecurityContext context = SecurityContextHolder.createEmptyContext();
@@ -60,6 +60,33 @@ public class UiAuthenticationService {
         contextRepository.saveContext(context, request, response);
         session.setMaxInactiveInterval((int) java.time.Duration.ofMinutes(30).toSeconds());
         return pair.user();
+    }
+
+    /**
+     * /login is a public path with no guard against being posted by someone who is already signed in, and
+     * changeSessionId() rotates the identifier while leaving every attribute in place. On a shared browser that
+     * handed the incoming user whatever the previous one left behind - their cart, and their outstanding checkout
+     * idempotency key, which would then be spent on the new user's first order. Only a genuine change of identity
+     * discards the session; a cart built before signing in belongs to the person signing in and still carries over.
+     */
+    private HttpSession startSessionFor(UiAuthenticatedUser user, HttpServletRequest request) {
+        HttpSession session = request.getSession(true);
+        if (previousUserId(session).filter(previous -> !previous.equals(user.id())).isPresent()) {
+            session.invalidate();
+            return request.getSession(true);
+        }
+        request.changeSessionId();
+        return session;
+    }
+
+    private Optional<UUID> previousUserId(HttpSession session) {
+        Object stored = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        if (stored instanceof SecurityContext context
+                && context.getAuthentication() != null
+                && context.getAuthentication().getPrincipal() instanceof UiAuthenticatedUser previous) {
+            return Optional.ofNullable(previous.id());
+        }
+        return Optional.empty();
     }
 
     public UiSessionTokens refreshCurrentSession() {
