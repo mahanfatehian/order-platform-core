@@ -21,5 +21,11 @@ public record PageResponse<T>(
 
     public int number() { return page; }
     public boolean hasPrevious() { return page > 0; }
-    public boolean hasNext() { return page + 1 < totalPages; }
+
+    /**
+     * Compared as longs on purpose. The page number is echoed back from the backend, which bounds it below at
+     * zero but not above, so a request for page 2147483647 made {@code page + 1} wrap to a negative int - which
+     * is less than any page count, so the view offered a Next link past the end of an empty result.
+     */
+    public boolean hasNext() { return (long) page + 1L < (long) totalPages; }
 }
