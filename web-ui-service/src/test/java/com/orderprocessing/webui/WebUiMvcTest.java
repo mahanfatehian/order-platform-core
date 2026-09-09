@@ -279,6 +279,19 @@ class WebUiMvcTest {
     }
 
     @Test
+    void aChangePasswordPostMissingTheNewPasswordIsAValidationErrorNotACrash() throws Exception {
+        // The confirmation check ran before the binding result was consulted, so an absent newPassword was
+        // dereferenced and became a 500 rather than the field error the form is built to show.
+        mvc.perform(post("/app/profile/change-password").with(user("customer").roles("USER")).with(csrf())
+                        .param("currentPassword", "Current123!")
+                        .param("confirmPassword", "NewPassword1!"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Change password")));
+
+        verify(authenticatedClient, never()).changePassword(any());
+    }
+
+    @Test
     void cartAndCheckoutWorkAsNormalFormsWithoutHtmx() throws Exception {
         var session = new org.springframework.mock.web.MockHttpSession();
         mvc.perform(post("/app/cart/items").with(user("customer").roles("USER")).with(csrf()).session(session)

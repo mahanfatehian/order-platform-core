@@ -52,7 +52,11 @@ public class ProfileController {
     @PostMapping("/change-password")
     public String changePassword(@Valid @ModelAttribute ChangePasswordForm changePasswordForm, BindingResult binding,
                                  Model model, RedirectAttributes redirect) {
-        if (!changePasswordForm.getNewPassword().equals(changePasswordForm.getConfirmPassword())) {
+        // Only compare once the fields are known to be present. @NotBlank records a binding error for a missing
+        // newPassword, but this ran first and dereferenced it, turning an ordinary incomplete form into a 500.
+        if (!binding.hasFieldErrors("newPassword")
+                && !java.util.Objects.equals(changePasswordForm.getNewPassword(),
+                                             changePasswordForm.getConfirmPassword())) {
             binding.rejectValue("confirmPassword", "mismatch", "Passwords do not match");
         }
         if (binding.hasErrors()) {
