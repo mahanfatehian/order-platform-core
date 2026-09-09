@@ -27,6 +27,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -103,7 +104,11 @@ public class SecurityAutoConfiguration {
                 UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
                 long tokenVersion = ((Number) jwt.getClaim("tokenVersion")).longValue();
                 if (!tokenRevocationService.isAccessTokenValid(jwt.getId(), userId, tokenVersion)) {
-                    throw new JwtException("Access token has been revoked");
+                    // BadJwtException, not a plain JwtException: JwtAuthenticationProvider turns the former into
+                    // InvalidBearerTokenException, which the chain answers as 401, and the latter into
+                    // AuthenticationServiceException, which Spring rethrows out of the filter as a server fault.
+                    // A revoked token is the caller's problem, so it has to be the 401.
+                    throw new BadJwtException("Access token has been revoked");
                 }
                 if (revocationUnreadable.compareAndSet(true, false)) {
                     log.info("Token revocation state is readable again; authenticated requests are being accepted");
