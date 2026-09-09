@@ -61,6 +61,36 @@ class StoreOutboxPublisherServiceTest {
         }
     }
 
+    /** Behaves like a wait cut short by shutdown rather than by the broker. */
+    private static final class InterruptedSend extends CompletableFuture<SendResult<String, Object>> {
+        @Override
+        public SendResult<String, Object> get(long timeout, TimeUnit unit) throws InterruptedException {
+            throw new InterruptedException("shutting down");
+        }
+    }
+
+    @Test
+    void shutdownDoesNotSpendAnAttemptOnAnEventItStoppedWaitingFor() {
+        List<StoreOutboxEvent> events = List.of(event("StockReservedEvent"), event("StockReservedEvent"));
+        events.getFirst().setAttemptCount(4);
+        when(repository.lockReadyBatch(anyInt())).thenReturn(events);
+        when(kafkaTemplate.send(anyString(), anyString(), any())).thenAnswer(invocation -> new InterruptedSend());
+
+        try {
+            publisher(Duration.ofSeconds(5)).publishReadyEvents();
+
+            assertThat(events.getFirst().getAttemptCount())
+                    .describedAs("a wait abandoned at shutdown is not a publish failure")
+                    .isEqualTo(4);
+            assertThat(events.getFirst().isDeadLettered()).isFalse();
+            assertThat(events.getFirst().getNextAttemptAt()).isNull();
+            assertThat(events.getFirst().isPublished()).isFalse();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     @Test
     void spendsOneTimeoutBudgetAcrossTheBatchRatherThanOnePerEvent() {
         List<StoreOutboxEvent> events = List.of(event("StockReservedEvent"), event("StockReservedEvent"),

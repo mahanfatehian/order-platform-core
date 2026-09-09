@@ -100,9 +100,11 @@ public class StoreOutboxPublisherService {
                 entry.getValue().get(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
                 markPublished(event);
             } catch (InterruptedException exception) {
-                // Shutdown. Leave the remaining rows untouched so the next run picks them up unchanged.
+                // Shutdown, not a publish failure. The send may already have reached the broker; we only stopped
+                // waiting for the acknowledgement. Charging it an attempt would let a restart that lands on the
+                // last permitted attempt dead-letter an event that never actually failed. Leave this row exactly
+                // as the remaining ones are left, so the next run picks them all up unchanged.
                 Thread.currentThread().interrupt();
-                recordFailure(event, exception);
                 return;
             } catch (Exception exception) {
                 recordFailure(event, exception);
