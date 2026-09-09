@@ -6,6 +6,8 @@ import com.orderprocessing.userservice.dto.CreateUserRequest;
 import com.orderprocessing.userservice.dto.PageResponse;
 import com.orderprocessing.userservice.dto.UserResponse;
 import com.orderprocessing.userservice.entity.RoleEntity;
+import com.orderprocessing.userservice.exception.AuthenticationFailedException;
+import com.orderprocessing.userservice.exception.InvalidCurrentPasswordException;
 import com.orderprocessing.userservice.entity.UserEntity;
 import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
@@ -23,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,5 +173,35 @@ class UserServiceTest {
 
         assertThat(user.getPasswordHash()).isEqualTo("new-hash");
         verify(revocation).incrementTokenVersion(userId);
+    }
+
+    @Test
+    void aWrongCurrentPasswordIsNotSignalledAsAFailedAuthentication() {
+        UUID userId = UUID.randomUUID();
+        UserRepository users = mock(UserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        TokenRevocationService revocation = mock(TokenRevocationService.class);
+        UserEntity user = UserEntity.builder()
+                .username("customer")
+                .email("customer@example.com")
+                .passwordHash("old-hash")
+                .roles(Set.of(RoleEntity.builder().name("ROLE_USER").build()))
+                .build();
+        user.setId(userId);
+        when(users.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+        when(encoder.matches("Wrong123!", "old-hash")).thenReturn(false);
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword("Wrong123!");
+        request.setNewPassword("NewPassword1!");
+
+        assertThatThrownBy(() -> new UserService(users, roles, encoder, revocation)
+                .changePassword(userId, request))
+                .describedAs("an authentication failure here is answered as 401, which ends the caller's session")
+                .isInstanceOf(InvalidCurrentPasswordException.class)
+                .isNotInstanceOf(AuthenticationFailedException.class);
+
+        assertThat(user.getPasswordHash()).isEqualTo("old-hash");
+        verify(revocation, never()).incrementTokenVersion(userId);
     }
 }

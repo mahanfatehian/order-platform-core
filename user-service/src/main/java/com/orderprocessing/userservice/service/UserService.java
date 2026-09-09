@@ -10,9 +10,9 @@ import com.orderprocessing.userservice.dto.UpdateUserStatusRequest;
 import com.orderprocessing.userservice.dto.UserResponse;
 import com.orderprocessing.userservice.entity.RoleEntity;
 import com.orderprocessing.userservice.entity.UserEntity;
-import com.orderprocessing.userservice.exception.AuthenticationFailedException;
 import com.orderprocessing.userservice.exception.DuplicateResourceException;
 import com.orderprocessing.userservice.exception.ForbiddenOperationException;
+import com.orderprocessing.userservice.exception.InvalidCurrentPasswordException;
 import com.orderprocessing.userservice.exception.ResourceNotFoundException;
 import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
@@ -116,7 +116,7 @@ public class UserService {
     public void changePassword(UUID userId, ChangePasswordRequest request) {
         UserEntity user = findUserForUpdate(userId);
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new AuthenticationFailedException("Current password is incorrect");
+            throw new InvalidCurrentPasswordException("Current password is incorrect");
         }
         if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("New password must differ from the current password");

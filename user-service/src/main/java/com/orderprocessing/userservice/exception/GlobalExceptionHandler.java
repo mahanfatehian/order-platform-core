@@ -63,6 +63,24 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", "Invalid username or password", request);
     }
 
+    /**
+     * Deliberately not grouped with the 401 handler above. The caller's token is fine; a field in the payload is
+     * wrong. Answering 401 tells every client its session is over, and the BFF acts on that by signing the user
+     * out - so a mistyped current password ended the session instead of showing an error on the form.
+     */
+    @ExceptionHandler(InvalidCurrentPasswordException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCurrentPassword(
+            InvalidCurrentPasswordException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest().body(ApiErrorResponse.validation(
+                exception.getMessage(),
+                request.getRequestURI(),
+                CorrelationId.resolve(request),
+                Map.of(InvalidCurrentPasswordException.FIELD, exception.getMessage())
+        ));
+    }
+
     @ExceptionHandler(ForbiddenOperationException.class)
     public ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenOperationException exception, HttpServletRequest request) {
         return error(HttpStatus.FORBIDDEN, "FORBIDDEN_OPERATION", exception.getMessage(), request);
