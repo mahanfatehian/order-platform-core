@@ -16,7 +16,8 @@ import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.springframework.util.backoff.BackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +39,36 @@ public class KafkaConfig {
      */
     @Value("${kafka.producer.max-block-ms:5000}")
     private long maxBlockMs;
+
+    @Value("${kafka.consumer.retry.initial-interval-ms:1000}")
+    private long retryInitialIntervalMillis;
+
+    @Value("${kafka.consumer.retry.multiplier:2.0}")
+    private double retryMultiplier;
+
+    @Value("${kafka.consumer.retry.max-interval-ms:30000}")
+    private long retryMaxIntervalMillis;
+
+    @Value("${kafka.consumer.retry.max-attempts:8}")
+    private int retryMaxAttempts;
+
+    /**
+     * A fact that reaches the dead-letter topic stops driving its saga: an OrderCancelled or OrderFailed that
+     * never lands leaves its inventory reservation held with nothing left to release it. A flat second between
+     * three attempts gave a transient fault - a database deadlock, a Redis blip, a peer service restarting -
+     * about three seconds to clear, which is shorter than any of them. Backing off exponentially to a couple of
+     * minutes covers a restart without turning a genuinely broken record into a long partition stall:
+     * DefaultErrorHandler already classifies deserialization and conversion failures as not retryable, so a
+     * poison pill is still recovered on the first attempt.
+     */
+    static BackOff sagaRetryBackOff(long initialIntervalMillis, double multiplier, long maxIntervalMillis,
+                                    int maxAttempts) {
+        ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries(Math.max(1, maxAttempts));
+        backOff.setInitialInterval(Math.max(1L, initialIntervalMillis));
+        backOff.setMultiplier(Math.max(1.0d, multiplier));
+        backOff.setMaxInterval(Math.max(Math.max(1L, initialIntervalMillis), maxIntervalMillis));
+        return backOff;
+    }
 
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
@@ -81,7 +112,8 @@ public class KafkaConfig {
                 kafkaTemplate,
                 new ConsumerOwnedDeadLetterResolver(applicationName));
 
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, sagaRetryBackOff(
+                retryInitialIntervalMillis, retryMultiplier, retryMaxIntervalMillis, retryMaxAttempts));
 
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
