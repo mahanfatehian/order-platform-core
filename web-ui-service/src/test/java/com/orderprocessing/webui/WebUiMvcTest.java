@@ -292,6 +292,24 @@ class WebUiMvcTest {
     }
 
     @Test
+    void aRejectedCurrentPasswordIsShownOnItsOwnFieldRatherThanAsABanner() throws Exception {
+        when(authenticatedClient.changePassword(any())).thenThrow(new com.orderprocessing.webui.exception
+                .BackendClientException(org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "Current password is incorrect",
+                java.util.Map.of("currentPassword", "Current password is incorrect")));
+
+        mvc.perform(post("/app/profile/change-password").with(user("customer").roles("USER")).with(csrf())
+                        .param("currentPassword", "Wrong123!")
+                        .param("newPassword", "NewPassword1!")
+                        .param("confirmPassword", "NewPassword1!"))
+                .andExpect(status().isOk())
+                // Not merely present on the page: the summary banner lists global errors only, so asserting the
+                // text is somewhere in the HTML would pass just as well with a form-level rejection.
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<div class=\"field-error\">Current password is incorrect</div>")));
+    }
+
+    @Test
     void cartAndCheckoutWorkAsNormalFormsWithoutHtmx() throws Exception {
         var session = new org.springframework.mock.web.MockHttpSession();
         mvc.perform(post("/app/cart/items").with(user("customer").roles("USER")).with(csrf()).session(session)

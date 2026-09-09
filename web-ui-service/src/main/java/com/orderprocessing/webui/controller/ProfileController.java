@@ -71,7 +71,13 @@ public class ProfileController {
             changePasswordForm.setCurrentPassword(null);
             changePasswordForm.setNewPassword(null);
             changePasswordForm.setConfirmPassword(null);
-            binding.reject("backend", exception.getMessage());
+            // The backend names the field it rejected - a wrong current password comes back as a fieldErrors
+            // entry - so put the message on that input instead of in the summary banner, the same way the
+            // profile form above already does. Only a failure that names no field stays a form-level error.
+            exception.getFieldErrors().forEach((field, message) -> binding.rejectValue(field, "backend", message));
+            if (exception.getFieldErrors().isEmpty()) {
+                binding.reject("backend", exception.getMessage());
+            }
             model.addAttribute("profile", client.profile()); model.addAttribute("profileForm", new ProfileForm());
             return "profile/index";
         }
