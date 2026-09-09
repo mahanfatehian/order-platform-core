@@ -75,6 +75,33 @@ class ResourceServerErrorContractTest {
         assertThat(result.getResponse().getStatus()).isEqualTo(401);
     }
 
+    /**
+     * The BFF and every other caller parse the error body to decide what to show. A refusal that carries no body
+     * at all forces them onto a generic fallback message, and the two halves of the same 401 - no credentials
+     * versus refused credentials - stop looking like the same API.
+     */
+    @Test
+    void everyRefusalCarriesTheSameJsonErrorBody() throws Exception {
+        when(revocation.isAccessTokenValid(anyString(), any(UUID.class), anyLong())).thenReturn(false);
+
+        assertJsonErrorBody(mvc.perform(get("/probe")).andReturn(), "anonymous");
+        assertJsonErrorBody(mvc.perform(get("/probe")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")).andReturn(), "malformed token");
+        assertJsonErrorBody(mvc.perform(get("/probe")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedAccessToken())).andReturn(), "revoked token");
+    }
+
+    private void assertJsonErrorBody(MvcResult result, String description) throws Exception {
+        assertThat(result.getResponse().getStatus()).describedAs(description).isEqualTo(401);
+        assertThat(result.getResponse().getContentType())
+                .describedAs("%s must answer with the JSON error contract", description)
+                .startsWith("application/json");
+        assertThat(result.getResponse().getContentAsString())
+                .describedAs("%s must carry the error body", description)
+                .contains("\"status\":401")
+                .contains("AUTHENTICATION_REQUIRED");
+    }
+
     private String signedAccessToken() {
         Instant now = Instant.now();
         return Jwts.builder()

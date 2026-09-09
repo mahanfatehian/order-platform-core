@@ -149,6 +149,12 @@ public class SecurityAutoConfiguration {
 
         String[] publicPaths = properties.getPublicPaths().toArray(new String[0]);
 
+        // The handlers have to be given to oauth2ResourceServer as well as to exceptionHandling. The bearer-token
+        // filter answers its own failures and would otherwise use Spring's default entry point, which writes a
+        // bare 401 with no body - so a refused token and a missing one would not look like the same API.
+        RestAuthenticationEntryPoint authenticationEntryPoint = new RestAuthenticationEntryPoint();
+        RestAccessDeniedHandler accessDeniedHandler = new RestAccessDeniedHandler();
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -156,14 +162,16 @@ public class SecurityAutoConfiguration {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new RestAuthenticationEntryPoint())
-                        .accessDeniedHandler(new RestAccessDeniedHandler())
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
 

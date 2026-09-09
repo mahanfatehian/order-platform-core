@@ -68,6 +68,10 @@ public class UserServiceSecurityConfig {
     ) throws Exception {
 
         String[] publicPaths = properties.getPublicPaths().toArray(new String[0]);
+        // Also handed to oauth2ResourceServer below: its bearer filter answers its own failures and would
+        // otherwise fall back to Spring's bodiless default 401.
+        RestAuthenticationEntryPoint authenticationEntryPoint = new RestAuthenticationEntryPoint();
+        RestAccessDeniedHandler accessDeniedHandler = new RestAccessDeniedHandler();
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -76,8 +80,8 @@ public class UserServiceSecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new RestAuthenticationEntryPoint())
-                        .accessDeniedHandler(new RestAccessDeniedHandler())
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(publicPaths).permitAll()
@@ -86,6 +90,8 @@ public class UserServiceSecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
 
