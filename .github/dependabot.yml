@@ -4,7 +4,26 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Majors are migrations (Spring Boot 4, Spring Cloud 2025.1, springdoc 3, htmx 4), not weekly bumps.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Boot, Cloud and springdoc move as one platform: each Cloud train accepts a single Boot minor line and
+      # each springdoc minor targets one, so a minor bump of any of them alone fails Cloud's compatibility check.
+      - dependency-name: 'org.springframework.boot:*'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'org.springframework.cloud:*'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'org.springdoc:*'
+        update-types: ['version-update:semver-minor']
+      # The templates link webjars by versioned path (/webjars/bootstrap/5.3.3/...), so a webjar bump 404s the
+      # UI's CSS and scripts unless the paths move with it; update them by hand, together.
+      - dependency-name: 'org.webjars:*'
+      - dependency-name: 'org.webjars.npm:*'
     groups:
+      # A dependency joins the first group it matches, so the platform group comes first.
+      spring-platform:
+        patterns: ['org.springframework.boot:*', 'org.springframework.cloud:*', 'org.springdoc:*']
       java-dependencies:
         patterns: ['*']
   - package-ecosystem: github-actions
