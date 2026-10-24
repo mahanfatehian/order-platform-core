@@ -5,6 +5,7 @@ Describe the user-visible or architectural outcome.
 ## Verification
 
 - [ ] `mvn -B -ntp clean verify`
+- [ ] `python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'`
 - [ ] `docker compose --env-file .env.example config --quiet`
 - [ ] Relevant browser or API flow exercised
 - [ ] Migrations tested from an existing schema when applicable

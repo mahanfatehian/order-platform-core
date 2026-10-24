@@ -4,10 +4,11 @@ Thanks for improving Order/flow. Keep changes small enough to review and preserv
 
 ## Local verification
 
-Prerequisites: Java 21 and Maven 3.9+, or Docker with Compose v2.20+.
+Prerequisites: Java 21 and Maven 3.9+, or Docker with Compose v2.20+; the acceptance tests also need Python 3.
 
 ```bash
 mvn -B -ntp clean verify
+python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
 docker compose --env-file .env.example config --quiet
 ```
 
@@ -34,7 +35,7 @@ docker run --rm \
 
 Test fixtures sign tokens with keys made by repeating `0123456789abcdef` (32 characters, or 64 where a test needs a longer key), which `.gitleaks.toml` allowlists by that exact pattern. Reuse one of them in new tests rather than inventing another key, so the scan stays strict everywhere else.
 
-To verify the scanner itself, create a disposable canary outside the repository by concatenating the `A`, `K`, `I`, and `A` fragments with a cryptographically random 16-character uppercase alphanumeric suffix. Scan only that temporary directory with `gitleaks dir --redact --exit-code=2`; it must exit `2`. Do not paste a literal credential into a file, terminal, issue, or pull request, and remove the verified temporary directory immediately after the check.
+To verify the scanner itself, create a disposable canary outside the repository by concatenating the `A`, `K`, `I`, and `A` fragments with a cryptographically random 16-character suffix drawn from the uppercase letters and the digits 2 to 7 (the AWS key rule rejects 0, 1, 8, and 9 there). Scan only that temporary directory with `gitleaks dir --redact --exit-code=2`; it must exit `2`. Do not paste a literal credential into a file, terminal, issue, or pull request, and remove the verified temporary directory immediately after the check.
 
 ## Full Saga acceptance
 
