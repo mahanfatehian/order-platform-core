@@ -26,10 +26,10 @@ Run the immutable Gitleaks CLI against the complete local Git history before ope
 
 ```bash
 docker run --rm \
-  --mount type=bind,source=$PWD,target=/repo,readonly \
+  --mount "type=bind,source=$PWD,target=/repo,readonly" \
   --workdir /repo \
   ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
-  git --config=/repo/.gitleaks.toml --redact --no-banner /repo
+  git --config=/repo/.gitleaks.toml --redact --verbose --no-banner /repo
 ```
 
 Test fixtures sign tokens with keys made by repeating `0123456789abcdef` (32 characters, or 64 where a test needs a longer key), which `.gitleaks.toml` allowlists by that exact pattern. Reuse one of them in new tests rather than inventing another key, so the scan stays strict everywhere else.

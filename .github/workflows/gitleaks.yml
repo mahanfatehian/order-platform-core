@@ -18,10 +18,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # --verbose prints each finding's commit, file and line; --redact still masks the matched value.
       - name: Scan full Git history
         run: |
           docker run --rm \
             --mount "type=bind,source=${GITHUB_WORKSPACE},target=/repo,readonly" \
             --workdir /repo \
             ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
-            git --config=/repo/.gitleaks.toml --redact --no-banner /repo
+            git --config=/repo/.gitleaks.toml --redact --verbose --no-banner /repo
