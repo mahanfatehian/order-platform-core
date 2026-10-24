@@ -11,7 +11,25 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Each service keeps its Dockerfile beside its pom; the root has none, so "/" found nothing to update.
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /auth-service
+      - /discovery-service
+      - /gateway-service
+      - /order-service
+      - /store-service
+      - /user-service
+      - /web-ui-service
     schedule:
       interval: weekly
+    ignore:
+      # Java 21 is the platform line; a JDK/JRE or Maven major is a deliberate change, made together with
+      # maven.compiler.release and the build image's -eclipse-temurin-NN suffix, not a weekly bump.
+      - dependency-name: 'eclipse-temurin'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'maven'
+        update-types: ['version-update:semver-major']
+    groups:
+      container-images:
+        patterns: ['*']
