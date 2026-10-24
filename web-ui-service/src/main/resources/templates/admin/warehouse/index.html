@@ -36,7 +36,7 @@
                     <span><i class="bi bi-clock" aria-hidden="true"></i>
                         <span th:text="${#temporals.format(order.createdAt(),'MMM d, HH:mm')}">Created</span></span>
                     <span><i class="bi bi-box" aria-hidden="true"></i>
-                        <span th:text="|${order.itemCount()} units|">0 units</span></span>
+                        <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span></span>
                     <span class="money" th:text="|$${#numbers.formatDecimal(order.totalAmount(),1,2)}|">$0</span>
                 </div>
             </div>

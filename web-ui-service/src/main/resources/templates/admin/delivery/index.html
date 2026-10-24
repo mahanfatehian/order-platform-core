@@ -34,7 +34,7 @@
                         <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
                     </div>
                     <div class="queue-card__meta">
-                        <span th:text="|${order.itemCount()} units|">0 units</span>
+                        <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span>
                         <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
                         <span th:replace="~{fragments/status-badge :: order(${order.status()})}"></span>
                     </div>
                     <div class="queue-card__meta">
-                        <span th:text="|${order.itemCount()} units|">0 units</span>
+                        <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span>
                         <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
                     </div>
                 </div>

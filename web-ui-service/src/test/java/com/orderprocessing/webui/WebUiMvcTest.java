@@ -205,6 +205,30 @@ class WebUiMvcTest {
     }
 
     @Test
+    void fulfillmentQueuesCountASingleUnitInTheSingular() throws Exception {
+        Instant now = Instant.parse("2026-01-02T03:04:05Z");
+        OrderView single = new OrderView(ORDER_ID, USER_ID, "CONFIRMED", new BigDecimal("29.90"), null,
+                List.of(new OrderItemView(UUID.randomUUID(), PRODUCT_ID, "Signal Lamp", new BigDecimal("29.90"), 1,
+                        new BigDecimal("29.90"))), now, now, true);
+        OrderView pair = new OrderView(UUID.randomUUID(), USER_ID, "CONFIRMED", new BigDecimal("59.80"), null,
+                List.of(new OrderItemView(UUID.randomUUID(), PRODUCT_ID, "Signal Lamp", new BigDecimal("29.90"), 2,
+                        new BigDecimal("59.80"))), now, now, true);
+        when(authenticatedClient.fulfillmentOrders(anyInt(), anyInt(), anyString()))
+                .thenReturn(new PageResponse<>(List.of(single, pair), 0, 20, 2, 1, true, true));
+
+        mvc.perform(get("/admin/warehouse").with(user("warehouse_worker").roles("WAREHOUSE")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(">1 unit<")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(">2 units<")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("1 units"))));
+        mvc.perform(get("/admin/delivery").with(user("delivery_driver").roles("DELIVERY")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(">1 unit<")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(">2 units<")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("1 units"))));
+    }
+
+    @Test
     void homeRedirectsEachPersonaToItsOwnWorkspace() throws Exception {
         mvc.perform(get("/").with(user("warehouse_worker").roles("WAREHOUSE")))
                 .andExpect(redirectedUrl("/admin/warehouse"));
