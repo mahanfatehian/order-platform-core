@@ -130,7 +130,7 @@ a:hover { color: var(--app-primary-hover); }
 .metric--warning { --metric-accent: var(--app-warning); }
 .metric--danger { --metric-accent: var(--app-danger); }
 
-.quick-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(14rem,1fr)); gap: 1rem; }
 .quick-link { display: grid; grid-template-columns: 2.5rem 1fr auto; align-items: center; gap: .85rem; padding: 1rem; color: var(--app-text); text-decoration: none; transition: border-color .15s ease, transform .15s ease; }
 .quick-link:hover { color: var(--app-text); border-color: var(--app-border-strong); transform: translateY(-1px); }
 .quick-link__icon { width: 2.5rem; height: 2.5rem; display: grid; place-items: center; color: var(--app-primary); background: color-mix(in srgb,var(--app-primary) 11%,transparent); border-radius: .55rem; }
