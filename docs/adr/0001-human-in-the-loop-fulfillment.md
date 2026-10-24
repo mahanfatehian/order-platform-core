@@ -75,7 +75,7 @@ Order and store services use transactional outboxes, Kafka keys based on order I
 
 Orders that remain `PENDING` beyond the configurable deadline (10 minutes by default) are locked and transitioned to `FAILED` by a reconciliation worker. The same transaction appends history and writes `OrderFailedEvent`, allowing store-side reservations to be released even when the original stock result never completed the handshake.
 
-Consumer failures use bounded retry and then the source topic's `.dlt`. Publisher failures use bounded attempts and a database `dead_lettered` flag. These mechanisms are intentionally described as at-least-once delivery, not end-to-end exactly once.
+Consumer failures use bounded retry and then a dead-letter topic owned by the failing consumer, such as `order.events.store-service.dlt`, so consumers of the same topic never share one. (Amended 2026-08-30: this originally named the source topic's `.dlt`, which is now provisioned only as a legacy compatibility topic.) Publisher failures use bounded attempts and a database `dead_lettered` flag. These mechanisms are intentionally described as at-least-once delivery, not end-to-end exactly once.
 
 ## Consequences
 
