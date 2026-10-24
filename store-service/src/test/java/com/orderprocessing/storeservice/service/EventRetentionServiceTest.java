@@ -1,12 +1,15 @@
 package com.orderprocessing.storeservice.service;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.convert.ApplicationConversionService;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -21,6 +24,18 @@ class EventRetentionServiceTest {
     private static final Instant OUTBOX_CUTOFF = NOW.minus(OUTBOX_RETENTION);
     private static final Instant INBOX_CUTOFF = NOW.minus(INBOX_RETENTION);
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+
+    // The other tests call the clock-taking constructor directly, so only a container can tell
+    // whether Spring is able to choose between the two.
+    @Test
+    void springConstructsTheScheduledBean() {
+        new ApplicationContextRunner()
+                .withInitializer(context -> context.getBeanFactory()
+                        .setConversionService(ApplicationConversionService.getSharedInstance()))
+                .withBean(EventRetentionBatchService.class, () -> mock(EventRetentionBatchService.class))
+                .withUserConfiguration(EventRetentionService.class)
+                .run(context -> assertThat(context).hasNotFailed().hasSingleBean(EventRetentionService.class));
+    }
 
     @Test
     void limitsEachSourceToConfiguredMaximumBatches() {

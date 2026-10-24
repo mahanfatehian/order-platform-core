@@ -1,6 +1,7 @@
 package com.orderprocessing.storeservice.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ public class EventRetentionService {
     private final int maxBatchesPerRun;
     private final Clock clock;
 
+    @Autowired
     public EventRetentionService(EventRetentionBatchService batches,
                                  @Value("${maintenance.outbox-retention:P30D}") Duration outboxRetention,
                                  @Value("${maintenance.inbox-retention:P30D}") Duration inboxRetention,
