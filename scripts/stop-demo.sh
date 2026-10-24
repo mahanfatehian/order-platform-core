@@ -6,4 +6,5 @@ cd "$ROOT_DIR"
 . "$ROOT_DIR/scripts/demo-env.sh"
 
 echo "Using environment file: $DEMO_ENV_FILE"
-docker compose --env-file "$DEMO_ENV_FILE" down
+# Compose only acts on the profiles it is given, so name the optional ones or their containers outlive the stop.
+docker compose --env-file "$DEMO_ENV_FILE" --profile tools --profile observability down

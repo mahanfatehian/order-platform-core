@@ -202,7 +202,7 @@ sh scripts/stop-demo.sh
 .\scripts\stop-demo.ps1
 ```
 
-Reset all local database, Redis, and Prometheus volumes and recreate the demo:
+Delete all local database, Redis, and Prometheus volumes, then run the start script again to recreate the demo:
 
 ```bash
 sh scripts/reset-demo.sh --yes

@@ -12,5 +12,6 @@ cd "$ROOT_DIR"
 . "$ROOT_DIR/scripts/demo-env.sh"
 
 echo "Using environment file: $DEMO_ENV_FILE"
-docker compose --env-file "$DEMO_ENV_FILE" down --volumes --remove-orphans
+# Compose only acts on the profiles it is given, so name the optional ones or Prometheus keeps its volume.
+docker compose --env-file "$DEMO_ENV_FILE" --profile tools --profile observability down --volumes --remove-orphans
 echo "Local demo data was removed. Run ./scripts/start-demo.sh to recreate it."

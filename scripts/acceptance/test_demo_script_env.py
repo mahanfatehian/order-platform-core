@@ -97,9 +97,11 @@ class DemoScriptEnvironmentContractTest(unittest.TestCase):
         prefix = ["compose", "--env-file", environment_file]
         if script_name == "start-demo":
             return [prefix + ["up", "-d", "--build", "--wait", "--wait-timeout", "360"], prefix + ["ps"]]
+        # Teardown names every optional profile, or Kafka UI and Prometheus (and its volume) would survive it.
+        teardown = prefix + ["--profile", "tools", "--profile", "observability", "down"]
         if script_name == "stop-demo":
-            return [prefix + ["down"]]
-        return [prefix + ["down", "--volumes", "--remove-orphans"]]
+            return [teardown]
+        return [teardown + ["--volumes", "--remove-orphans"]]
 
     def _configure_environment(self, root, setup):
         if setup.get("create_example", True):

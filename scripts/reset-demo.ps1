@@ -11,7 +11,8 @@ Push-Location $root
 try {
     . (Join-Path $PSScriptRoot 'DemoEnvironment.ps1')
     Write-Host "Using environment file: $DemoEnvironmentFile"
-    docker compose --env-file $DemoEnvironmentFile down --volumes --remove-orphans
+    # Compose only acts on the profiles it is given, so name the optional ones or Prometheus keeps its volume.
+    docker compose --env-file $DemoEnvironmentFile --profile tools --profile observability down --volumes --remove-orphans
     if ($LASTEXITCODE -ne 0) { throw 'Docker Compose could not reset the showcase.' }
     Write-Host 'Local demo data was removed. Run .\scripts\start-demo.ps1 to recreate it.' -ForegroundColor Green
 }
