@@ -23,6 +23,18 @@ The repository is designed to be evaluated from a clean clone. Docker Compose bu
 - Optional Kafka event browser and Prometheus metrics through Compose profiles
 - Health-gated startup, non-root application images, graceful shutdown, CI, and safe demo reset scripts
 
+## Screenshots
+
+Captured from the Compose stack with the default `dev` profile, after placing a few orders through the public gateway.
+
+| Customer order timeline | Live catalog |
+| --- | --- |
+| ![A delivered order: all five fulfillment stages complete, its tracking reference, and the actor-by-actor activity history](docs/images/order-timeline.png) | ![The product catalog with live prices and stock levels from store-service](docs/images/catalog.png) |
+| **Warehouse queue** | **Delivery queue** |
+| ![Confirmed orders waiting for the warehouse operator to pack them](docs/images/warehouse-queue.png) | ![Packed orders waiting for a tracking handoff, and a shipped order in transit](docs/images/delivery-queue.png) |
+| **Operations console** | **Dark theme** |
+| ![The administrator overview with platform metrics, shortcuts, and service readiness](docs/images/admin-overview.png) | ![A shipped order in the dark theme while its status keeps polling](docs/images/order-timeline-dark.png) |
+
 ## Run it
 
 ### Prerequisites
