@@ -77,7 +77,7 @@ Use separate private browser windows for the personas, or sign out between steps
 5. Return to the customer order. The horizontal rail shows all five completed stages, the tracking reference, and the actor-aware activity history. The cancel control disappeared when fulfillment advanced beyond `CONFIRMED`.
 6. Optionally sign in as `admin` to inspect all statuses, users, roles, products, inventory, and service readiness.
 
-To see checkout protection, add more units than are live and available. Checkout remains blocked with an actionable availability message instead of creating a knowingly invalid saga. The seeded **Lumen Portable Bluetooth Speaker** has zero stock for this path.
+To see checkout protection, add an in-stock product such as the **Summit Cordless Stick Vacuum** (14 in stock), then raise its quantity in the cart above what is available. The cart flags the line and disables **Review checkout**, and if availability drops after review, the order is refused with an availability message instead of creating a knowingly invalid saga. The seeded **Lumen Portable Bluetooth Speaker** has zero stock, so the catalog marks it unavailable and never offers it to the cart.
 
 ## Architecture at a glance
 
@@ -161,6 +161,8 @@ Start the core platform plus Kafka UI and Prometheus:
 docker compose --env-file .env.example --profile tools --profile observability up -d --build --wait --wait-timeout 360
 ```
 
+If you created `.env` or set `ORDER_PLATFORM_ENV_FILE`, pass that file to `--env-file` instead: `up` recreates every container whose configuration differs, so mixing env files restarts the platform with different credentials.
+
 | Tool | URL | Useful for |
 | --- | --- | --- |
 | Kafka UI | <http://localhost:8090> | Inspect `order.events`, `store.events`, and their DLTs |
@@ -220,12 +222,12 @@ Two independent controls guard the anonymous entry points; [ADR-0002](docs/adr/0
 
 | Control | Reacts to | Effect |
 | --- | --- | --- |
-| Captcha escalation | Failed credential attempts, per address and per targeted account | The next submission must solve a challenge |
-| Request ceiling | Every request, whatever the outcome | Further submissions are refused with `429` and a `Retry-After` |
+| Captcha escalation | Failed sign-ins, per address and per targeted account, and every registration submission, per address | The next submission must solve a challenge |
+| Request ceiling | Every sign-in or registration submission and captcha image, whatever the outcome | Further submissions are refused with `429` and a `Retry-After` |
 
 The challenge is drawn in process with Java2D and held in the Redis-backed session, so there is no captcha vendor, API key, or outbound call, and the demo behaves identically offline. A challenge is consumed on first verification, so a solved one cannot be replayed.
 
-Only a genuine `401` counts towards the captcha threshold; a `503` from a degraded `auth-service` never does, so an outage cannot push a legitimate user towards a challenge. The request ceiling is what bounds volume in that case. It sits behind the gateway's own per-address limit on the same routes rather than replacing it, and lives beside the counters that decide when a challenge appears so the two stay tuned together.
+A sign-in fails towards the captcha threshold on a `401`, or on a missing or wrong captcha answer once one is required, so the challenge cannot be probed for free. A `503` from a degraded `auth-service` never counts, so an outage cannot push a legitimate user towards a challenge. The request ceiling is what bounds volume in that case. It sits behind the gateway's own per-address limit on the same routes rather than replacing it, and lives beside the counters that decide when a challenge appears so the two stay tuned together.
 
 Counters are shared through Redis. If Redis is unreachable they fall back to bounded per-instance counting rather than reporting zero, so the controls degrade instead of switching themselves off.
 
@@ -242,12 +244,13 @@ Important runtime switches:
 | `SPRING_PROFILES_ACTIVE` | `dev` | Enables demo identities and catalog |
 | `DEMO_MODE` | `true` | Shows demo credentials on the sign-in page |
 | `REGISTRATION_ENABLED` | `true` | Enables customer self-registration |
-| `CAPTCHA_ENABLED` | `true` | Escalates the sign-in and registration forms to a captcha after repeated failures |
+| `CAPTCHA_ENABLED` | `true` | Escalates the sign-in form to a captcha after repeated failures, and the registration form after repeated submissions |
 | `CAPTCHA_FAILURE_THRESHOLD` | `3` | Failed sign-ins tolerated from one address, or against one account, before a captcha is demanded |
 | `CAPTCHA_REGISTRATION_THRESHOLD` | `3` | Registration submissions tolerated from one address before a captcha is demanded |
 | `CAPTCHA_WINDOW` | `15m` | How long attempt counters survive without further activity |
 | `RATE_LIMIT_SUBMISSIONS_PER_WINDOW` | `10` | Sign-in and registration submissions allowed per address per window |
 | `RATE_LIMIT_CHALLENGES_PER_WINDOW` | `30` | Captcha images allowed per address per window |
+| `RATE_LIMIT_WINDOW` | `1m` | The window both request ceilings count over |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `KAFKA_TOPICS_ORDER_EVENTS` / `KAFKA_TOPICS_STORE_EVENTS` | `order.events` / `store.events` | Shared Kafka routes; set both values identically for `order-service` and `store-service` |
 | `ORDER_PENDING_TIMEOUT` | `PT10M` | Deadline before an unfinished inventory handshake is reconciled to `FAILED` |

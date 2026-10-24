@@ -28,7 +28,7 @@ A control that reacts to volume alone punishes a legitimate user who mistypes a 
 | One host guessing against many accounts | address counter |
 | Many hosts guessing against one account | account counter |
 
-A successful sign-in clears both counters. Only a genuine `401` counts; a `503` from a degraded `auth-service` never does, because an outage is not evidence about the caller and must not push an innocent user towards a challenge.
+A successful sign-in clears both counters. A `401` counts, and so does a missing or wrong captcha answer once one is required, so the challenge cannot be probed at no cost. A `503` from a degraded `auth-service` never does, because an outage is not evidence about the caller and must not push an innocent user towards a challenge.
 
 Registration counts every submission rather than only failures. A script creating accounts succeeds every time, so failure-only accounting would never notice it.
 
