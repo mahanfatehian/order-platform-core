@@ -52,7 +52,7 @@ There is no distributed database transaction. Each service commits only its own 
 
 ## Trust boundaries
 
-1. **Browser to edge.** `gateway-service` is the public application entry point. In Compose, application-service ports are available only on the backend network; the gateway is the only application port bound publicly. Infrastructure ports are bound to loopback for local inspection.
+1. **Browser to edge.** `gateway-service` is the public application entry point. In Compose, application-service ports are available only on the backend network; the gateway is the only application port bound publicly. PostgreSQL, Redis, ZooKeeper, and Kafka publish no host ports at all; only Eureka and the optional Kafka UI and Prometheus are bound to loopback for local inspection.
 2. **Browser session to BFF.** Access and refresh JWTs are stored in the server-side, Redis-backed HTTP session. The browser receives an HTTP-only session cookie, not the tokens. `web-ui-service` enforces its own route roles and CSRF protection on state-changing forms.
 3. **Gateway to resource services.** API callers present an access JWT. The gateway and servlet resource services each validate blacklist and token-version revocation state with one atomic Redis script. Those multi-key scripts support the standalone Compose Redis deployment; a hash-tagged key migration is required before Redis Cluster. The `roles` claim becomes `ROLE_*` authorities.
 4. **Internal HTTP.** Auth-to-user credential/state calls require `USER_SERVICE_INTERNAL_API_KEY`. The authoritative store quote endpoint requires `STORE_SERVICE_INTERNAL_API_KEY`; it is called server-side by `order-service` and `web-ui-service`. These keys authenticate a calling service, not an end user, and must be replaced outside development.
@@ -82,7 +82,7 @@ Human actions are synchronous, authenticated HTTP commands handled by `order-ser
 | `POST /api/orders/{id}/ship` | `ROLE_DELIVERY` | `PACKAGED` | `SHIPPED` | `OrderShippedEvent` |
 | `POST /api/orders/{id}/deliver` | `ROLE_DELIVERY` | `SHIPPED` | `DELIVERED` | `OrderDeliveredEvent` |
 
-Pack, ship, and deliver are idempotent when the aggregate is already in the command's resulting state. A repeated ship with a different supplied tracking reference is an idempotency conflict. Any other current-state mismatch returns an order transition conflict rather than skipping a lifecycle step.
+Pack, ship, and deliver are idempotent when the aggregate is already in the command's resulting state. A repeated ship that supplies a different tracking reference from the one already stored is an idempotency conflict; supplying one after a ship without a reference records it on the order instead. Any other current-state mismatch returns an order transition conflict rather than skipping a lifecycle step.
 
 The order service also consumes its own packaged, shipped, and delivered events. That listener records inbox acknowledgement only. It does **not** apply the transition again and does not treat a Kafka record as authority to perform a human action.
 
@@ -105,7 +105,7 @@ stateDiagram-v2
 
 `PACKAGED`, `SHIPPED`, and `DELIVERED` cannot be cancelled. There is no endpoint that assigns an arbitrary status or skips a transition.
 
-Each accepted transition appends an `order_status_history` row containing the source and destination status, event ID, actor ID when applicable, actor role/system label, reason, correlation ID, event time, and record time. The JPA entity is immutable and the application exposes creation and ordered reads only. Shipment tracking is stored on the order; it also appears in the shipment event and the human-readable shipment history reason.
+Each accepted transition appends an `order_status_history` row containing the source and destination status, event ID, actor ID when applicable, actor role/system label, reason, correlation ID, event time, and record time. The JPA entity is immutable and the application exposes creation and ordered reads only. Shipment tracking is stored on the order. A reference given with the ship command also appears in the shipment event and the human-readable history reason; one recorded later is added to the order only, without a new event or history row.
 
 ## Checkout and reservation saga
 
@@ -128,7 +128,7 @@ sequenceDiagram
     O->>OO: Commit PENDING + history + OrderPlacedEvent
     OO->>K: order.events (key = orderId)
     K->>S: OrderPlacedEvent
-    S->>S: Lock all inventory rows; validate whole order
+    S->>S: Lock all inventory rows, then validate the whole order
     alt every item is active and available
         S->>SO: Commit RESERVED rows + StockReservedEvent
         SO->>K: store.events (key = orderId)
@@ -198,7 +198,7 @@ Because the inbox insert shares the transaction, a handler exception rolls back 
 
 `OrderFailedEvent` is emitted only by pending-order reconciliation so `store-service` can release a reservation whose stock result never completed the saga. `OrderConfirmedEvent` remains in `KafkaEventRegistry` as a deserializable compatibility contract but is not emitted or consumed by the current saga.
 
-The Kafka consumer error handler retries a failed record three times at one-second intervals after its initial delivery, then republishes the original record to `<source-topic>.<consumer-service>.dlt` on the same partition. The active routes are `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`; the source-only DLTs are legacy compatibility topics and receive no new failures. No application listener automatically replays a DLT.
+The Kafka consumer error handler retries a failed record up to eight times with exponential back-off, starting at one second and doubling to a 30-second cap (about two minutes in all, tunable through `kafka.consumer.retry.*`), then republishes the original record to `<source-topic>.<consumer-service>.dlt` on the same partition. Records that cannot be deserialized or converted are not retried. The active routes are `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`; the source-only DLTs are legacy compatibility topics and receive no new failures. No application listener automatically replays a DLT.
 
 ## Failure paths and recovery boundaries
 
@@ -210,7 +210,7 @@ The Kafka consumer error handler retries a failed record three times at one-seco
 | Wrong role | BFF/backend authorization rejects the command; backend enforcement is authoritative |
 | Correct role, wrong order state | Command returns HTTP `409` and makes no change |
 | Cancellation after fulfillment starts | Returns HTTP `409`; no compensation event is emitted |
-| Kafka consumer handler repeatedly fails | Original record plus three retries, then its consumer-owned DLT on the source partition |
+| Kafka consumer handler repeatedly fails | Original record plus up to eight back-off retries (about two minutes), then its consumer-owned DLT on the source partition |
 | Outbox publish repeatedly fails | Database outbox row is marked `dead_lettered` at the configured attempt limit |
 | Process dies after broker acknowledgement | Outbox may republish; downstream inbox absorbs the duplicate |
 | Inventory handshake never completes | After 10 minutes by default, reconciliation commits `FAILED`, records history, and emits `OrderFailedEvent` so active reservations are released |
@@ -236,7 +236,7 @@ which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | 
 
 - `eventId` is the durable idempotency key and must remain stable across outbox retries.
 - `correlationId` is propagated from the originating request through related facts where available.
-- `schemaVersion` describes payload evolution. Current cancellation and fulfillment facts are emitted as version 2; the other active facts use version 1.
+- `schemaVersion` describes payload evolution. Cancellation, reconciliation-failure (`OrderFailedEvent`), and fulfillment facts are emitted as version 2; `OrderPlacedEvent` and the store facts use version 1.
 - Fulfillment metadata fields are nullable in Java so legacy version-one payloads containing only `orderId` can still deserialize. New consumers must tolerate absent optional metadata.
 - Event class simple names are persistence and deserialization identifiers in the outbox allow-list; renaming one requires an explicit compatibility migration/alias.
 - Additive fields are preferred. A breaking field or semantic change requires a new schema version and a compatibility plan for stored outbox rows and records already in Kafka.
