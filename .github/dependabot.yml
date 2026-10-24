@@ -43,12 +43,13 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # Java 21 is the platform line; a JDK/JRE or Maven major is a deliberate change, made together with
-      # maven.compiler.release and the build image's -eclipse-temurin-NN suffix, not a weekly bump.
+      # Java 21 is the platform line; moving it is a deliberate change, made together with
+      # maven.compiler.release, not a weekly bump.
       - dependency-name: 'eclipse-temurin'
         update-types: ['version-update:semver-major']
+      # The build image's tag carries its JDK (-eclipse-temurin-21), and Dependabot reads a newer one as a plain
+      # 3.9.x update - it proposed 3.9-eclipse-temurin-26 - so no update type can fence it off. Update it by hand.
       - dependency-name: 'maven'
-        update-types: ['version-update:semver-major']
     groups:
       container-images:
         patterns: ['*']
