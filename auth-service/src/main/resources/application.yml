@@ -1,6 +1,10 @@
 server:
   port: ${AUTH_SERVICE_PORT:8081}
   shutdown: graceful
+  # Outside callers reach this service only through the gateway, which drops any X-Forwarded-* they send and sets
+  # its own, including X-Forwarded-Prefix on the /auth-service docs routes. Trusting them lets springdoc keep the
+  # Swagger UI's URLs under that prefix; nothing here reads the client address.
+  forward-headers-strategy: framework
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s

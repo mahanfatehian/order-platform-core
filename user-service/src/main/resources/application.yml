@@ -1,6 +1,10 @@
 server:
   port: ${USER_SERVICE_PORT:8082}
   shutdown: graceful
+  # Outside callers reach this service only through the gateway, which drops any X-Forwarded-* they send and sets
+  # its own, including X-Forwarded-Prefix on the /user-service docs routes. Trusting them lets springdoc keep the
+  # Swagger UI's URLs under that prefix; nothing here reads the client address.
+  forward-headers-strategy: framework
 spring:
   mvc:
     throw-exception-if-no-handler-found: true
