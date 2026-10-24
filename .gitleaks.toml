@@ -2,3 +2,11 @@ title = "Order/flow secret scanning"
 
 [extend]
 useDefault = true
+
+# Tests sign their tokens with this sequential hex key, or the same key twice where a test needs
+# 64 characters; neither has ever been a deployed secret. Matching exactly those two forms keeps
+# the scan strict for every other string in those files.
+[[allowlists]]
+description = "Sequential hex HMAC keys used only by test fixtures"
+regexTarget = "secret"
+regexes = ['''^(?:0123456789abcdef0123456789abcdef){1,2}$''']

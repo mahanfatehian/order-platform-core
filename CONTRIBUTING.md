@@ -32,6 +32,8 @@ docker run --rm \
   git --config=/repo/.gitleaks.toml --redact --no-banner /repo
 ```
 
+Test fixtures sign tokens with keys made by repeating `0123456789abcdef` (32 characters, or 64 where a test needs a longer key), which `.gitleaks.toml` allowlists by that exact pattern. Reuse one of them in new tests rather than inventing another key, so the scan stays strict everywhere else.
+
 To verify the scanner itself, create a disposable canary outside the repository by concatenating the `A`, `K`, `I`, and `A` fragments with a cryptographically random 16-character uppercase alphanumeric suffix. Scan only that temporary directory with `gitleaks dir --redact --exit-code=2`; it must exit `2`. Do not paste a literal credential into a file, terminal, issue, or pull request, and remove the verified temporary directory immediately after the check.
 
 ## Full Saga acceptance
