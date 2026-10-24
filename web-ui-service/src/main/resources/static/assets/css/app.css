@@ -207,7 +207,7 @@ a:hover { color: var(--app-primary-hover); }
 .queue-card__title { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-bottom: .32rem; }
 .queue-card__meta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; color: var(--app-muted); font-size: .82rem; }
 .queue-card__action { display: flex; align-items: end; gap: .55rem; }
-.queue-card__action .form-control { width: 12rem; }
+.queue-card__action .form-control { width: 17rem; }
 
 .activity-feed { position: relative; display: grid; gap: 0; }
 .activity-item { position: relative; display: grid; grid-template-columns: 1.25rem minmax(0,1fr); gap: .8rem; padding: 0 0 1.15rem; }
