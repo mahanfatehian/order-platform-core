@@ -172,11 +172,17 @@ def login(base_url: str, username: str, password: str) -> str:
     return token
 
 
-def login_until_ready(base_url, username, password, deadline):
+def until_routed(call, deadline):
+    """Retry a gateway call while it answers 503, which is how a cold discovery route looks.
+
+    Compose reports the gateway healthy before its load balancer has fetched every instance from
+    Eureka, so the first request to each backend can find nothing to route to for a short while.
+    Any other failure, or a 503 that outlasts the deadline, still surfaces.
+    """
     last_error = None
     while time.monotonic() < deadline:
         try:
-            return login(base_url, username, password)
+            return call()
         except RuntimeError as error:
             last_error = error
             if "actual_status=503" not in str(error):
@@ -184,7 +190,11 @@ def login_until_ready(base_url, username, password, deadline):
             time.sleep(min(POLL_INTERVAL_SECONDS, max(0, deadline - time.monotonic())))
     if last_error:
         raise last_error
-    raise RuntimeError("Gateway login readiness deadline elapsed without an attempt")
+    raise RuntimeError("Gateway readiness deadline elapsed without an attempt")
+
+
+def login_until_ready(base_url, username, password, deadline):
+    return until_routed(lambda: login(base_url, username, password), deadline)
 
 
 def poll_order(base_url: str, token: str, order_id: str, expected: str, deadline: float) -> dict:
@@ -307,7 +317,9 @@ def run_saga(base_url, timeout_seconds, personas):
     warehouse_token = login_until_ready(base_url, *personas["warehouse"], deadline)
     delivery_token = login_until_ready(base_url, *personas["delivery"], deadline)
     admin_token = login_until_ready(base_url, *personas["admin"], deadline)
-    catalog = request_json("GET", base_url + "/api/store/products?inStock=true&size=100", token=customer_token)
+    # The first call to each backend may meet a route the gateway has not discovered yet.
+    catalog = until_routed(lambda: request_json("GET", base_url + "/api/store/products?inStock=true&size=100",
+                                                token=customer_token), deadline)
     product = next((item for item in catalog.get("content", [])
                     if item.get("active") and item.get("availableQuantity", 0) > 0), None)
     if not product or not product.get("id"):
@@ -320,7 +332,9 @@ def run_saga(base_url, timeout_seconds, personas):
     correlation_id, idempotency_key = str(uuid.uuid4()), str(uuid.uuid4())
     body = {"items": [{"productId": product_id, "quantity": 1}]}
     headers = {"Idempotency-Key": idempotency_key, "X-Correlation-Id": correlation_id}
-    created = request_json("POST", base_url + "/api/orders", token=customer_token, body=body, headers=headers, expected=(201,))
+    # Retrying the create is safe: the idempotency key makes a repeated request return the same order.
+    created = until_routed(lambda: request_json("POST", base_url + "/api/orders", token=customer_token, body=body,
+                                                headers=headers, expected=(201,)), deadline)
     order_id = created.get("id")
     if not order_id:
         raise RuntimeError("Order creation did not return an order ID")
