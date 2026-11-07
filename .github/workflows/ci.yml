@@ -30,6 +30,9 @@ jobs:
           cache: maven
       - name: Verify all modules
         run: mvn -B -ntp clean verify
+      # The runner has Docker, so a skipped test here is one that silently stopped running.
+      - name: Require every test to have run
+        run: python3 scripts/ci/require_no_skipped_tests.py
       - name: Summarise test coverage
         if: always() && hashFiles('coverage-report/target/site/jacoco-aggregate/jacoco.csv') != ''
         run: python3 scripts/ci/coverage_summary.py coverage-report/target/site/jacoco-aggregate/jacoco.csv >> "$GITHUB_STEP_SUMMARY"

@@ -35,6 +35,7 @@
         <springdoc.version>2.6.0</springdoc.version>
         <spring.cloud.version>2023.0.6</spring.cloud.version>
         <jjwt.version>0.13.0</jjwt.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- Empty unless another plugin sets it; surefire expands @{argLine} late, so such agents still reach the test JVM. -->
@@ -43,6 +44,15 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Imported ahead of Boot's BOM, which pins 1.19.8: that client speaks Docker API 1.32, which current Docker
+                 Engines refuse, so the Testcontainers tests decided Docker was missing and skipped themselves. -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>

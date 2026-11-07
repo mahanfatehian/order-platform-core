@@ -172,13 +172,13 @@ For the full state machine, trust boundaries, retry/reconciliation behavior, and
 | **Real infrastructure:** Testcontainers with PostgreSQL 16 and Redis 7.2 | Two transactions racing on one order's stock serialize, and a cancellation that wins the race leaves a tombstone so the late placement never reserves. The V8 Flyway migration backfills rows written under V7. Retention deletes only eligible rows, in exact batches that commit on their own. The Redis access-token script fails closed on missing or malformed state. | Docker |
 | **Acceptance:** Python 3 standard library | Unit tests pin the saga runner and the demo scripts' environment-file precedence under `sh` and PowerShell; [`full-saga.py`](scripts/acceptance/full-saga.py) then drives the running stack. | Python 3, Docker |
 
-Without a reachable Docker daemon the Testcontainers classes are reported as skipped rather than failed. GitHub's hosted runners provide Docker, so CI runs them.
+Without a reachable Docker daemon the Testcontainers classes are reported as skipped rather than failed. GitHub's hosted runners provide Docker, so CI runs them, and the build fails if any test at all is skipped.
 
 ### What CI enforces
 
 On every pull request and every push to `master` or `dev`:
 
-1. **Reactor verification.** `mvn -B -ntp clean verify` on Temurin 21, Testcontainers included. JaCoCo line and branch coverage for every module goes into the run summary, with the HTML report attached as the `coverage-report` artifact; the Surefire reports are attached even when the build fails.
+1. **Reactor verification.** `mvn -B -ntp clean verify` on Temurin 21, Testcontainers included, and no test may be skipped. JaCoCo line and branch coverage for every module goes into the run summary, with the HTML report attached as the `coverage-report` artifact; the Surefire reports are attached even when the build fails.
 2. **Repository checks.** The acceptance unit tests, and `docker compose config` against the Compose model.
 3. **Clean-clone smoke test**, once a pull request leaves draft. It builds every image, waits for every health check, checks the gateway, the sign-in page, and the internal Prometheus exports of `order-service` and `store-service`, then runs `full-saga.py` through the public gateway. The runner replays the order creation with the same `Idempotency-Key` and expects the same order, expects `403` when the customer tries to pack, repeats `pack`, `ship`, and `deliver` and expects no new history, requires an event ID and a correlation ID on every history entry, and checks that available stock ends exactly one lower.
 4. **Secret scanning.** A separate workflow runs gitleaks 8.30, pinned by image digest, over the complete Git history.
