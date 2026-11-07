@@ -33,6 +33,8 @@
         <jjwt.version>0.12.6</jjwt.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Empty unless another plugin sets it; surefire expands @{argLine} late, so such agents still reach the test JVM. -->
+        <argLine/>
     </properties>
 
     <dependencyManagement>
@@ -103,9 +105,37 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.2</version>
+                    <configuration>
+                        <!-- Mockito's inline mock maker needs Byte Buddy's instrumentation agent. Loading it when the test JVM
+                             starts, instead of letting Mockito attach it to the running VM, is what JDK 21 asks for and keeps
+                             working where self-attachment is refused. (Mockito 5.11, which Boot 3.3 manages, cannot be the agent
+                             itself; that arrived in 5.14.) -Xshare:off stops the JVM warning that class sharing is lost once an
+                             agent extends the bootstrap class path. -->
+                        <argLine>@{argLine} -javaagent:${net.bytebuddy:byte-buddy-agent:jar} -Xshare:off</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.7.0</version>
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!-- Publishes every dependency's path as a property, such as ${net.bytebuddy:byte-buddy-agent:jar}. -->
+                        <id>dependency-paths</id>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
 </project>
