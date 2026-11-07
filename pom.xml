@@ -19,6 +19,7 @@
         <module>discovery-service</module>
         <module>gateway-service</module>
         <module>web-ui-service</module>
+        <module>coverage-report</module>
     </modules>
 
     <properties>
@@ -149,6 +150,11 @@
                     <artifactId>maven-dependency-plugin</artifactId>
                     <version>3.7.0</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>0.8.16</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -184,6 +190,19 @@
                         <id>dependency-paths</id>
                         <goals>
                             <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!-- Prepends JaCoCo's agent to argLine, so every module's tests record coverage for coverage-report. -->
+                        <id>coverage-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
                         </goals>
                     </execution>
                 </executions>
