@@ -145,7 +145,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.6.0</version>
+                    <version>3.6.1</version>
                     <configuration>
                         <!-- Mockito's inline mock maker needs Byte Buddy's instrumentation agent. Loading it when the test JVM
                              starts, instead of letting Mockito attach it to the running VM, is what JDK 21 asks for and keeps
@@ -158,7 +158,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
-                    <version>3.7.0</version>
+                    <version>3.11.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
