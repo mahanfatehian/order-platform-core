@@ -17,11 +17,6 @@
     <description>User Service</description>
     <packaging>jar</packaging>
 
-<properties>
-    <java.version>21</java.version>
-    <maven.compiler.release>21</maven.compiler.release>
-</properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -85,7 +80,6 @@
         <dependency>
             <groupId>com.orderprocessing</groupId>
             <artifactId>security-starter</artifactId>
-            <version>1.0.0</version>
         </dependency>
 
         <dependency>

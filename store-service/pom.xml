@@ -32,7 +32,6 @@
         <dependency>
             <groupId>com.orderprocessing</groupId>
             <artifactId>security-starter</artifactId>
-            <version>1.0.0</version>
         </dependency>
         
         <!-- Database -->
@@ -54,7 +53,6 @@
         <dependency>
             <groupId>com.orderprocessing</groupId>
             <artifactId>kafka-common</artifactId>
-            <version>1.0.0</version>
         </dependency>
 
         <dependency>
