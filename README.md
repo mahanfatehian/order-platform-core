@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/mahanfatehian/order-platform-core/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mahanfatehian/order-platform-core/actions/workflows/ci.yml)
 [![Secret scanning](https://github.com/mahanfatehian/order-platform-core/actions/workflows/gitleaks.yml/badge.svg?branch=master)](https://github.com/mahanfatehian/order-platform-core/actions/workflows/gitleaks.yml)
+[![CodeQL](https://github.com/mahanfatehian/order-platform-core/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/mahanfatehian/order-platform-core/actions/workflows/codeql.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-informational)
 ![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-informational)
 
@@ -296,7 +297,7 @@ python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
 docker compose --env-file .env.example config --quiet
 ```
 
-GitHub Actions runs the Java 21 reactor and the acceptance unit tests, then builds the complete stack from a clean clone, waits for every service to report healthy, checks the gateway, the sign-in page, and the internal Prometheus exports, and drives one order through all five fulfillment stages with [`full-saga.py`](scripts/acceptance/full-saga.py). A separate workflow scans the entire Git history with gitleaks. Dependabot covers Maven, the service Dockerfiles, and workflow actions; the infrastructure images in `docker-compose.yml` are updated by hand.
+GitHub Actions runs the Java 21 reactor and the acceptance unit tests, then builds the complete stack from a clean clone, waits for every service to report healthy, checks the gateway, the sign-in page, and the internal Prometheus exports, and drives one order through all five fulfillment stages with [`full-saga.py`](scripts/acceptance/full-saga.py). Separate workflows scan the entire Git history with gitleaks, and analyse the Java services, the Python acceptance scripts, the UI's JavaScript, and the workflows themselves with CodeQL on every push and weekly. Dependabot covers Maven, the service Dockerfiles, and workflow actions; the infrastructure images in `docker-compose.yml` are updated by hand.
 
 ## Troubleshooting
 
