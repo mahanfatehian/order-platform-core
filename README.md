@@ -160,6 +160,55 @@ For the full state machine, trust boundaries, retry/reconciliation behavior, and
 | `security-starter` | Shared servlet JWT and revocation enforcement |
 | `discovery-service` | Eureka registry and dashboard |
 
+## Testing and quality gates
+
+`mvn clean verify` runs more than 350 JUnit 5 tests across the reactor. CI runs every layer below on each pull request; the Compose smoke test that hosts the full saga waits until a pull request leaves draft.
+
+| Layer | What it proves, for example | Needs |
+| --- | --- | --- |
+| **Unit:** JUnit 5, Mockito, AssertJ | The order state machine holds against every command and every inventory fact in every status: only documented edges advance, replays write nothing, and a late reservation never revives a cancelled order. The outbox dead-letters an exhausted event and refuses a type outside the allow-list. The gateway strips internal credentials and spoofed forwarded headers. | JDK 21 |
+| **Spring web:** `@SpringBootTest` with MockMvc or WebTestClient | BFF route roles and CSRF, captcha escalation, sign-in rate limits, and checkout idempotency keys. Every resource-server refusal carries the same JSON error body. | JDK 21 |
+| **Embedded Kafka:** `@EmbeddedKafka` | Exhausted records from two consumer groups reach separate consumer-owned DLTs with recovery headers, and none reach the legacy DLT. | JDK 21 |
+| **Real infrastructure:** Testcontainers with PostgreSQL 16 and Redis 7.2 | Two transactions racing on one order's stock serialize, and a cancellation that wins the race leaves a tombstone so the late placement never reserves. The V8 Flyway migration backfills rows written under V7. Retention deletes only eligible rows, in exact batches that commit on their own. The Redis access-token script fails closed on missing or malformed state. | Docker |
+| **Acceptance:** Python 3 standard library | Unit tests pin the saga runner and the demo scripts' environment-file precedence under `sh` and PowerShell; [`full-saga.py`](scripts/acceptance/full-saga.py) then drives the running stack. | Python 3, Docker |
+
+Without a reachable Docker daemon the Testcontainers classes are reported as skipped rather than failed. GitHub's hosted runners provide Docker, so CI runs them.
+
+### What CI enforces
+
+On every pull request and every push to `master` or `dev`:
+
+1. **Reactor verification.** `mvn -B -ntp clean verify` on Temurin 21, Testcontainers included. JaCoCo line and branch coverage for every module goes into the run summary, with the HTML report attached as the `coverage-report` artifact; the Surefire reports are attached even when the build fails.
+2. **Repository checks.** The acceptance unit tests, and `docker compose config` against the Compose model.
+3. **Clean-clone smoke test**, once a pull request leaves draft. It builds every image, waits for every health check, checks the gateway, the sign-in page, and the internal Prometheus exports of `order-service` and `store-service`, then runs `full-saga.py` through the public gateway. The runner replays the order creation with the same `Idempotency-Key` and expects the same order, expects `403` when the customer tries to pack, repeats `pack`, `ship`, and `deliver` and expects no new history, requires an event ID and a correlation ID on every history entry, and checks that available stock ends exactly one lower.
+4. **Secret scanning.** A separate workflow runs gitleaks 8.30, pinned by image digest, over the complete Git history.
+5. **Code scanning.** CodeQL analyses the Java services, the Python acceptance scripts, the UI's JavaScript, and the workflows themselves, and runs weekly as well.
+
+Workflow actions are pinned to commit SHAs, and each job's token carries only the permissions it needs - read-only, apart from CodeQL uploading its results - and is not left on disk. Dependabot proposes Maven, Dockerfile, and workflow action updates weekly; the infrastructure images in `docker-compose.yml` are updated by hand.
+
+### Run the checks locally
+
+With Java 21 and Maven 3.9 or newer, which the build checks before anything else:
+
+```bash
+mvn clean verify
+```
+
+Without local Java/Maven, the Dockerfiles support an opt-in test build:
+
+```bash
+docker compose --env-file .env.example build --build-arg "MAVEN_TEST_ARGS=" order-service store-service web-ui-service
+```
+
+The other checks need only Python 3 and Docker:
+
+```bash
+python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
+docker compose --env-file .env.example config --quiet
+```
+
+To run the full saga yourself against a disposable Compose project, follow [Full Saga acceptance](CONTRIBUTING.md#full-saga-acceptance).
+
 ## Seed catalog
 
 The `dev` profile creates exactly 15 deterministic products: five electronics, five clothing items, and five home goods. Prices range from `$49.95` to `$249.99`, stock levels range from `0` to `85`, SKUs are unique, and descriptions are presentation-ready. Seeding is idempotent and profile-scoped; production profiles do not receive demo catalog rows.
@@ -275,29 +324,6 @@ Important runtime switches:
 | `ORDER_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` / `STORE_EVENT_CLEANUP_MAX_BATCHES_PER_RUN` | `20` | Maximum delete batches per source and scheduled run |
 
 Outbox retries use exponential backoff with jitter and preserve order per aggregate. A dead-lettered outbox row deliberately blocks later facts for that order; unrelated orders continue. Kafka consumer failures use bounded retry and route exhausted records to consumer-owned DLTs: `<order-events>.order-service.dlt`, `<order-events>.store-service.dlt`, and `<store-events>.order-service.dlt`. The source-only `<order-events>.dlt` and `<store-events>.dlt` remain provisioned as legacy compatibility topics but receive no new failures. `KAFKA_TOPICS_ORDER_EVENTS` and `KAFKA_TOPICS_STORE_EVENTS` must be identical in the Order and Store service environments.
-
-## Build and test
-
-With Java 21 and Maven 3.9+:
-
-```bash
-mvn clean verify
-```
-
-Without local Java/Maven, the Dockerfiles support an opt-in test build:
-
-```bash
-docker compose --env-file .env.example build --build-arg "MAVEN_TEST_ARGS=" order-service store-service web-ui-service
-```
-
-The other repository checks CI runs, which need only Python 3 and Docker:
-
-```bash
-python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
-docker compose --env-file .env.example config --quiet
-```
-
-GitHub Actions runs the Java 21 reactor and the acceptance unit tests, writes JaCoCo line and branch coverage for every module into the run summary (the full HTML report is attached as the `coverage-report` artifact), then builds the complete stack from a clean clone, waits for every service to report healthy, checks the gateway, the sign-in page, and the internal Prometheus exports, and drives one order through all five fulfillment stages with [`full-saga.py`](scripts/acceptance/full-saga.py). Separate workflows scan the entire Git history with gitleaks, and analyse the Java services, the Python acceptance scripts, the UI's JavaScript, and the workflows themselves with CodeQL on every push and weekly. Dependabot covers Maven, the service Dockerfiles, and workflow actions; the infrastructure images in `docker-compose.yml` are updated by hand.
 
 ## Troubleshooting
 
