@@ -234,7 +234,7 @@ which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | 
 
 ## Planned shop
 
-Not implemented. Checkout does not take payment, store an address, send mail, or accept a return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it: admin-funded wallet, merchant catalog, address snapshot, status mail, ship-to-address, return after delivery, then a gateway port. The task map is `vault/00 Index.md`. None of that is in the running services.
+The ledger module `wallet-service` exists. Checkout does not call it yet, and there is still no address, mail, or return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it. The task map is `vault/00 Index.md`.
 
 ## Contract evolution rules
 

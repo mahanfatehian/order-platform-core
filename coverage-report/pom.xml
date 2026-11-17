@@ -47,6 +47,11 @@
         </dependency>
         <dependency>
             <groupId>com.orderprocessing</groupId>
+            <artifactId>wallet-service</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.orderprocessing</groupId>
             <artifactId>discovery-service</artifactId>
             <version>${project.version}</version>
         </dependency>

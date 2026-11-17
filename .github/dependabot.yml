@@ -39,6 +39,7 @@ updates:
       - /order-service
       - /store-service
       - /user-service
+      - /wallet-service
       - /web-ui-service
     schedule:
       interval: weekly

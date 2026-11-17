@@ -266,6 +266,47 @@ services:
     networks:
       - backend
 
+  wallet-service:
+    build:
+      context: .
+      dockerfile: wallet-service/Dockerfile
+    restart: "on-failure:3"
+    init: true
+    environment:
+      WALLET_SERVICE_PORT: ${WALLET_SERVICE_PORT:-8086}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/walletdb
+      DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      EUREKA_HOST: discovery-service
+      EUREKA_PORT: ${DISCOVERY_SERVICE_PORT:-8761}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      WALLET_SERVICE_INTERNAL_API_KEY: ${WALLET_SERVICE_INTERNAL_API_KEY:?Set WALLET_SERVICE_INTERNAL_API_KEY in .env}
+      LOG_LEVEL_SQL: ${LOG_LEVEL_SQL:-INFO}
+      LOG_LEVEL_SECURITY: ${LOG_LEVEL_SECURITY:-INFO}
+      LOG_LEVEL_FLYWAY: ${LOG_LEVEL_FLYWAY:-INFO}
+    expose:
+      - "${WALLET_SERVICE_PORT:-8086}"
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${WALLET_SERVICE_PORT}/actuator/health | grep -q '\\\"status\\\":\\\"UP\\\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 45s
+    stop_grace_period: 40s
+    networks:
+      - backend
+
   order-service:
     build:
       context: .

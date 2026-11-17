@@ -41,7 +41,8 @@ class InternalApiBoundaryFilterTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "/api/users/internal/authenticate",
-            "/api/store/internal/quote"
+            "/api/store/internal/quote",
+            "/api/wallets/internal/credits"
     })
     void rejectsInternalPathsBeforeTheDownstreamChain(String path) {
         MockServerWebExchange exchange = exchange(path);
@@ -74,6 +75,7 @@ class InternalApiBoundaryFilterTest {
             HttpHeaders headers = value.getRequest().getHeaders();
             assertThat(headers.keySet()).noneMatch(name -> name.equalsIgnoreCase("X-Internal-Api-Key"));
             assertThat(headers.keySet()).noneMatch(name -> name.equalsIgnoreCase("X-Store-Internal-Api-Key"));
+            assertThat(headers.keySet()).noneMatch(name -> name.equalsIgnoreCase("X-Wallet-Internal-Api-Key"));
             assertThat(headers.getFirst(CorrelationIdWebFilter.HEADER)).isEqualTo("correlation-123");
         });
     }
@@ -94,6 +96,7 @@ class InternalApiBoundaryFilterTest {
                 .header(CorrelationIdWebFilter.HEADER, "correlation-123")
                 .header(userHeader, "user-internal-secret")
                 .header(storeHeader, "store-internal-secret")
+                .header("X-Wallet-Internal-Api-Key", "wallet-internal-secret")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         exchange.getAttributes().put(CorrelationIdWebFilter.ATTRIBUTE, "correlation-123");
