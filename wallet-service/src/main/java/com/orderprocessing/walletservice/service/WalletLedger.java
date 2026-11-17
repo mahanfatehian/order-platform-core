@@ -19,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -179,6 +180,13 @@ public class WalletLedger {
         long booked = entries.booked(wallet.getId());
         long open = holds.sumAmountByWalletAndStatus(wallet.getId(), HoldStatus.OPEN);
         return new Balance(wallet.getUserId(), wallet.getCurrency(), booked, booked - open, open);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LedgerEntry> entries(UUID userId) {
+        Wallet wallet = wallets.findByUserId(userId)
+                .orElseThrow(() -> WalletException.notFound("WALLET_NOT_FOUND", "No wallet for this user"));
+        return entries.findByWalletIdOrderByCreatedAtDesc(wallet.getId());
     }
 
     public long available(UUID walletId) {

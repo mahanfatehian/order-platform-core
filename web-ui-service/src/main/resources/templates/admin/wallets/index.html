@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Wallet</p>
+            <h1>Credit a wallet</h1>
+            <p>An administrator funds a wallet. The balance is the ledger. It is not edited here. Demo customer: johndoe.</p>
+        </div>
+    </header>
+    <form class="filter-bar surface" method="get" th:action="@{/admin/wallets}">
+        <label class="form-label" for="userId">User</label>
+        <select id="userId" class="form-select" name="userId">
+            <option value="">Choose a user</option>
+            <option th:each="person : ${users}" th:value="${person.id()}" th:text="${person.username()}"
+                    th:selected="${selectedUserId != null and selectedUserId == person.id()}">user</option>
+        </select>
+        <button class="btn btn-primary" type="submit">Show entries</button>
+    </form>
+    <form class="surface surface--padded" th:action="@{/admin/wallets}" th:object="${creditForm}" method="post" novalidate>
+        <input type="hidden" th:field="*{userId}">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="amount">Amount in rials</label>
+                <input id="amount" class="form-control" type="number" min="1" step="1" th:field="*{amount}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="reason">Reason</label>
+                <input id="reason" class="form-control" th:field="*{reason}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="idempotencyKey">Idempotency key</label>
+                <input id="idempotencyKey" class="form-control" th:field="*{idempotencyKey}">
+            </div>
+        </div>
+        <button class="btn btn-primary mt-3" type="submit">Credit wallet</button>
+    </form>
+    <p th:if="${balance != null}" id="wallet-balance">Available <span th:text="${balance.available()}">0</span> <span th:text="${balance.currency()}">IRR</span>. This number is calculated. It is not an editable field.</p>
+    <p th:if="${credited != null}" id="credited-entry">Credited <span th:text="${credited.amount()}">0</span> rials. Entry <span th:text="${credited.id()}">id</span>.</p>
+    <section class="surface table-responsive">
+        <table class="table data-table">
+            <thead><tr><th>When</th><th>Type</th><th>Amount</th><th>Reason</th><th>Actor</th></tr></thead>
+            <tbody>
+            <tr th:each="entry : ${entries}">
+                <td th:text="${entry.createdAt()}">time</td>
+                <td th:text="${entry.type()}">CREDIT</td>
+                <td th:text="${entry.amount()}">0</td>
+                <td th:text="${entry.reason()}">reason</td>
+                <td th:text="${entry.actorRole()}">ADMIN</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</section>
+</html>

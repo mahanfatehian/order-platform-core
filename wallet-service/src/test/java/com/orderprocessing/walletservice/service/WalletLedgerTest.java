@@ -68,6 +68,7 @@ class WalletLedgerTest {
         assertThat(balance.available()).isEqualTo(1_000);
         assertThat(balance.booked()).isEqualTo(1_000);
         assertThat(balance.currency()).isEqualTo("IRR");
+        assertThat(ledger.entries(userId)).extracting(entry -> entry.getReason()).containsExactly("opening");
     }
 
     @Test

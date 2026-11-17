@@ -39,6 +39,7 @@ public class WebUiProperties {
         @NotBlank private String userUrl;
         @NotBlank private String storeUrl;
         @NotBlank private String orderUrl;
+        private String walletUrl;
         @NotBlank @Size(min = 32) private String storeInternalApiKey;
         private Duration connectTimeout = Duration.ofSeconds(2);
         private Duration readTimeout = Duration.ofSeconds(5);
@@ -51,6 +52,8 @@ public class WebUiProperties {
         public void setStoreUrl(String storeUrl) { this.storeUrl = storeUrl; }
         public String getOrderUrl() { return orderUrl; }
         public void setOrderUrl(String orderUrl) { this.orderUrl = orderUrl; }
+        public String getWalletUrl() { return walletUrl; }
+        public void setWalletUrl(String walletUrl) { this.walletUrl = walletUrl; }
         public String getStoreInternalApiKey() { return storeInternalApiKey; }
         public void setStoreInternalApiKey(String storeInternalApiKey) { this.storeInternalApiKey = storeInternalApiKey; }
         public Duration getConnectTimeout() { return connectTimeout; }

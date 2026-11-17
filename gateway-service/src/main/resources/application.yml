@@ -222,6 +222,18 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
+        - id: wallet-service
+          uri: lb://wallet-service
+          predicates:
+            - Path=/api/wallets/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+
 app:
   security:
     jwt:

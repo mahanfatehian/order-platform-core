@@ -47,6 +47,11 @@ public class AuthenticatedPlatformClient {
     public UserView updateProfile(ProfileForm form) { return mutate(token -> client.updateProfile(token, form)); }
     public Void changePassword(ChangePasswordForm form) { return mutate(token -> { client.changePassword(token, form); return null; }); }
     public PageResponse<UserView> adminUsers(int page, int size, String search) { return get(t -> client.adminUsers(t, page, size, search)); }
+    public WalletEntryView creditWallet(UUID userId, long amount, String reason, String idempotencyKey) {
+        return mutate(t -> client.creditWallet(t, userId, amount, reason, idempotencyKey));
+    }
+    public List<WalletEntryView> walletEntries(UUID userId) { return get(t -> client.walletEntries(t, userId)); }
+    public WalletBalanceView walletBalance(UUID userId) { return get(t -> client.walletBalance(t, userId)); }
     public UserView adminUser(UUID id) { return get(t -> client.adminUser(t, id)); }
     public UserView setUserStatus(UUID id, boolean enabled) { return mutate(t -> client.setUserStatus(t, id, enabled)); }
     public UserView setUserRoles(UUID id, Set<String> roles) { return mutate(t -> client.setUserRoles(t, id, roles)); }
