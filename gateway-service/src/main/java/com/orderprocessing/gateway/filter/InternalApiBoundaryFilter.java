@@ -21,6 +21,7 @@ public class InternalApiBoundaryFilter implements WebFilter, Ordered {
 
     static final String USER_INTERNAL_HEADER = "X-Internal-Api-Key";
     static final String STORE_INTERNAL_HEADER = "X-Store-Internal-Api-Key";
+    static final String WALLET_INTERNAL_HEADER = "X-Wallet-Internal-Api-Key";
 
     /**
      * Headers that describe who the caller is and how they reached us. Only a proxy in front of this service may
@@ -34,6 +35,8 @@ public class InternalApiBoundaryFilter implements WebFilter, Ordered {
             .parse("/api/users/internal/**");
     private static final PathPattern STORE_INTERNAL_PATH = PathPatternParser.defaultInstance
             .parse("/api/store/internal/**");
+    private static final PathPattern WALLET_INTERNAL_PATH = PathPatternParser.defaultInstance
+            .parse("/api/wallets/internal/**");
 
     private final GatewayErrorWriter errorWriter;
     private final boolean trustsProxyHeaders;
@@ -55,7 +58,7 @@ public class InternalApiBoundaryFilter implements WebFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         PathContainer path = exchange.getRequest().getPath().pathWithinApplication();
-        if (USER_INTERNAL_PATH.matches(path) || STORE_INTERNAL_PATH.matches(path)) {
+        if (USER_INTERNAL_PATH.matches(path) || STORE_INTERNAL_PATH.matches(path) || WALLET_INTERNAL_PATH.matches(path)) {
             return errorWriter.write(
                     exchange,
                     HttpStatus.FORBIDDEN,
@@ -67,6 +70,7 @@ public class InternalApiBoundaryFilter implements WebFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest().mutate().headers(headers -> {
             headers.remove(USER_INTERNAL_HEADER);
             headers.remove(STORE_INTERNAL_HEADER);
+            headers.remove(WALLET_INTERNAL_HEADER);
             if (!trustsProxyHeaders) {
                 // Stop a forged chain reaching the services behind us. The routing filter appends the real peer
                 // address afterwards, so downstream still receives an accurate X-Forwarded-For.

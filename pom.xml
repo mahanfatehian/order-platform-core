@@ -16,7 +16,8 @@
         <module>kafka-common</module>
          <module>store-service</module>
          <module>order-service</module>
-        <module>discovery-service</module>
+         <module>wallet-service</module>
+         <module>discovery-service</module>
         <module>gateway-service</module>
         <module>web-ui-service</module>
         <module>coverage-report</module>
