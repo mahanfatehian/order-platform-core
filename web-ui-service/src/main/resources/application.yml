@@ -41,6 +41,7 @@ app:
     user-url: ${USER_SERVICE_URL:http://user-service:8082}
     store-url: ${STORE_SERVICE_URL:http://store-service:8083}
     order-url: ${ORDER_SERVICE_URL:http://order-service:8084}
+    wallet-url: ${WALLET_SERVICE_URL:http://wallet-service:8086}
     store-internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
     connect-timeout: 2s
     read-timeout: 5s

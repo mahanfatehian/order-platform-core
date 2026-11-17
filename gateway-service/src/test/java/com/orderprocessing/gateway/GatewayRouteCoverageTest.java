@@ -88,6 +88,7 @@ class GatewayRouteCoverageTest {
         assertThat(isRouted(HttpMethod.GET, "/admin/users")).isTrue();
         assertThat(isRouted(HttpMethod.POST, "/api/auth/login")).isTrue();
         assertThat(isRouted(HttpMethod.GET, "/api/orders/summary")).isTrue();
+        assertThat(isRouted(HttpMethod.POST, "/api/wallets/" + java.util.UUID.randomUUID() + "/credits")).isTrue();
     }
 
     @Test

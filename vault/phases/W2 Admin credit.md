@@ -1,5 +1,7 @@
 # W2 Admin credit
 
+The admin page and the credit command are on the integration branch. Checkout still does not spend the wallet.
+
 ## Build
 
 - `POST /api/wallets/{userId}/credits` through the gateway, `ROLE_ADMIN` only

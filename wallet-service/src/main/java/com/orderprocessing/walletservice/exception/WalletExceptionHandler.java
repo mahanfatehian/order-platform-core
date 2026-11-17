@@ -2,6 +2,7 @@ package com.orderprocessing.walletservice.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,6 +18,11 @@ public class WalletExceptionHandler {
     @ExceptionHandler(WalletException.class)
     public ResponseEntity<Map<String, Object>> handle(WalletException exception, HttpServletRequest request) {
         return body(exception.getStatus().value(), exception.getCode(), exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, Object>> forbidden(AuthorizationDeniedException exception, HttpServletRequest request) {
+        return body(403, "FORBIDDEN", "You do not have permission to perform this operation", request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

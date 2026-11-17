@@ -5,6 +5,7 @@ import com.orderprocessing.webui.dto.*;
 import com.orderprocessing.webui.exception.SessionExpiredException;
 import com.orderprocessing.webui.form.InventoryForm;
 import com.orderprocessing.webui.form.ProductForm;
+import com.orderprocessing.webui.form.WalletCreditForm;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -167,6 +168,40 @@ public class AdminController {
 
     @GetMapping("/system")
     public String system(Model model) { model.addAttribute("serviceStatuses", client.serviceHealth()); return "admin/system/index"; }
+
+    @GetMapping("/wallets")
+    public String wallets(@RequestParam(required = false) UUID userId, Model model) {
+        model.addAttribute("users", client.adminUsers(0, 100, "").content());
+        model.addAttribute("selectedUserId", userId);
+        WalletCreditForm form = new WalletCreditForm();
+        form.setUserId(userId);
+        form.setIdempotencyKey(UUID.randomUUID().toString());
+        model.addAttribute("creditForm", form);
+        model.addAttribute("entries", userId == null ? java.util.List.of() : client.walletEntries(userId));
+        model.addAttribute("balance", userId == null ? null : client.walletBalance(userId));
+        model.addAttribute("credited", null);
+        return "admin/wallets/index";
+    }
+
+    @PostMapping("/wallets")
+    public String creditWallet(@Valid @ModelAttribute("creditForm") com.orderprocessing.webui.form.WalletCreditForm form,
+                               BindingResult binding, Model model) {
+        if (binding.hasErrors()) {
+            model.addAttribute("users", client.adminUsers(0, 100, "").content());
+            model.addAttribute("selectedUserId", form.getUserId());
+            model.addAttribute("entries", form.getUserId() == null ? java.util.List.of() : client.walletEntries(form.getUserId()));
+            model.addAttribute("balance", form.getUserId() == null ? null : client.walletBalance(form.getUserId()));
+            model.addAttribute("credited", null);
+            return "admin/wallets/index";
+        }
+        WalletEntryView credited = client.creditWallet(form.getUserId(), form.getAmount(), form.getReason(), form.getIdempotencyKey());
+        model.addAttribute("users", client.adminUsers(0, 100, "").content());
+        model.addAttribute("selectedUserId", form.getUserId());
+        model.addAttribute("entries", client.walletEntries(form.getUserId()));
+        model.addAttribute("balance", client.walletBalance(form.getUserId()));
+        model.addAttribute("credited", credited);
+        return "admin/wallets/index";
+    }
 
     private void populateOrderStatusModel(UUID id, Model model) {
         model.addAttribute("order", client.order(id));

@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
@@ -29,6 +30,7 @@ public class PlatformClient {
     private final RestClient users;
     private final RestClient store;
     private final RestClient orders;
+    private final RestClient wallets;
     private final String storeInternalApiKey;
     private final ObjectProvider<EurekaClient> eurekaClient;
     private final CartQuoteValidator cartQuoteValidator;
@@ -39,6 +41,8 @@ public class PlatformClient {
         this.users = builder.clone().baseUrl(properties.getServices().getUserUrl()).build();
         this.store = builder.clone().baseUrl(properties.getServices().getStoreUrl()).build();
         this.orders = builder.clone().baseUrl(properties.getServices().getOrderUrl()).build();
+        String walletUrl = properties.getServices().getWalletUrl();
+        this.wallets = walletUrl == null || walletUrl.isBlank() ? null : builder.clone().baseUrl(walletUrl).build();
         this.storeInternalApiKey = properties.getServices().getStoreInternalApiKey();
         this.eurekaClient = eurekaClient;
         this.cartQuoteValidator = cartQuoteValidator;
@@ -284,6 +288,33 @@ public class PlatformClient {
             return health(baseName, client);
         } finally {
             MDC.clear();
+        }
+    }
+
+    public WalletEntryView creditWallet(String token, UUID userId, long amount, String reason, String idempotencyKey) {
+        return wallets.post().uri("/api/wallets/{userId}/credits", userId)
+                .headers(headers -> bearer(headers, token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("amount", amount, "reason", reason, "idempotencyKey", idempotencyKey))
+                .retrieve().body(WalletEntryView.class);
+    }
+
+    public List<WalletEntryView> walletEntries(String token, UUID userId) {
+        return wallets.get().uri("/api/wallets/{userId}/entries", userId)
+                .headers(headers -> bearer(headers, token))
+                .retrieve().body(new ParameterizedTypeReference<>() { });
+    }
+
+    public WalletBalanceView walletBalance(String token, UUID userId) {
+        try {
+            return wallets.get().uri("/api/wallets/{userId}/balance", userId)
+                    .headers(headers -> bearer(headers, token))
+                    .retrieve().body(WalletBalanceView.class);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) {
+                return null;
+            }
+            throw exception;
         }
     }
 
