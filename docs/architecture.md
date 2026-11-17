@@ -232,9 +232,9 @@ which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | 
 
 `gateway-service` is deliberately excluded. It is a reactive WebFlux application, where work for one exchange moves between event-loop threads and the thread-bound MDC does not follow it. `CorrelationIdWebFilter` therefore carries the value on the exchange and the header rather than in the MDC, and adding the pattern there would print an empty field on every line. Correlating a gateway line with a service line is done through the `X-Correlation-Id` response header.
 
-## Planned wallet
+## Planned shop
 
-Not implemented. Checkout does not take payment. The accepted direction, still proposed until the currency is locked, is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md): a `wallet-service` ledger, admin credit only, holds captured when an order is confirmed, and a gateway port that may later prove a top-up or an order payment without writing the ledger. The phase tasks are in the vault at `vault/00 Index.md`.
+Not implemented. Checkout does not take payment, store an address, send mail, or accept a return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it: admin-funded wallet, merchant catalog, address snapshot, status mail, ship-to-address, return after delivery, then a gateway port. The task map is `vault/00 Index.md`. None of that is in the running services.
 
 ## Contract evolution rules
 

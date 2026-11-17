@@ -146,7 +146,7 @@ sequenceDiagram
 
 For the full state machine, trust boundaries, retry/reconciliation behavior, and consistency guarantees, read [Architecture](docs/architecture.md). The message contracts are in [AsyncAPI](docs/asyncapi.yaml), and the command-versus-fact decision is recorded in [ADR-0001](docs/adr/0001-human-in-the-loop-fulfillment.md).
 
-A wallet is not implemented yet. The plan for an admin-funded wallet, pay-by-balance checkout, and a later payment-gateway port is in the Obsidian vault at [vault/00 Index.md](vault/00%20Index.md), with the rule in [ADR-0003](docs/adr/0003-wallet-is-the-only-money-authority.md).
+A shop is not implemented yet. The plan is an admin-funded wallet plus catalog, address, mail, shipping, and returns, in the Obsidian vault at [vault/00 Index.md](vault/00%20Index.md). The rules are [ADR-0003](docs/adr/0003-wallet-is-the-only-money-authority.md) and [ADR-0004](docs/adr/0004-one-shop-then-a-gateway-port.md).
 
 ## Modules
 

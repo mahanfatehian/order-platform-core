@@ -1,6 +1,6 @@
 # ADR-0003: The wallet is the only money authority
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-17
 - **Decision owners:** Order platform maintainers
 
@@ -22,7 +22,7 @@ The task map lives in the Obsidian vault at `vault/`. This ADR is the rule the c
 
 Balances are derived. Entries are append-only: `CREDIT`, `HOLD`, `CAPTURE`, `RELEASE`, `REFUND`. Amounts are positive minor units in one deployment currency. There is no command that sets a new balance, and no float.
 
-The currency code is not locked in this ADR. Lock it in an amendment before the first migration. Do not reuse the order total's decimal scale as the ledger unit.
+The deployment currency is `IRR`. The minor unit is 1, one rial. Catalog and order prices may stay decimal at their own boundary. Conversion to minor units happens only when a wallet command is built, and a scale mismatch fails the command. Do not store rials in the order total column.
 
 ### 3. Checkout spends a hold, not a new status
 
@@ -43,7 +43,7 @@ A future adapter may start a `WALLET_TOPUP` or an `ORDER_CHECKOUT` intent. After
 - Wallet races need the same kind of concurrency test the stock reservation already has.
 - Confirm becomes a two-service step. Reconciliation must release orphan holds and must not confirm an order whose hold is still open.
 - Gateway work is a new module after the port exists, not a change to these rules.
-- This ADR is proposed until W0 records the currency and the first ledger migration starts. Until then, no payment code should land under a different design.
+- The shop around this wallet is ADR-0004. This ADR does not by itself make the repository a store.
 
 ## Plan
 

@@ -1,6 +1,6 @@
-# Phases and tasks
+# Money track
 
-Do these in order. A later phase that starts before the previous phase's tests exist is out of sequence.
+This note is only the wallet. The shop around it is [[08 Tracks]]. Do these phases in order. A later phase that starts before the previous phase's tests exist is out of sequence.
 
 | Phase | Outcome | Note |
 | --- | --- | --- |
@@ -10,19 +10,16 @@ Do these in order. A later phase that starts before the previous phase's tests e
 | [[W3 Pay orders from the wallet]] | Checkout holds, confirm captures, failure releases | Buying |
 | [[W4 Reconciliation]] | Orphan holds and missed captures cannot stick | Safety |
 | [[W5 Customer surface]] | Balance and entries visible in the existing UI | Still no gateway |
-| [[W6 Gateway port]] | Intent and applier exist, with a fake adapter only | For later developers |
-| [[W7 Refunds]] | Cancel after confirm returns money and stock | Still no carrier returns |
-| [[W8 Production gate]] | Demo mode off is safe, saga script pays with a wallet | Not a public launch |
+| [[W6 Gateway port]] | Intent and applier exist, with a fake adapter only | After the shop tracks, before opening |
+| [[W7 Refunds]] | Cancel after confirm returns money and stock | Not a post-delivery return |
+| [[W8 Production gate]] | Demo mode off is safe for the money path | Not the shop opening |
 
-## Exit of the base product
+W8 checks the wallet on Compose. The shop is not open until [[P1 Open the door]].
 
-W0 through W7 are the base app: admin charges wallets, customers buy with that balance, and a gateway author can plug in without touching the ledger. W8 is the check that this still runs as one Compose stack.
+## Not in this track
 
-## Explicitly not in these phases
-
+- Pictures, categories a merchant names, addresses, mail, and post-delivery returns. Those are the other tracks.
 - A real درگاه inside this repository
-- Guest checkout
-- Partial refunds, split tender, or paying part by wallet and part by card
-- Multi-currency wallets
+- Guest checkout, split tender, or a second currency
 - A `PAID` order status
 - Letting the browser post a ledger entry

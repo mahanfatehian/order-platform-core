@@ -1,12 +1,18 @@
 # Product end state
 
-Order/flow stays the fulfillment core. The shop around it has one closed money loop until a gateway is added on purpose.
+The fulfillment core stays. The shop around it is catalog, wallet, address, mail, ship, and return. Money has one owner, the wallet, until a gateway is added on purpose.
 
 ## The shop a customer can use
 
-A signed-in customer sees a catalog with live price and stock, holds a wallet balance, and can buy only what that balance can cover. Checkout quotes the cart, places a hold for the exact quoted total, and creates one order. If stock cannot be reserved, the hold is released and the order fails. If stock is reserved, the hold is captured and the order becomes `CONFIRMED`. Pack, ship, and deliver stay human commands. Cancel before capture releases the hold. Cancel after capture refunds the wallet and releases stock, and only from `CONFIRMED`.
+A signed-in customer searches a catalog with pictures, live price, and live stock. They pay only from a wallet an administrator credited. Checkout quotes the cart, places a hold for the exact quoted total in minor units, and creates one order only if the hold succeeds. The order stores the ship-to address as it was at that moment. If stock cannot be reserved, the hold is released and the order fails. If stock is reserved, the hold is captured and the order becomes `CONFIRMED`. There is no `PAID` status.
+
+Pack, ship, and deliver stay human commands. Ship requires the snapshotted address and a non-empty tracking reference. The customer receives one mail at confirm, ship, deliver, fail, and refund. Cancel before capture releases the hold. Cancel from `CONFIRMED` refunds the wallet and releases stock. After `PACKAGED`, cancel stays forbidden. After `DELIVERED`, a return can bring stock and money back, once.
 
 The customer can read every credit, hold, capture, release, and refund. An administrator can credit a wallet, and cannot edit or delete history.
+
+## What a merchant can do
+
+An administrator creates a product without seed data: name, description, SKU, price, a category they named, stock received by command, and at least one picture. They credit a wallet with a reason. They cannot pack or ship unless they also hold those roles.
 
 ## The shop another developer can extend
 
@@ -19,17 +25,18 @@ A gateway (درگاه پرداخت) is an adapter, not a second ledger. The same
 
 The base product implements neither intent with a real gateway. The only top-up command in the base product is `AdminCredit`. It goes through the same ledger post function a future gateway will call after verification.
 
-## What "done" means for the base product
+## What "done" means
 
-- One currency per deployment, stored as minor units (integer), never a float
-- Available balance cannot go below zero
-- Two checkouts cannot spend the same unit
-- A failed or cancelled order cannot keep the money
-- A delivered order cannot be refunded by accident through the cancel command
-- Repeating an admin credit, a callback, or a capture does not move money twice
-- The demo login still works with `DEMO_MODE=true`, and a wallet can be credited for `johndoe` without a gateway
-- `mvn verify` covers the ledger races the same way it covers the stock races
+- Currency is `IRR`, minor unit 1, one deployment, no float
+- Available balance cannot go below zero, and two checkouts cannot spend the same rial
+- A failed, cancelled, or returned order cannot keep the money or the stock
+- A product can be created, pictured, found, and bought without the demo seed
+- Every shipped order has an address snapshot
+- Status mail is sent once per fact
+- A delivered order can be returned once
+- `DEMO_MODE=false` still completes the saga, and a backup of each database can be restored
+- A fake gateway proves the port. A real درگاه is not in this repository
 
 ## What "done" does not mean
 
-It does not mean a public domain, tax invoices, a carrier, guest checkout, or a marketplace. Those stay out until the wallet rules above are true in tests and in the Compose saga.
+A public domain, tax invoices, a carrier API, guest checkout, a marketplace, or a second currency. Those stay out until [[P1 Open the door]] is green.
