@@ -25,8 +25,14 @@ public class ProductDTO {
     @Schema(description = "Price of the product", example = "149.99")
     private BigDecimal price;
 
-    @Schema(description = "Category of the product", example = "ELECTRONICS", allowableValues = {"ELECTRONICS", "CLOTHING", "HOME", "BOOKS", "OTHER"})
+    @Schema(description = "Merchant-named category", example = "Electronics")
     private String category;
+
+    @Schema(description = "Identifier of the merchant category")
+    private UUID categoryId;
+
+    @Schema(description = "First picture stored for this product, served by this platform")
+    private UUID pictureId;
 
     private boolean active;
 

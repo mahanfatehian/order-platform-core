@@ -13,10 +13,6 @@ import lombok.Setter;
 @Table(name = "products")
 public class Product {
 
-    public enum Category {
-        ELECTRONICS, CLOTHING, HOME, BOOKS, OTHER
-    }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -33,9 +29,9 @@ public class Product {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "category", nullable = false)
-    @Enumerated(EnumType.STRING)
-    private Category category;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private ProductCategory category;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;

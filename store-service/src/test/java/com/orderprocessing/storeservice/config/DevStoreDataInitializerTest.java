@@ -2,13 +2,17 @@ package com.orderprocessing.storeservice.config;
 
 import com.orderprocessing.storeservice.model.Inventory;
 import com.orderprocessing.storeservice.model.Product;
+import com.orderprocessing.storeservice.model.ProductCategory;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
+import com.orderprocessing.storeservice.repository.ProductCategoryRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,10 +27,17 @@ class DevStoreDataInitializerTest {
     void createsExactlyFifteenProfessionalProductsAcrossShowcaseCategories() throws Exception {
         ProductRepository products = mock(ProductRepository.class);
         InventoryRepository inventory = mock(InventoryRepository.class);
+        ProductCategoryRepository categories = mock(ProductCategoryRepository.class);
         when(products.existsById(any())).thenReturn(false);
         when(inventory.existsById(any())).thenReturn(false);
+        when(categories.findByNameIgnoreCase(any())).thenAnswer(invocation -> {
+            ProductCategory category = new ProductCategory();
+            category.setId(UUID.randomUUID());
+            category.setName(invocation.getArgument(0));
+            return Optional.of(category);
+        });
 
-        new DevStoreDataInitializer(products, inventory).run(null);
+        new DevStoreDataInitializer(products, inventory, categories).run(null);
 
         ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
         verify(products, times(DevStoreDataInitializer.SHOWCASE_PRODUCT_COUNT)).save(productCaptor.capture());
@@ -39,11 +50,11 @@ class DevStoreDataInitializerTest {
             assertThat(product.getPrice()).isPositive();
             assertThat(product.getSku()).matches("(ELEC|CLTH|HOME)-[A-Z]{3}-[123][0-9]{3}");
         });
-        assertThat(seededProducts).filteredOn(product -> product.getCategory() == Product.Category.ELECTRONICS)
+        assertThat(seededProducts).filteredOn(product -> "Electronics".equals(product.getCategory().getName()))
                 .hasSize(5);
-        assertThat(seededProducts).filteredOn(product -> product.getCategory() == Product.Category.CLOTHING)
+        assertThat(seededProducts).filteredOn(product -> "Clothing".equals(product.getCategory().getName()))
                 .hasSize(5);
-        assertThat(seededProducts).filteredOn(product -> product.getCategory() == Product.Category.HOME)
+        assertThat(seededProducts).filteredOn(product -> "Home".equals(product.getCategory().getName()))
                 .hasSize(5);
 
         ArgumentCaptor<Inventory> inventoryCaptor = ArgumentCaptor.forClass(Inventory.class);

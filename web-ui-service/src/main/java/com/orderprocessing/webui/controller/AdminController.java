@@ -2,9 +2,12 @@ package com.orderprocessing.webui.controller;
 
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
 import com.orderprocessing.webui.dto.*;
+import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.exception.SessionExpiredException;
+import com.orderprocessing.webui.form.CategoryForm;
 import com.orderprocessing.webui.form.InventoryForm;
 import com.orderprocessing.webui.form.ProductForm;
+import com.orderprocessing.webui.form.StockReceiptForm;
 import com.orderprocessing.webui.form.WalletCreditForm;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,9 +15,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.io.IOException;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,38 +60,126 @@ public class AdminController {
     @GetMapping("/products/new")
     public String newProduct(Model model) {
         if (!model.containsAttribute("productForm")) model.addAttribute("productForm", new ProductForm());
-        model.addAttribute("editing", false); return "admin/products/form";
+        model.addAttribute("editing", false);
+        addCategories(model);
+        return "admin/products/form";
     }
 
     @PostMapping("/products")
     public String createProduct(@Valid @ModelAttribute ProductForm productForm, BindingResult binding,
                                 Model model, RedirectAttributes redirect) {
-        if (binding.hasErrors()) { model.addAttribute("editing", false); return "admin/products/form"; }
-        client.createProduct(productForm); redirect.addFlashAttribute("success", "Product created");
+        if (binding.hasErrors()) {
+            model.addAttribute("editing", false);
+            addCategories(model);
+            return "admin/products/form";
+        }
+        try {
+            client.createProduct(productForm);
+        } catch (BackendClientException exception) {
+            model.addAttribute("editing", false);
+            model.addAttribute("error", exception.getMessage());
+            addCategories(model);
+            return "admin/products/form";
+        }
+        redirect.addFlashAttribute("success", "Product created");
         return "redirect:/admin/products";
     }
 
     @GetMapping("/products/{id}/edit")
     public String editProduct(@PathVariable UUID id, Model model) {
-        ProductView product = client.product(id);
-        ProductForm form = new ProductForm(); form.setName(product.name()); form.setSku(product.sku());
-        form.setDescription(product.description()); form.setPrice(product.price()); form.setCategory(product.category()); form.setActive(product.active());
-        model.addAttribute("productForm", form); model.addAttribute("productId", id); model.addAttribute("editing", true);
+        ProductView product = client.adminProduct(id);
+        if (!model.containsAttribute("productForm")) {
+            ProductForm form = new ProductForm();
+            form.setName(product.name());
+            form.setSku(product.sku());
+            form.setDescription(product.description());
+            form.setPrice(product.price());
+            form.setCategoryId(product.categoryId());
+            form.setActive(product.active());
+            model.addAttribute("productForm", form);
+        }
+        model.addAttribute("productId", id);
+        model.addAttribute("editing", true);
+        model.addAttribute("pictureId", product.pictureId());
+        addCategories(model);
         return "admin/products/form";
     }
 
     @PostMapping("/products/{id}")
     public String updateProduct(@PathVariable UUID id, @Valid @ModelAttribute ProductForm productForm,
                                 BindingResult binding, Model model, RedirectAttributes redirect) {
-        if (binding.hasErrors()) { model.addAttribute("productId", id); model.addAttribute("editing", true); return "admin/products/form"; }
-        client.updateProduct(id, productForm); redirect.addFlashAttribute("success", "Product updated");
+        if (binding.hasErrors()) {
+            model.addAttribute("productId", id);
+            model.addAttribute("editing", true);
+            addCategories(model);
+            return "admin/products/form";
+        }
+        try {
+            client.updateProduct(id, productForm);
+        } catch (BackendClientException exception) {
+            model.addAttribute("productId", id);
+            model.addAttribute("editing", true);
+            model.addAttribute("error", exception.getMessage());
+            addCategories(model);
+            return "admin/products/form";
+        }
+        redirect.addFlashAttribute("success", "Product updated");
         return "redirect:/admin/products";
     }
 
     @PostMapping("/products/{id}/activation")
     public String activation(@PathVariable UUID id, @RequestParam boolean active, RedirectAttributes redirect) {
-        client.setProductActive(id, active); redirect.addFlashAttribute("success", active ? "Product activated" : "Product deactivated");
+        try {
+            client.setProductActive(id, active);
+            redirect.addFlashAttribute("success", active ? "Product activated" : "Product deactivated");
+        } catch (BackendClientException exception) {
+            redirect.addFlashAttribute("error", exception.getMessage());
+        }
         return "redirect:/admin/products";
+    }
+
+    @PostMapping("/categories")
+    public String createCategory(@Valid @ModelAttribute CategoryForm categoryForm, BindingResult binding,
+                                 RedirectAttributes redirect) {
+        if (binding.hasErrors()) {
+            redirect.addFlashAttribute("error", "Category name is required");
+            return "redirect:" + safeProductReturn(categoryForm.getReturnTo());
+        }
+        try {
+            client.createCategory(categoryForm.getName());
+            redirect.addFlashAttribute("success", "Category saved");
+        } catch (BackendClientException exception) {
+            redirect.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:" + safeProductReturn(categoryForm.getReturnTo());
+    }
+
+    @PostMapping("/products/{id}/pictures")
+    public String uploadPicture(@PathVariable UUID id, @RequestParam("file") MultipartFile file,
+                                RedirectAttributes redirect) {
+        if (file == null || file.isEmpty()) {
+            redirect.addFlashAttribute("error", "Choose a PNG or JPEG picture");
+            return "redirect:/admin/products/" + id + "/edit";
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType();
+        int separator = contentType.indexOf(';');
+        if (separator >= 0) {
+            contentType = contentType.substring(0, separator);
+        }
+        contentType = contentType.trim().toLowerCase();
+        if (!contentType.equals("image/png") && !contentType.equals("image/jpeg")) {
+            redirect.addFlashAttribute("error", "Only image/png and image/jpeg are accepted");
+            return "redirect:/admin/products/" + id + "/edit";
+        }
+        try {
+            client.uploadPicture(id, contentType, file.getBytes());
+            redirect.addFlashAttribute("success", "Picture stored");
+        } catch (BackendClientException exception) {
+            redirect.addFlashAttribute("error", exception.getMessage());
+        } catch (IOException exception) {
+            redirect.addFlashAttribute("error", "The picture could not be read");
+        }
+        return "redirect:/admin/products/" + id + "/edit";
     }
 
     @GetMapping("/inventory")
@@ -103,6 +197,34 @@ public class AdminController {
         if (binding.hasErrors()) redirect.addFlashAttribute("error", "Stock quantity must be zero or greater");
         else { client.updateInventory(id, inventoryForm.getQuantity()); redirect.addFlashAttribute("success", "Inventory updated"); }
         return "redirect:/admin/inventory";
+    }
+
+    @PostMapping("/inventory/{id}/receipts")
+    public String receiveStock(@PathVariable UUID id, @Valid @ModelAttribute StockReceiptForm receiptForm,
+                               BindingResult binding, RedirectAttributes redirect) {
+        if (binding.hasErrors()) {
+            redirect.addFlashAttribute("error", "A receipt needs a positive quantity, a reason, and an idempotency key");
+            return "redirect:/admin/inventory";
+        }
+        try {
+            client.receiveStock(id, receiptForm.getQuantity(), receiptForm.getReason(), receiptForm.getIdempotencyKey());
+            redirect.addFlashAttribute("success", "Stock received");
+        } catch (BackendClientException exception) {
+            redirect.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/admin/inventory";
+    }
+
+    private void addCategories(Model model) {
+        List<CategoryView> categories = client.categories();
+        model.addAttribute("categories", categories == null ? List.of() : categories);
+    }
+
+    private static String safeProductReturn(String returnTo) {
+        if (returnTo != null && returnTo.startsWith("/admin/products") && !returnTo.startsWith("//")) {
+            return returnTo;
+        }
+        return "/admin/products/new";
     }
 
     @GetMapping("/orders")

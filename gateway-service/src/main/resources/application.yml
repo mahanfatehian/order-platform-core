@@ -8,6 +8,8 @@ server:
   forward-headers-strategy: ${GATEWAY_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
+  codec:
+    max-in-memory-size: 8MB
   lifecycle:
     timeout-per-shutdown-phase: 30s
   application:

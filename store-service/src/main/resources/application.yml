@@ -18,6 +18,10 @@ spring:
         size: ${SCHEDULER_POOL_SIZE:2}
   application:
     name: store-service
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 8MB
   data:
     redis:
       host: ${REDIS_HOST:localhost}

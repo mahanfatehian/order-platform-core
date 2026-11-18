@@ -258,7 +258,9 @@ class InventoryServiceTest {
         product.setId(id);
         product.setName("Product");
         product.setPrice(BigDecimal.TEN);
-        product.setCategory(Product.Category.OTHER);
+        com.orderprocessing.storeservice.model.ProductCategory category = new com.orderprocessing.storeservice.model.ProductCategory();
+        category.setName("Other");
+        product.setCategory(category);
         product.setActive(active);
         product.setCreatedAt(Instant.now());
         product.setUpdatedAt(Instant.now());

@@ -148,7 +148,7 @@ Create-order idempotency is scoped by `(userId, Idempotency-Key)`. A PostgreSQL 
 
 ## Inventory lifecycle
 
-`inventory.quantity` is total on-hand stock and `inventory.reserved_quantity` is the portion held by active orders. Availability is `quantity - reserved_quantity`.
+`inventory.quantity` is total on-hand stock and `inventory.reserved_quantity` is the portion held by active orders. Availability is `quantity - reserved_quantity`. A product is active only with a stored picture, categories are merchant-named, and stock is received by command.
 
 | Reservation state | Inventory effect | Terminal timestamp |
 | --- | --- | --- |

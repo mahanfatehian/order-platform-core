@@ -1,5 +1,7 @@
 # C1 Catalog a merchant can run
 
+The merchant category, stored picture, and stock-receive command are implemented. A product is active only after a picture is stored in this platform.
+
 Admin can already create a product with a name, description, SKU, decimal price, one of five fixed categories, and an active flag. Catalog search and stock quantity already exist. This track finishes the catalog. It does not add a second storefront.
 
 ## Build

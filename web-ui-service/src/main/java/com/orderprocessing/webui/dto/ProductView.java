@@ -14,7 +14,9 @@ public record ProductView(
         boolean active,
         int availableQuantity,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        UUID categoryId,
+        UUID pictureId
 ) {
     public boolean inStock() { return active && availableQuantity > 0; }
 }

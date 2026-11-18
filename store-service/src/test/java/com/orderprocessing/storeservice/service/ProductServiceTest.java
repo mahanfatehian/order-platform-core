@@ -2,8 +2,12 @@ package com.orderprocessing.storeservice.service;
 
 import com.orderprocessing.storeservice.dto.ProductDTO;
 import com.orderprocessing.storeservice.dto.ProductRequest;
+import com.orderprocessing.storeservice.exception.CatalogRuleException;
 import com.orderprocessing.storeservice.model.Product;
+import com.orderprocessing.storeservice.model.ProductCategory;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
+import com.orderprocessing.storeservice.repository.ProductCategoryRepository;
+import com.orderprocessing.storeservice.repository.ProductPictureRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,47 +21,55 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The admin product form carries an "Active in catalog" checkbox and web-ui puts it in the request body, so the
- * store service has to act on it. Ignoring it means the checkbox silently does nothing and a product an admin
- * meant to keep out of the catalog is on sale anyway.
- */
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private InventoryRepository inventoryRepository;
+    @Mock private ProductCategoryRepository categoryRepository;
+    @Mock private ProductPictureRepository pictureRepository;
 
     private ProductService service;
+    private final UUID categoryId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new ProductService(productRepository, inventoryRepository);
+        service = new ProductService(productRepository, inventoryRepository, categoryRepository, pictureRepository);
     }
 
     @Test
     void createsAnInactiveProductWhenTheRequestSaysSo() {
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category()));
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductDTO created = service.createProduct(request("SKU-1", false));
 
         assertThat(created.isActive()).isFalse();
+        assertThat(created.getCategory()).isEqualTo("Other");
+        assertThat(created.getCategoryId()).isEqualTo(categoryId);
     }
 
     @Test
-    void createsAnActiveProductByDefault() {
-        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    void rejectsAnActiveCreateWhenTheProductHasNoPicture() {
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category()));
 
-        assertThat(service.createProduct(request("SKU-2", null)).isActive()).isTrue();
-        assertThat(service.createProduct(request("SKU-3", true)).isActive()).isTrue();
+        assertThatThrownBy(() -> service.createProduct(request("SKU-2", null)))
+                .isInstanceOf(CatalogRuleException.class);
+        assertThatThrownBy(() -> service.createProduct(request("SKU-3", true)))
+                .isInstanceOf(CatalogRuleException.class);
+        verify(productRepository, never()).save(any());
     }
 
     @Test
     void takesAProductOutOfTheCatalogOnUpdate() {
         Product existing = existingProduct(true);
         when(productRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category()));
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(inventoryRepository.findById(existing.getId())).thenReturn(Optional.empty());
 
@@ -71,10 +83,23 @@ class ProductServiceTest {
     void leavesTheFlagAloneWhenAnUpdateOmitsIt() {
         Product existing = existingProduct(false);
         when(productRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category()));
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(inventoryRepository.findById(existing.getId())).thenReturn(Optional.empty());
 
         assertThat(service.updateProduct(existing.getId(), request("SKU-5", null)).isActive()).isFalse();
+    }
+
+    @Test
+    void rejectsAnActiveUpdateWhenTheProductHasNoPicture() {
+        Product existing = existingProduct(false);
+        when(productRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category()));
+
+        assertThatThrownBy(() -> service.updateProduct(existing.getId(), request("SKU-6", true)))
+                .isInstanceOf(CatalogRuleException.class);
+        assertThat(existing.isActive()).isFalse();
+        verify(productRepository, never()).save(any());
     }
 
     private ProductRequest request(String sku, Boolean active) {
@@ -82,7 +107,7 @@ class ProductServiceTest {
         request.setName("Signal Lamp");
         request.setSku(sku);
         request.setPrice(new BigDecimal("29.90"));
-        request.setCategory(Product.Category.OTHER);
+        request.setCategoryId(categoryId);
         request.setActive(active);
         return request;
     }
@@ -94,10 +119,17 @@ class ProductServiceTest {
         product.setName("Signal Lamp");
         product.setSku("SKU-EXISTING");
         product.setPrice(new BigDecimal("29.90"));
-        product.setCategory(Product.Category.OTHER);
+        product.setCategory(category());
         product.setActive(active);
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
         return product;
+    }
+
+    private ProductCategory category() {
+        ProductCategory category = new ProductCategory();
+        category.setId(categoryId);
+        category.setName("Other");
+        return category;
     }
 }

@@ -48,7 +48,7 @@ class CartQuantityLimitMvcTest {
     void productIsOrderable() {
         when(authenticatedClient.product(any())).thenReturn(new ProductView(
                 PRODUCT, "Product", "description", "SKU-1", new BigDecimal("10.00"), "OTHER",
-                true, 50, Instant.now(), Instant.now()));
+                true, 50, Instant.now(), Instant.now(), null, null));
     }
 
     @Test
