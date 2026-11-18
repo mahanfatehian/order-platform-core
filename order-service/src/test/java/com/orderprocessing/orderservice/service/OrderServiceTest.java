@@ -3,6 +3,7 @@ package com.orderprocessing.orderservice.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
+import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
@@ -60,6 +61,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -189,6 +191,8 @@ class OrderServiceTest {
         assertThat(response.getStatus()).isEqualTo("CANCELLED");
         verify(orderRepository, never()).save(any());
         verify(outboxRepository, never()).save(any());
+        verify(walletClient, never()).refundCapture(any(), any(), any());
+        verify(walletClient, never()).releaseHold(any(), any(), any());
     }
 
     @Test
@@ -197,15 +201,122 @@ class OrderServiceTest {
         for (Order.Status status : List.of(
                 Order.Status.PACKAGED, Order.Status.SHIPPED, Order.Status.DELIVERED)) {
             Order order = order(owner, status);
+            order.setWalletCaptureEntryId(UUID.randomUUID());
             when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
 
             assertThatThrownBy(() -> service.cancelOrder(order.getId(), owner, false, "corr"))
                     .isInstanceOf(InvalidOrderStateException.class)
                     .hasMessageContaining("cannot be cancelled");
+            assertThat(order.getStatus()).isEqualTo(status);
         }
 
         verify(outboxRepository, never()).save(any());
         verify(historyRepository, never()).save(any());
+        verify(walletClient, never()).refundCapture(any(), any(), any());
+        verify(walletClient, never()).releaseHold(any(), any(), any());
+    }
+
+    @Test
+    void cancellingAConfirmedOrderRefundsTheCaptureOnceAndStillReleasesStock() throws Exception {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        UUID headphones = UUID.randomUUID();
+        UUID hub = UUID.randomUUID();
+        order.setItems(List.of(orderItem(order, headphones, 2), orderItem(order, hub, 3)));
+        order.setWalletHoldId(UUID.randomUUID());
+        order.setWalletCaptureEntryId(UUID.randomUUID());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(walletClient.refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", "corr"))
+                .thenReturn(UUID.randomUUID());
+
+        OrderResponse response = service.cancelOrder(order.getId(), owner, false, "corr");
+
+        assertThat(response.getStatus()).isEqualTo("CANCELLED");
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
+        verify(walletClient).refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", "corr");
+        verify(walletClient, never()).releaseHold(any(), any(), any());
+        ArgumentCaptor<OutboxEvent> outbox = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(outbox.capture());
+        assertThat(outbox.getValue().getEventType()).isEqualTo("OrderCancelledEvent");
+        OrderCancelledEvent fact = new ObjectMapper().findAndRegisterModules()
+                .readValue(outbox.getValue().getPayload(), OrderCancelledEvent.class);
+        assertThat(fact.getItems()).containsExactlyInAnyOrderEntriesOf(Map.of(headphones, 2, hub, 3));
+    }
+
+    @Test
+    void repeatingCancelOfARefundedOrderDoesNotRefundAgain() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        order.setWalletCaptureEntryId(UUID.randomUUID());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(walletClient.refundCapture(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        service.cancelOrder(order.getId(), owner, false, "corr");
+        service.cancelOrder(order.getId(), owner, false, "corr");
+
+        verify(walletClient, times(1)).refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", "corr");
+        verify(outboxRepository, times(1)).save(any());
+    }
+
+    @Test
+    void cancellingAPendingOrderReleasesTheHoldAndDoesNotRefund() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.PENDING);
+        order.setWalletHoldId(UUID.randomUUID());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        service.cancelOrder(order.getId(), owner, false, "corr");
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
+        verify(walletClient).releaseHold(order.getWalletHoldId(), order.getId() + ":release", "corr");
+        verify(walletClient, never()).refundCapture(any(), any(), any());
+    }
+
+    @Test
+    void confirmedOrderWithAHoldAndNoCaptureCannotBeCancelled() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        order.setWalletHoldId(UUID.randomUUID());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.cancelOrder(order.getId(), owner, false, "corr"))
+                .isInstanceOf(InvalidOrderStateException.class)
+                .hasMessageContaining("cannot be cancelled");
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+        verify(orderRepository, never()).save(any());
+        verify(outboxRepository, never()).save(any());
+        verify(walletClient, never()).refundCapture(any(), any(), any());
+        verify(walletClient, never()).releaseHold(any(), any(), any());
+    }
+
+    @Test
+    void aFailedRefundLeavesTheConfirmedOrderUncancelled() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        order.setWalletCaptureEntryId(UUID.randomUUID());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(walletClient.refundCapture(any(), any(), any()))
+                .thenThrow(new ServiceUnavailableException("Wallet refund failed"));
+
+        assertThatThrownBy(() -> service.cancelOrder(order.getId(), owner, false, "corr"))
+                .isInstanceOf(ServiceUnavailableException.class);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+        verify(orderRepository, never()).save(any());
+        verify(outboxRepository, never()).save(any());
+    }
+
+    @Test
+    void cancellingAConfirmedOrderWithNoWalletIdsDoesNotCallTheWallet() {
+        UUID owner = UUID.randomUUID();
+        Order order = order(owner, Order.Status.CONFIRMED);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderResponse response = service.cancelOrder(order.getId(), owner, false, "corr");
+
+        assertThat(response.getStatus()).isEqualTo("CANCELLED");
+        verifyNoInteractions(walletClient);
     }
 
     @Test

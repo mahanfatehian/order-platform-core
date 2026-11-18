@@ -9,6 +9,8 @@ public interface WalletLedgerClient {
 
     UUID captureHold(UUID holdId, String idempotencyKey, String correlationId);
 
+    UUID refundCapture(UUID captureEntryId, String idempotencyKey, String correlationId);
+
     void releaseHold(UUID holdId, String idempotencyKey, String correlationId);
 
     List<OpenHold> listOpenHolds(Instant createdBefore, int limit);

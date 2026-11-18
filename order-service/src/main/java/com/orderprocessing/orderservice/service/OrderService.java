@@ -285,6 +285,8 @@ public class OrderService {
         }
         if (order.getStatus() == Order.Status.PENDING) {
             releaseOpenHold(order, correlationId);
+        } else {
+            refundConfirmedCapture(order, correlationId);
         }
 
         Order.Status previousStatus = order.getStatus();
@@ -807,6 +809,16 @@ public class OrderService {
         failed.setCorrelationId(event.getCorrelationId());
         recordHistory(order, failed, Order.Status.PENDING, Order.Status.FAILED, null, "SYSTEM_WALLET", reason);
         addOutbox(order.getId(), kafkaTopicNames.orderEvents(), failed);
+    }
+
+    private void refundConfirmedCapture(Order order, String correlationId) {
+        if (order.getWalletCaptureEntryId() != null) {
+            walletLedgerClient.refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", correlationId);
+            return;
+        }
+        if (order.getWalletHoldId() != null) {
+            throw new InvalidOrderStateException("Order cannot be cancelled while wallet money stays captured");
+        }
     }
 
     private void releaseOpenHold(Order order, String correlationId) {

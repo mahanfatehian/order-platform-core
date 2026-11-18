@@ -50,6 +50,26 @@ public class FeignWalletLedgerClient implements WalletLedgerClient {
     }
 
     @Override
+    public UUID refundCapture(UUID captureEntryId, String idempotencyKey, String correlationId) {
+        try {
+            WalletServiceFeignClient.WalletEntryResponse response = client.refund(captureEntryId,
+                    new WalletServiceFeignClient.WalletKeyRequest(idempotencyKey));
+            if (response == null || response.id() == null) {
+                throw new ServiceUnavailableException("Wallet refund response was invalid");
+            }
+            return response.id();
+        } catch (FeignException.Conflict exception) {
+            String body = exception.contentUTF8();
+            if (body != null && body.contains("ALREADY_REFUNDED")) {
+                return null;
+            }
+            throw new ServiceUnavailableException("Wallet refund failed", exception);
+        } catch (FeignException exception) {
+            throw new ServiceUnavailableException("Wallet refund failed", exception);
+        }
+    }
+
+    @Override
     public void releaseHold(UUID holdId, String idempotencyKey, String correlationId) {
         try {
             client.release(holdId, new WalletServiceFeignClient.WalletKeyRequest(idempotencyKey));

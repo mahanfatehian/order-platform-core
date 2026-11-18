@@ -234,7 +234,7 @@ which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | 
 
 ## Planned shop
 
-The ledger module `wallet-service` owns `walletdb`. An administrator credits a wallet. Checkout places a hold for the quoted total before it writes an order, and confirm captures that hold before `CONFIRMED`. A short balance creates no order. A scheduled job releases a hold that never became an order, and captures a hold left open after confirm. The customer home and checkout show the available balance and open holds. A short balance does not create an order. Cancel after capture is not a refund yet. There is still no address, mail, or return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it. The task map is `vault/00 Index.md`.
+The ledger module `wallet-service` owns `walletdb`. An administrator credits a wallet. Checkout places a hold for the quoted total before it writes an order, and confirm captures that hold before `CONFIRMED`. A short balance creates no order. A scheduled job releases a hold that never became an order, and captures a hold left open after confirm. The customer home and checkout show the available balance and open holds. A short balance does not create an order. Cancel from `CONFIRMED` refunds the capture once and still emits the stock-release fact. Cancel before capture only releases the hold. Cancel after `PACKAGED` stays forbidden. There is still no address, mail, or return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it. The task map is `vault/00 Index.md`.
 
 ## Contract evolution rules
 

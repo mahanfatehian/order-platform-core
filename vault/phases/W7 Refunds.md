@@ -1,10 +1,10 @@
 # W7 Refunds
 
-Cancel after capture must return money. Cancel before capture must not refund.
+Cancel after capture must return money. Cancel before capture must not refund. The cancel command calls the existing refund on this branch.
 
 ## Build
 
-- Cancel from `CONFIRMED` calls `RefundCapture` for the full captured amount, then the existing stock release
+- Cancel from `CONFIRMED` calls the existing refund on this branch for the full captured amount, then the existing stock release
 - Cancel from `PENDING` only releases the hold
 - Cancel from `PACKAGED`, `SHIPPED`, or `DELIVERED` stays rejected
 - Refund entry links to the capture entry
