@@ -83,12 +83,13 @@ These are local showcase credentials, not production defaults. Set `DEMO_MODE=fa
 
 Use separate private browser windows for the personas, or sign out between steps.
 
-1. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The BFF revalidates the exact cart against live store inventory immediately before creating the order.
-2. Open the new order. It moves from `PENDING` to `CONFIRMED` after the Kafka inventory handshake. The status region continues polling while fulfillment is active and replaces itself completely on a terminal outcome.
-3. Sign in as `warehouse_worker`. Open **Warehouse queue** and choose **Pack order**. The authoritative HTTP command commits `PACKAGED`, history, and an `OrderPackagedEvent` outbox row atomically.
-4. Sign in as `delivery_driver`. Open **Delivery queue**, enter an optional tracking reference, choose **Mark shipped**, then **Mark delivered**. Delivery settles the reservation as `CONSUMED` and reduces on-hand stock exactly once.
-5. Return to the customer order. The horizontal rail shows all five completed stages, the tracking reference, and the actor-aware activity history. The cancel control disappeared when fulfillment advanced beyond `CONFIRMED`.
-6. Optionally sign in as `admin` to inspect all statuses, users, roles, products, inventory, and service readiness.
+1. Sign in as `admin`, open **Wallets**, and credit `johndoe`. That credit is the only money the walkthrough spends.
+2. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The order service places a wallet hold for the quoted total before it writes the order. A short balance keeps the cart and creates no order.
+3. Open the new order. It moves from `PENDING` to `CONFIRMED` after the Kafka inventory handshake. The page shows the wallet amount held, then captured. The status region continues polling while fulfillment is active and replaces itself completely on a terminal outcome.
+4. Sign in as `warehouse_worker`. Open **Warehouse queue** and choose **Pack order**. The authoritative HTTP command commits `PACKAGED`, history, and an `OrderPackagedEvent` outbox row atomically.
+5. Sign in as `delivery_driver`. Open **Delivery queue**, enter an optional tracking reference, choose **Mark shipped**, then **Mark delivered**. Delivery settles the reservation as `CONSUMED` and reduces on-hand stock exactly once.
+6. Return to the customer order. The horizontal rail shows all five completed stages, the tracking reference, and the actor-aware activity history. The cancel control disappeared when fulfillment advanced beyond `CONFIRMED`.
+7. Optionally sign in as `admin` to inspect all statuses, users, roles, products, inventory, and service readiness.
 
 To see checkout protection, add an in-stock product such as the **Summit Cordless Stick Vacuum** (14 in stock), then raise its quantity in the cart above what is available. The cart flags the line and disables **Review checkout**, and if availability drops after review, the order is refused with an availability message instead of creating a knowingly invalid saga. The seeded **Lumen Portable Bluetooth Speaker** has zero stock, so the catalog marks it unavailable and never offers it to the cart.
 

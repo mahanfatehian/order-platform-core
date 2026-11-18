@@ -39,6 +39,15 @@ public class Order {
     @Column(name = "tracking_reference", length = 100)
     private String trackingReference;
 
+    @Column(name = "wallet_hold_id")
+    private UUID walletHoldId;
+
+    @Column(name = "wallet_amount_minor")
+    private Long walletAmountMinor;
+
+    @Column(name = "wallet_capture_entry_id")
+    private UUID walletCaptureEntryId;
+
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 

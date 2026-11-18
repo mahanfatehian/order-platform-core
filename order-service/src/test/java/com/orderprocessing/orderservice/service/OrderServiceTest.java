@@ -7,6 +7,7 @@ import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
+import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
 import com.orderprocessing.orderservice.dto.OrderItemRequest;
 import com.orderprocessing.orderservice.dto.OrderResponse;
@@ -16,6 +17,9 @@ import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.IdempotencyConflictException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
 import com.orderprocessing.orderservice.exception.OrderTransitionConflictException;
+import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
+import com.orderprocessing.kafkacommon.event.StockReservedEvent;
+import com.orderprocessing.orderservice.exception.InsufficientWalletBalanceException;
 import com.orderprocessing.orderservice.exception.ServiceUnavailableException;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.model.OrderItem;
@@ -50,8 +54,10 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -60,20 +66,23 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
-    @Mock private OrderRepository orderRepository;
-    @Mock private OutboxEventRepository outboxRepository;
-    @Mock private ProcessedKafkaEventRepository processedRepository;
-    @Mock private OrderStatusHistoryRepository historyRepository;
-    @Mock private StoreServiceClient storeClient;
-    @Mock private TransactionOperations orderTransactions;
+    @Mock OrderRepository orderRepository;
+    @Mock OutboxEventRepository outboxRepository;
+    @Mock ProcessedKafkaEventRepository processedRepository;
+    @Mock OrderStatusHistoryRepository historyRepository;
+    @Mock StoreServiceClient storeClient;
+    @Mock WalletLedgerClient walletClient;
+    @Mock TransactionOperations orderTransactions;
 
-    private OrderService service;
+    OrderService service;
 
     @BeforeEach
     void setUp() {
         service = new OrderService(orderRepository, outboxRepository, processedRepository, historyRepository,
-                storeClient, new ObjectMapper().findAndRegisterModules(), orderTransactions,
+                storeClient, walletClient, new ObjectMapper().findAndRegisterModules(), orderTransactions,
                 new KafkaTopicNames("orders.v2", "stores.v2"));
+        lenient().when(walletClient.placeHold(any(), any(), anyLong(), any(), any()))
+                .thenReturn(new WalletLedgerClient.HoldPlaced(UUID.randomUUID(), 1));
     }
 
     @Test
@@ -422,5 +431,72 @@ class OrderServiceTest {
         assertThat(thrown).isInstanceOf(ServiceUnavailableException.class);
         // Dropping the cause left nothing anywhere to say which dependency failed or how.
         assertThat(thrown).hasCause(upstream);
+    }
+
+    @Test
+    void aShortBalanceDoesNotCreateAnOrder() {
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-short")).thenReturn(Optional.empty());
+        when(storeClient.quote(any())).thenReturn(new StoreQuoteResponse(List.of(
+                new StoreQuoteItemResponse(productId, "Product", new BigDecimal("12.50"), true, 1, 10, true))));
+        when(walletClient.placeHold(any(), any(), anyLong(), any(), any()))
+                .thenThrow(new InsufficientWalletBalanceException("INSUFFICIENT_FUNDS", "short"));
+
+        assertThatThrownBy(() -> service.createOrder(userId,
+                new CreateOrderRequest(List.of(new OrderItemRequest(productId, 1))), "checkout-short", "corr"))
+                .isInstanceOf(InsufficientWalletBalanceException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmCapturesTheHoldOnceAndARepeatDoesNotCaptureAgain() {
+        Order order = pendingWithHold();
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1, 0);
+        when(walletClient.captureHold(eq(order.getWalletHoldId()), eq(order.getId() + ":capture"), any()))
+                .thenReturn(UUID.randomUUID());
+        StockReservedEvent reserved = new StockReservedEvent();
+        reserved.setOrderId(order.getId());
+        reserved.setSuccess(true);
+
+        service.processStockReserved(reserved, "stores.v2", 0, 1L);
+        service.processStockReserved(reserved, "stores.v2", 0, 1L);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+        assertThat(order.getWalletCaptureEntryId()).isNotNull();
+        verify(walletClient).captureHold(eq(order.getWalletHoldId()), eq(order.getId() + ":capture"), any());
+    }
+
+    @Test
+    void insufficientStockReleasesTheHoldAndFailsTheOrder() {
+        Order order = pendingWithHold();
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1);
+        StockInsufficientEvent event = new StockInsufficientEvent();
+        event.setOrderId(order.getId());
+        event.setReason("none left");
+
+        service.processStockInsufficient(event, "stores.v2", 0, 2L);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.FAILED);
+        verify(walletClient).releaseHold(eq(order.getWalletHoldId()), eq(order.getId() + ":release"), any());
+        verify(walletClient, never()).captureHold(any(), any(), any());
+    }
+
+    private Order pendingWithHold() {
+        Order order = new Order();
+        order.setId(UUID.randomUUID());
+        order.setUserId(UUID.randomUUID());
+        order.setStatus(Order.Status.PENDING);
+        order.setWalletHoldId(UUID.randomUUID());
+        order.setWalletAmountMinor(2500L);
+        order.setItems(new java.util.ArrayList<>());
+        OrderItem item = new OrderItem();
+        item.setProductId(UUID.randomUUID());
+        item.setQuantity(1);
+        item.setOrder(order);
+        order.getItems().add(item);
+        return order;
     }
 }

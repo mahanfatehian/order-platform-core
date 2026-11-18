@@ -15,15 +15,26 @@ public record OrderView(
         Instant createdAt,
         Instant updatedAt,
         boolean cancellable,
-        String trackingReference
+        String trackingReference,
+        UUID walletHoldId,
+        Long walletAmountMinor,
+        String walletTender
 ) {
     public OrderView {
         items = items == null ? List.of() : List.copyOf(items);
     }
     public OrderView(UUID id, UUID userId, String status, BigDecimal totalAmount, String failureReason,
+                     List<OrderItemView> items, Instant createdAt, Instant updatedAt, boolean cancellable,
+                     String trackingReference) {
+        this(id, userId, status, totalAmount, failureReason, items, createdAt, updatedAt, cancellable,
+                trackingReference, null, null, null);
+    }
+    public OrderView(UUID id, UUID userId, String status, BigDecimal totalAmount, String failureReason,
                      List<OrderItemView> items, Instant createdAt, Instant updatedAt, boolean cancellable) {
         this(id, userId, status, totalAmount, failureReason, items, createdAt, updatedAt, cancellable, null);
     }
+    public boolean held() { return "HELD".equals(walletTender); }
+    public boolean captured() { return "CAPTURED".equals(walletTender); }
     public boolean pending() { return "PENDING".equals(status); }
     public boolean confirmed() { return "CONFIRMED".equals(status); }
     public boolean packaged() { return "PACKAGED".equals(status); }

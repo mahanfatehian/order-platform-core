@@ -6,6 +6,7 @@ import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
+import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.OrderResponse;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
@@ -78,7 +79,7 @@ class OrderLifecycleTransitionTest {
     private final OrderStatusHistoryRepository historyRepository = mock(OrderStatusHistoryRepository.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final OrderService service = new OrderService(orderRepository, outboxRepository, processedRepository,
-            historyRepository, mock(StoreServiceClient.class), objectMapper, mock(TransactionOperations.class),
+            historyRepository, mock(StoreServiceClient.class), mock(WalletLedgerClient.class), objectMapper, mock(TransactionOperations.class),
             new KafkaTopicNames(ORDER_EVENTS, "stores.v2"));
     private final UUID owner = UUID.randomUUID();
 

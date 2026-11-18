@@ -1,5 +1,7 @@
 # W3 Pay orders from the wallet
 
+Checkout places a hold before the order row and captures it on confirm. A short balance creates no order. Cancel after capture is still the next money slice.
+
 ## Build
 
 - Checkout computes the quoted total in minor units

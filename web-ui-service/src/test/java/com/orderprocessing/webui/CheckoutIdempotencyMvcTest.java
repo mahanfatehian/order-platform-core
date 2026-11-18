@@ -14,6 +14,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import com.orderprocessing.webui.exception.BackendClientException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.math.BigDecimal;
@@ -25,11 +27,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -119,5 +124,19 @@ class CheckoutIdempotencyMvcTest {
 
         // Different intent, so reusing the key would make order-service reject it as an idempotency conflict.
         assertThat(renderReviewAndReadKey(session)).isNotEqualTo(first);
+    }
+
+    @Test
+    void aShortWalletKeepsTheCartAndCreatesNoOrder() throws Exception {
+        MockHttpSession session = sessionWithCart();
+        String key = renderReviewAndReadKey(session);
+        when(client.createOrder(anyMap(), anyString())).thenThrow(new BackendClientException(
+                HttpStatus.CONFLICT, "INSUFFICIENT_FUNDS", "short", java.util.Map.of()));
+
+        mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session).param("idempotencyKey", key))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/app/cart"));
+
+        verify(client).createOrder(anyMap(), anyString());
     }
 }
