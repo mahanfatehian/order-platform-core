@@ -1,5 +1,7 @@
 # W4 Reconciliation
 
+The scheduled job releases an open hold that has no order, or an open hold on a failed or cancelled order. It captures an open hold on a confirmed order, using the same capture key as confirm. A capture that is no longer possible is logged and does not invent a payment.
+
 Holds and captures can be left behind if a process dies between two services. This phase closes those gaps. It does not add features.
 
 ## Jobs

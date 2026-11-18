@@ -5,6 +5,8 @@ import com.orderprocessing.orderservice.exception.ServiceUnavailableException;
 import feign.FeignException;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -53,6 +55,21 @@ public class FeignWalletLedgerClient implements WalletLedgerClient {
             client.release(holdId, new WalletServiceFeignClient.WalletKeyRequest(idempotencyKey));
         } catch (FeignException exception) {
             throw new ServiceUnavailableException("Wallet release failed", exception);
+        }
+    }
+
+    @Override
+    public List<WalletLedgerClient.OpenHold> listOpenHolds(Instant createdBefore, int limit) {
+        try {
+            List<WalletServiceFeignClient.OpenHoldResponse> response = client.openHolds(createdBefore, limit);
+            if (response == null) {
+                return List.of();
+            }
+            return response.stream()
+                    .map(hold -> new WalletLedgerClient.OpenHold(hold.holdId(), hold.orderId(), hold.amount(), hold.createdAt()))
+                    .toList();
+        } catch (FeignException exception) {
+            throw new ServiceUnavailableException("Wallet hold scan failed", exception);
         }
     }
 
