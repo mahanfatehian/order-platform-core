@@ -81,7 +81,7 @@ These are local showcase credentials, not production defaults. Set `DEMO_MODE=fa
 
 ## Five-minute guided walkthrough
 
-Use separate private browser windows for the personas, or sign out between steps.
+Use separate private browser windows for the personas, or sign out between steps. The customer pays only from wallet balance, and that balance comes from the admin credit in step 1.
 
 1. Sign in as `admin`, open **Wallets**, and credit `johndoe`. That credit is the only money the walkthrough spends.
 2. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The order service places a wallet hold for the quoted total before it writes the order. A short balance keeps the cart and creates no order.

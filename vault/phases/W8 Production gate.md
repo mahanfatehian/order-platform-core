@@ -1,4 +1,4 @@
-# W8 Production gate
+# W8 Production gate — gate tests are on this branch (feature/wallet-production-gate)
 
 This is not a launch. It is the proof that the base shop can run without demo money tricks.
 
