@@ -330,6 +330,7 @@ services:
       EUREKA_PORT: ${DISCOVERY_SERVICE_PORT:-8761}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       STORE_SERVICE_INTERNAL_API_KEY: ${STORE_SERVICE_INTERNAL_API_KEY:?Set STORE_SERVICE_INTERNAL_API_KEY in .env}
+      WALLET_SERVICE_INTERNAL_API_KEY: ${WALLET_SERVICE_INTERNAL_API_KEY:?Set WALLET_SERVICE_INTERNAL_API_KEY in .env}
       ORDER_PENDING_TIMEOUT: ${ORDER_PENDING_TIMEOUT:-PT10M}
       ORDER_OUTBOX_MAX_ATTEMPTS: ${ORDER_OUTBOX_MAX_ATTEMPTS:-5}
       ORDER_OUTBOX_RETRY_BASE_DELAY: ${ORDER_OUTBOX_RETRY_BASE_DELAY:-1000}
@@ -355,8 +356,10 @@ services:
         condition: service_healthy
       store-service:
         condition: service_healthy
+      wallet-service:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${ORDER_SERVICE_PORT}/actuator/health | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${ORDER_SERVICE_PORT}/actuator/health | grep -q '\\\"status\\\":\\\"UP\\\"'"]
       interval: 10s
       timeout: 5s
       retries: 18

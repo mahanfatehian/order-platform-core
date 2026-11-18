@@ -70,6 +70,11 @@ public class CheckoutController {
         try {
             order = client.createOrder(quantities, idempotencyKey);
         } catch (BackendClientException exception) {
+            if ("INSUFFICIENT_FUNDS".equals(exception.getCode()) || "WALLET_NOT_FOUND".equals(exception.getCode())) {
+                redirect.addFlashAttribute("warning",
+                        "Wallet balance is not enough for this order. Your cart was kept.");
+                return "redirect:/app/cart";
+            }
             if (exception.getStatus().value() != 409) throw exception;
             clearCheckoutAttempt(session);
             redirect.addFlashAttribute("warning",

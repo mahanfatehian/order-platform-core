@@ -40,4 +40,10 @@ public class OrderResponse {
     private String trackingReference;
 
     private boolean cancellable;
+
+    private UUID walletHoldId;
+
+    private Long walletAmountMinor;
+
+    private String walletTender;
 }

@@ -74,11 +74,17 @@ spring:
             connect-timeout: 2000
             read-timeout: 3000
             logger-level: basic
+          wallet-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+            logger-level: basic
 
 services:
   store-service:
     url: http://store-service:${STORE_SERVICE_PORT:8083}
     internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
+  wallet-service:
+    internal-api-key: ${WALLET_SERVICE_INTERNAL_API_KEY}
 
 outbox:
   polling:

@@ -15,6 +15,7 @@ import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
+import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
 import com.orderprocessing.orderservice.dto.OrderItemRequest;
 import com.orderprocessing.orderservice.dto.OrderItemResponse;
@@ -32,6 +33,7 @@ import com.orderprocessing.orderservice.exception.OrderTransitionConflictExcepti
 import com.orderprocessing.orderservice.exception.ProductUnavailableException;
 import com.orderprocessing.orderservice.exception.ResourceNotFoundException;
 import com.orderprocessing.orderservice.exception.ServiceUnavailableException;
+import com.orderprocessing.orderservice.money.WalletMoney;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.model.OrderItem;
 import com.orderprocessing.orderservice.model.OrderStatusHistory;
@@ -72,6 +74,7 @@ public class OrderService {
     private final ProcessedKafkaEventRepository processedEventRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final StoreServiceClient storeServiceClient;
+    private final WalletLedgerClient walletLedgerClient;
     private final ObjectMapper objectMapper;
     private final TransactionOperations orderTransactions;
     private final KafkaTopicNames kafkaTopicNames;
@@ -81,6 +84,7 @@ public class OrderService {
                         ProcessedKafkaEventRepository processedEventRepository,
                         OrderStatusHistoryRepository historyRepository,
                         StoreServiceClient storeServiceClient,
+                        WalletLedgerClient walletLedgerClient,
                         ObjectMapper objectMapper,
                         TransactionOperations orderTransactions,
                         KafkaTopicNames kafkaTopicNames) {
@@ -89,6 +93,7 @@ public class OrderService {
         this.processedEventRepository = processedEventRepository;
         this.historyRepository = historyRepository;
         this.storeServiceClient = storeServiceClient;
+        this.walletLedgerClient = walletLedgerClient;
         this.objectMapper = objectMapper;
         this.orderTransactions = orderTransactions;
         this.kafkaTopicNames = kafkaTopicNames;
@@ -106,16 +111,24 @@ public class OrderService {
 
         StoreQuoteResponse quote = loadAuthoritativeQuote(quantities);
         Map<UUID, StoreQuoteItemResponse> quoteByProduct = validateQuote(quantities, quote);
-
+        BigDecimal total = quotedTotal(quantities, quoteByProduct);
+        long minor = WalletMoney.minorUnits(total);
+        UUID orderId = plannedOrderId(userId, normalizedKey);
+        String holdKey = normalizedKey == null ? orderId.toString() : normalizedKey;
+        WalletLedgerClient.HoldPlaced hold = walletLedgerClient.placeHold(
+                userId, orderId, minor, holdKey, normalizedCorrelationId);
         return Objects.requireNonNull(orderTransactions.execute(status ->
-                persistQuotedOrder(userId, quantities, quoteByProduct, normalizedKey, normalizedCorrelationId)));
+                persistQuotedOrder(userId, quantities, quoteByProduct, normalizedKey, normalizedCorrelationId,
+                        orderId, hold)));
     }
 
     private OrderResponse persistQuotedOrder(UUID userId,
                                              Map<UUID, Integer> quantities,
                                              Map<UUID, StoreQuoteItemResponse> quoteByProduct,
                                              String normalizedKey,
-                                             String normalizedCorrelationId) {
+                                             String normalizedCorrelationId,
+                                             UUID orderId,
+                                             WalletLedgerClient.HoldPlaced hold) {
         if (normalizedKey != null) {
             orderRepository.acquireIdempotencyLock(userId + ":" + normalizedKey);
             Optional<Order> existing = findIdempotentOrder(userId, normalizedKey);
@@ -126,11 +139,13 @@ public class OrderService {
 
         Instant now = Instant.now();
         Order order = new Order();
-        order.setId(UUID.randomUUID());
+        order.setId(orderId);
         order.setUserId(userId);
         order.setStatus(Order.Status.PENDING);
         order.setFailureReason(null);
         order.setIdempotencyKey(normalizedKey);
+        order.setWalletHoldId(hold.holdId());
+        order.setWalletAmountMinor(hold.amountMinor());
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
 
@@ -268,6 +283,9 @@ public class OrderService {
         if (order.getStatus() != Order.Status.PENDING && order.getStatus() != Order.Status.CONFIRMED) {
             throw new InvalidOrderStateException("Order cannot be cancelled in its current state");
         }
+        if (order.getStatus() == Order.Status.PENDING) {
+            releaseOpenHold(order, correlationId);
+        }
 
         Order.Status previousStatus = order.getStatus();
         String actorRole = admin ? "ROLE_ADMIN" : "ROLE_CUSTOMER";
@@ -325,6 +343,7 @@ public class OrderService {
         List<Order> staleOrders = orderRepository.lockStalePendingOrders(cutoff, batchSize);
         for (Order order : staleOrders) {
             order.getItems().size();
+            releaseOpenHold(order, UUID.randomUUID().toString());
             Instant now = Instant.now();
             String reason = "Inventory confirmation timed out; reserved stock will be reconciled";
             order.setStatus(Order.Status.FAILED);
@@ -357,6 +376,18 @@ public class OrderService {
         }
         Order order = lockOrder(event.getOrderId());
         if (order.getStatus() == Order.Status.PENDING) {
+            order.getItems().size();
+            if (order.getWalletHoldId() != null) {
+                try {
+                    UUID captureId = walletLedgerClient.captureHold(order.getWalletHoldId(),
+                            order.getId() + ":capture", event.getCorrelationId());
+                    order.setWalletCaptureEntryId(captureId);
+                } catch (RuntimeException exception) {
+                    failAfterCapture(order, event, "Wallet capture failed");
+                    releaseQuietly(order.getWalletHoldId(), order.getId() + ":release", event.getCorrelationId());
+                    return;
+                }
+            }
             Instant occurredAt = Instant.now();
             order.setStatus(Order.Status.CONFIRMED);
             order.setFailureReason(null);
@@ -376,6 +407,7 @@ public class OrderService {
         }
         Order order = lockOrder(event.getOrderId());
         if (order.getStatus() == Order.Status.PENDING) {
+            releaseOpenHold(order, event.getCorrelationId());
             Instant occurredAt = Instant.now();
             order.setStatus(Order.Status.FAILED);
             order.setFailureReason(safeReason(event.getReason()));
@@ -709,7 +741,72 @@ public class OrderService {
                 .failureReason(order.getFailureReason())
                 .trackingReference(order.getTrackingReference())
                 .cancellable(order.getStatus() == Order.Status.PENDING || order.getStatus() == Order.Status.CONFIRMED)
+                .walletHoldId(order.getWalletHoldId())
+                .walletAmountMinor(order.getWalletAmountMinor())
+                .walletTender(walletTender(order))
                 .build();
+    }
+
+    private void failAfterCapture(Order order, StockReservedEvent event, String reason) {
+        Instant now = Instant.now();
+        order.setStatus(Order.Status.FAILED);
+        order.setFailureReason(reason);
+        order.setUpdatedAt(now);
+        OrderFailedEvent failed = new OrderFailedEvent();
+        failed.setOrderId(order.getId());
+        failed.setItems(order.getItems().stream().collect(Collectors.toMap(
+                OrderItem::getProductId, OrderItem::getQuantity, Math::addExact, LinkedHashMap::new)));
+        failed.setSuccess(false);
+        failed.setReason(reason);
+        failed.setSchemaVersion(2);
+        failed.setOccurredAt(now);
+        failed.setCorrelationId(event.getCorrelationId());
+        recordHistory(order, failed, Order.Status.PENDING, Order.Status.FAILED, null, "SYSTEM_WALLET", reason);
+        addOutbox(order.getId(), kafkaTopicNames.orderEvents(), failed);
+    }
+
+    private void releaseOpenHold(Order order, String correlationId) {
+        if (order.getWalletHoldId() == null) {
+            return;
+        }
+        walletLedgerClient.releaseHold(order.getWalletHoldId(), order.getId() + ":release", correlationId);
+    }
+
+    private void releaseQuietly(UUID holdId, String idempotencyKey, String correlationId) {
+        try {
+            walletLedgerClient.releaseHold(holdId, idempotencyKey, correlationId);
+        } catch (RuntimeException exception) {
+            log.warn("Wallet hold {} could not be released after order persistence failed", holdId, exception);
+        }
+    }
+
+    private BigDecimal quotedTotal(Map<UUID, Integer> quantities, Map<UUID, StoreQuoteItemResponse> quoteByProduct) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (Map.Entry<UUID, Integer> requested : quantities.entrySet()) {
+            total = total.add(quoteByProduct.get(requested.getKey()).unitPrice()
+                    .multiply(BigDecimal.valueOf(requested.getValue())));
+        }
+        return total;
+    }
+
+    private UUID plannedOrderId(UUID userId, String idempotencyKey) {
+        if (idempotencyKey == null) {
+            return UUID.randomUUID();
+        }
+        return UUID.nameUUIDFromBytes((userId + ":" + idempotencyKey).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String walletTender(Order order) {
+        if (order.getWalletHoldId() == null) {
+            return "NONE";
+        }
+        if (order.getWalletCaptureEntryId() != null) {
+            return "CAPTURED";
+        }
+        if (order.getStatus() == Order.Status.PENDING) {
+            return "HELD";
+        }
+        return "RELEASED";
     }
 
     private OrderStatusHistoryResponse toHistoryResponse(OrderStatusHistory history) {
