@@ -5,6 +5,7 @@ import com.orderprocessing.webui.client.PlatformClient;
 import com.orderprocessing.webui.dto.CartView;
 import com.orderprocessing.webui.dto.ProductView;
 import com.orderprocessing.webui.dto.QuoteItemView;
+import com.orderprocessing.webui.dto.WalletBalanceView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +70,7 @@ class CheckoutIdempotencyMvcTest {
         when(client.quote(anyMap())).thenReturn(new CartView(
                 List.of(new QuoteItemView(PRODUCT, "Lamp", new BigDecimal("10.00"), true, 2, 50, true)),
                 new BigDecimal("20.00"), true));
+        when(client.myWalletBalance()).thenReturn(new WalletBalanceView(UUID.randomUUID(), "IRR", 100000, 100000, 0));
     }
 
     private MockHttpSession sessionWithCart() throws Exception {
@@ -130,13 +132,12 @@ class CheckoutIdempotencyMvcTest {
     void aShortWalletKeepsTheCartAndCreatesNoOrder() throws Exception {
         MockHttpSession session = sessionWithCart();
         String key = renderReviewAndReadKey(session);
-        when(client.createOrder(anyMap(), anyString())).thenThrow(new BackendClientException(
-                HttpStatus.CONFLICT, "INSUFFICIENT_FUNDS", "short", java.util.Map.of()));
+        when(client.myWalletBalance()).thenReturn(new WalletBalanceView(UUID.randomUUID(), "IRR", 5000, 1000, 4000));
 
         mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session).param("idempotencyKey", key))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/app/cart"));
 
-        verify(client).createOrder(anyMap(), anyString());
+        verify(client, never()).createOrder(anyMap(), anyString());
     }
 }

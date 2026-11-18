@@ -3,6 +3,8 @@ package com.orderprocessing.webui.controller;
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
 import com.orderprocessing.webui.dto.CartView;
 import com.orderprocessing.webui.dto.OrderView;
+import com.orderprocessing.webui.dto.WalletBalanceView;
+import com.orderprocessing.webui.money.WalletQuote;
 import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.service.CartService;
 import jakarta.servlet.http.HttpSession;
@@ -35,9 +37,13 @@ public class CheckoutController {
         if (quantities.isEmpty()) { redirect.addFlashAttribute("warning", "Your cart is empty"); return "redirect:/app/cart"; }
         CartView quote = client.quote(quantities);
         String key = checkoutKeyFor(session, quantities);
+        WalletBalanceView balance = client.myWalletBalance();
         session.setAttribute(KEY, key);
         session.setAttribute(REVIEWED_CART, new LinkedHashMap<>(quantities));
-        model.addAttribute("cart", quote); model.addAttribute("idempotencyKey", key);
+        model.addAttribute("cart", quote);
+        model.addAttribute("idempotencyKey", key);
+        model.addAttribute("wallet", balance);
+        model.addAttribute("walletShort", !WalletQuote.canSpend(quote.total(), balance == null ? null : balance.available()));
         return "checkout/review";
     }
 
@@ -64,6 +70,11 @@ public class CheckoutController {
         if (!quote.checkoutReady()) {
             clearCheckoutAttempt(session);
             redirect.addFlashAttribute("warning", "Availability changed. Review the updated cart before ordering.");
+            return "redirect:/app/cart";
+        }
+        WalletBalanceView balance = client.myWalletBalance();
+        if (!WalletQuote.canSpend(quote.total(), balance == null ? null : balance.available())) {
+            redirect.addFlashAttribute("warning", "Wallet balance is not enough for this order. Your cart was kept.");
             return "redirect:/app/cart";
         }
         OrderView order;

@@ -19,6 +19,7 @@ public class DashboardController {
     public String dashboard(Model model) {
         model.addAttribute("ordersUnavailable", false);
         model.addAttribute("productsUnavailable", false);
+        model.addAttribute("walletUnavailable", false);
         try {
             PageResponse<OrderView> orders = client.myOrders(0, 5);
             model.addAttribute("recentOrders", orders.content());
@@ -32,6 +33,12 @@ public class DashboardController {
             model.addAttribute("availableProducts", products.totalElements());
         } catch (RuntimeException exception) {
             model.addAttribute("productsUnavailable", true);
+        }
+        try {
+            model.addAttribute("wallet", client.myWalletBalance());
+        } catch (RuntimeException exception) {
+            model.addAttribute("wallet", null);
+            model.addAttribute("walletUnavailable", true);
         }
         return "dashboard/index";
     }

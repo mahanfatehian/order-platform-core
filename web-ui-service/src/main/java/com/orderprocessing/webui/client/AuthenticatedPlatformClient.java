@@ -52,6 +52,8 @@ public class AuthenticatedPlatformClient {
     }
     public List<WalletEntryView> walletEntries(UUID userId) { return get(t -> client.walletEntries(t, userId)); }
     public WalletBalanceView walletBalance(UUID userId) { return get(t -> client.walletBalance(t, userId)); }
+    public WalletBalanceView myWalletBalance() { return get(client::myWalletBalance); }
+    public List<WalletEntryView> myWalletEntries() { return get(client::myWalletEntries); }
     public UserView adminUser(UUID id) { return get(t -> client.adminUser(t, id)); }
     public UserView setUserStatus(UUID id, boolean enabled) { return mutate(t -> client.setUserStatus(t, id, enabled)); }
     public UserView setUserRoles(UUID id, Set<String> roles) { return mutate(t -> client.setUserRoles(t, id, roles)); }
