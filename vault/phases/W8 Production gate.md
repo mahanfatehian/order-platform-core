@@ -1,6 +1,6 @@
 # W8 Production gate
 
-This is not a launch. It is the proof that the base shop can run without demo money tricks.
+This is not a launch. It is the proof that the base shop can run without demo money tricks. The gate tests credit through the ledger command, capture once, and reject a second capture. They do not boot Compose, and they do not walk pack, ship, and deliver.
 
 ## Build
 
