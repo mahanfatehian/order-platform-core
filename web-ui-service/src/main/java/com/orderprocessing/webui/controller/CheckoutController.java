@@ -1,6 +1,7 @@
 package com.orderprocessing.webui.controller;
 
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
+import com.orderprocessing.webui.dto.AddressView;
 import com.orderprocessing.webui.dto.CartView;
 import com.orderprocessing.webui.dto.OrderView;
 import com.orderprocessing.webui.dto.WalletBalanceView;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.UUID;
 import java.util.Map;
+import java.util.List;
 import java.util.LinkedHashMap;
 
 @Controller
@@ -25,6 +27,7 @@ import java.util.LinkedHashMap;
 public class CheckoutController {
     private static final String KEY = CheckoutController.class.getName() + ".IDEMPOTENCY_KEY";
     private static final String REVIEWED_CART = CheckoutController.class.getName() + ".REVIEWED_CART";
+    private static final String REVIEWED_ADDRESS = CheckoutController.class.getName() + ".REVIEWED_ADDRESS";
     private final CartService cartService;
     private final AuthenticatedPlatformClient client;
     public CheckoutController(CartService cartService, AuthenticatedPlatformClient client) {
@@ -36,11 +39,20 @@ public class CheckoutController {
         Map<UUID, Integer> quantities = cartService.checkoutSnapshot(session);
         if (quantities.isEmpty()) { redirect.addFlashAttribute("warning", "Your cart is empty"); return "redirect:/app/cart"; }
         CartView quote = client.quote(quantities);
+        List<AddressView> addresses = addresses();
+        UUID selectedAddressId = selected(addresses);
         String key = checkoutKeyFor(session, quantities);
         WalletBalanceView balance = client.myWalletBalance();
         session.setAttribute(KEY, key);
         session.setAttribute(REVIEWED_CART, new LinkedHashMap<>(quantities));
+        if (selectedAddressId == null) {
+            session.removeAttribute(REVIEWED_ADDRESS);
+        } else {
+            session.setAttribute(REVIEWED_ADDRESS, selectedAddressId);
+        }
         model.addAttribute("cart", quote);
+        model.addAttribute("addresses", addresses);
+        model.addAttribute("selectedAddressId", selectedAddressId);
         model.addAttribute("idempotencyKey", key);
         model.addAttribute("wallet", balance);
         model.addAttribute("walletShort", !WalletQuote.canSpend(quote.total(), balance == null ? null : balance.available()));
@@ -48,7 +60,9 @@ public class CheckoutController {
     }
 
     @PostMapping
-    public String create(@RequestParam String idempotencyKey, HttpSession session, RedirectAttributes redirect) {
+    public String create(@RequestParam String idempotencyKey,
+                         @RequestParam(required = false) UUID addressId,
+                         HttpSession session, RedirectAttributes redirect) {
         Object expected = session.getAttribute(KEY);
         if (expected == null || !expected.equals(idempotencyKey)) {
             clearCheckoutAttempt(session);
@@ -66,6 +80,10 @@ public class CheckoutController {
             redirect.addFlashAttribute("warning", "Your cart changed after review. Confirm the refreshed total before ordering.");
             return "redirect:/app/checkout";
         }
+        if (addressId == null) {
+            redirect.addFlashAttribute("warning", "Choose a ship-to address before placing the order.");
+            return "redirect:/app/checkout";
+        }
         CartView quote = client.quote(quantities);
         if (!quote.checkoutReady()) {
             clearCheckoutAttempt(session);
@@ -79,7 +97,7 @@ public class CheckoutController {
         }
         OrderView order;
         try {
-            order = client.createOrder(quantities, idempotencyKey);
+            order = client.createOrder(quantities, addressId, idempotencyKey);
         } catch (BackendClientException exception) {
             if ("INSUFFICIENT_FUNDS".equals(exception.getCode()) || "WALLET_NOT_FOUND".equals(exception.getCode())) {
                 redirect.addFlashAttribute("warning",
@@ -119,8 +137,19 @@ public class CheckoutController {
         return UUID.randomUUID().toString();
     }
 
+    private List<AddressView> addresses() {
+        List<AddressView> addresses = client.addresses();
+        return addresses == null ? List.of() : addresses;
+    }
+
+    private UUID selected(List<AddressView> addresses) {
+        return addresses.stream().filter(AddressView::defaultAddress).map(AddressView::id).findFirst()
+                .orElseGet(() -> addresses.isEmpty() ? null : addresses.getFirst().id());
+    }
+
     private void clearCheckoutAttempt(HttpSession session) {
         session.removeAttribute(KEY);
         session.removeAttribute(REVIEWED_CART);
+        session.removeAttribute(REVIEWED_ADDRESS);
     }
 }

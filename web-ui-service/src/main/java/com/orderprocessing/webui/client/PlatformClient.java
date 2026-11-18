@@ -99,13 +99,55 @@ public class PlatformClient {
         return cartQuoteValidator.validate(quantities, quoted);
     }
 
-    public OrderView createOrder(String token, Map<UUID, Integer> quantities, String idempotencyKey) {
+    public OrderView createOrder(String token, Map<UUID, Integer> quantities, UUID addressId, String idempotencyKey) {
         List<Map<String, Object>> items = quantities.entrySet().stream()
                 .map(entry -> Map.<String, Object>of("productId", entry.getKey(), "quantity", entry.getValue())).toList();
         return orders.post().uri("/api/orders").headers(headers -> {
                     bearer(headers, token);
                     headers.set("Idempotency-Key", idempotencyKey);
-                }).contentType(MediaType.APPLICATION_JSON).body(Map.of("items", items)).retrieve().body(OrderView.class);
+                }).contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("items", items, "addressId", addressId)).retrieve().body(OrderView.class);
+    }
+
+    public List<AddressView> addresses(String token) {
+        List<AddressView> body = users.get().uri("/api/users/me/addresses")
+                .headers(headers -> bearer(headers, token)).retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+        return body == null ? List.of() : body;
+    }
+
+    public AddressView address(String token, UUID id) {
+        return users.get().uri("/api/users/me/addresses/{id}", id)
+                .headers(headers -> bearer(headers, token)).retrieve().body(AddressView.class);
+    }
+
+    public AddressView createAddress(String token, AddressForm form) {
+        return users.post().uri("/api/users/me/addresses").headers(headers -> bearer(headers, token))
+                .contentType(MediaType.APPLICATION_JSON).body(addressBody(form)).retrieve().body(AddressView.class);
+    }
+
+    public AddressView updateAddress(String token, UUID id, AddressForm form) {
+        return users.put().uri("/api/users/me/addresses/{id}", id).headers(headers -> bearer(headers, token))
+                .contentType(MediaType.APPLICATION_JSON).body(addressBody(form)).retrieve().body(AddressView.class);
+    }
+
+    public void deleteAddress(String token, UUID id) {
+        users.delete().uri("/api/users/me/addresses/{id}", id).headers(headers -> bearer(headers, token))
+                .retrieve().toBodilessEntity();
+    }
+
+    private Map<String, Object> addressBody(AddressForm form) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("recipient", form.getRecipient());
+        body.put("line1", form.getLine1());
+        body.put("line2", form.getLine2() == null ? "" : form.getLine2());
+        body.put("city", form.getCity());
+        body.put("region", form.getRegion());
+        body.put("postalCode", form.getPostalCode());
+        body.put("phone", form.getPhone());
+        body.put("country", "IR");
+        body.put("defaultAddress", form.isDefaultAddress());
+        return body;
     }
 
     public PageResponse<OrderView> myOrders(String token, int page, int size) {

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Address book</p>
+            <h1>Ship-to addresses</h1>
+            <p>Checkout copies the address you select. A later edit does not change an order already placed.</p>
+        </div>
+        <a class="btn btn-primary" th:href="@{/app/addresses/new}">Add address</a>
+    </header>
+    <th:block th:if="${addresses.isEmpty()}">
+        <div th:replace="~{fragments/empty-state :: empty('bi-geo-alt','No addresses yet','Add an Iran address before you place an order.')}"></div>
+    </th:block>
+    <article class="surface surface--padded mb-3" th:each="address : ${addresses}">
+        <div class="d-flex justify-content-between gap-3">
+            <div>
+                <strong th:text="${address.recipient()}">Recipient</strong>
+                <span th:if="${address.defaultAddress()}" class="badge text-bg-light">Default</span>
+                <p class="mb-1" th:text="${address.line1()}">Line 1</p>
+                <p class="mb-1" th:if="${address.line2() != null}" th:text="${address.line2()}">Line 2</p>
+                <p class="mb-1" th:text="|${address.city()}, ${address.region()} ${address.postalCode()}|">City</p>
+                <p class="mb-0 mono" th:text="|${address.phone()} · ${address.country()}|">Phone</p>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                <a class="btn btn-outline-primary btn-sm" th:href="@{/app/addresses/{id}/edit(id=${address.id()})}">Edit</a>
+                <form th:if="${!address.defaultAddress()}" th:action="@{/app/addresses/{id}/default(id=${address.id()})}" method="post">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">Make default</button>
+                </form>
+                <form th:action="@{/app/addresses/{id}/delete(id=${address.id()})}" method="post"
+                      data-confirm="Delete this address? Orders already placed keep the address copied at checkout.">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+    </article>
+</section>
+</html>

@@ -37,6 +37,7 @@
                         <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span>
                         <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
                     </div>
+                    <div class="mt-2" th:replace="~{orders/_ship-to :: snapshot(${order})}"></div>
                 </div>
                 <form class="queue-card__action" th:action="@{/admin/delivery/orders/{id}/ship(id=${order.id()})}" method="post">
                     <div>
@@ -75,6 +76,7 @@
                         <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span>
                         <span th:text="${#temporals.format(order.updatedAt(),'MMM d, HH:mm')}">Updated</span>
                     </div>
+                    <div class="mt-2" th:replace="~{orders/_ship-to :: snapshot(${order})}"></div>
                 </div>
                 <form class="queue-card__action" th:if="${#strings.isEmpty(order.trackingReference())}"
                       th:action="@{/admin/delivery/orders/{id}/tracking(id=${order.id()})}" method="post">

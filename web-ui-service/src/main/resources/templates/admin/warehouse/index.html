@@ -39,6 +39,7 @@
                         <span th:text="|${order.itemCount()} ${order.itemCount() == 1 ? 'unit' : 'units'}|">0 units</span></span>
                     <span class="money" th:text="|$${#numbers.formatDecimal(order.totalAmount(),1,2)}|">$0</span>
                 </div>
+                <div class="mt-2" th:replace="~{orders/_ship-to :: snapshot(${order})}"></div>
             </div>
             <form class="queue-card__action" th:action="@{/admin/warehouse/orders/{id}/pack(id=${order.id()})}"
                   method="post" data-confirm="Pack this order? The customer will no longer be able to cancel it.">

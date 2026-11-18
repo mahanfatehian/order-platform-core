@@ -7,6 +7,7 @@ import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
+import com.orderprocessing.orderservice.client.AddressBookClient;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
 import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
@@ -21,6 +22,7 @@ import com.orderprocessing.orderservice.exception.OrderTransitionConflictExcepti
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.orderservice.exception.InsufficientWalletBalanceException;
+import com.orderprocessing.orderservice.exception.ResourceNotFoundException;
 import com.orderprocessing.orderservice.exception.ServiceUnavailableException;
 import com.orderprocessing.orderservice.model.Order;
 import com.orderprocessing.orderservice.model.OrderItem;
@@ -61,6 +63,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -74,24 +77,28 @@ class OrderServiceTest {
     @Mock OrderStatusHistoryRepository historyRepository;
     @Mock StoreServiceClient storeClient;
     @Mock WalletLedgerClient walletClient;
+    @Mock AddressBookClient addressBookClient;
     @Mock TransactionOperations orderTransactions;
+
+    private static final UUID ADDRESS_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     OrderService service;
 
     @BeforeEach
     void setUp() {
         service = new OrderService(orderRepository, outboxRepository, processedRepository, historyRepository,
-                storeClient, walletClient, new ObjectMapper().findAndRegisterModules(), orderTransactions,
-                new KafkaTopicNames("orders.v2", "stores.v2"));
+                storeClient, walletClient, addressBookClient, new ObjectMapper().findAndRegisterModules(),
+                orderTransactions, new KafkaTopicNames("orders.v2", "stores.v2"));
         lenient().when(walletClient.placeHold(any(), any(), anyLong(), any(), any()))
                 .thenReturn(new WalletLedgerClient.HoldPlaced(UUID.randomUUID(), 1));
+        lenient().when(addressBookClient.findOwned(any(), any())).thenReturn(shipTo());
     }
 
     @Test
     void createsOrderFromAuthoritativeQuoteAndPersistsItemsWithPlacedOutbox() {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        CreateOrderRequest request = checkout(productId, 2);
         when(orderTransactions.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
@@ -115,6 +122,12 @@ class OrderServiceTest {
         assertThat(stored.getItems().getFirst().getUnitPrice()).isEqualByComparingTo("12.50");
         assertThat(stored.getItems().getFirst().getOrder()).isSameAs(stored);
         assertThat(response.getTotalAmount()).isEqualByComparingTo("25.00");
+        assertThat(stored.getShipRecipient()).isEqualTo("Ada Lovelace");
+        assertThat(stored.getShipLine1()).isEqualTo("12 Enghelab");
+        assertThat(stored.getShipLine2()).isEqualTo("Unit 4");
+        assertThat(stored.getShipCity()).isEqualTo("Tehran");
+        assertThat(stored.getShipCountry()).isEqualTo("IR");
+        assertThat(response.getShipRecipient()).isEqualTo("Ada Lovelace");
 
         ArgumentCaptor<OutboxEvent> outboxCaptor = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outboxRepository).save(outboxCaptor.capture());
@@ -145,7 +158,7 @@ class OrderServiceTest {
     @Test
     void doesNotAcquireIdempotencyLockWhenAuthoritativeQuoteFails() {
         UUID userId = UUID.randomUUID();
-        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(UUID.randomUUID(), 1)));
+        CreateOrderRequest request = checkout(UUID.randomUUID(), 1);
         when(storeClient.quote(any())).thenThrow(new FeignException.ServiceUnavailable(
                 "unavailable", mock(Request.class), null, Map.of()));
 
@@ -472,6 +485,104 @@ class OrderServiceTest {
         assertThat(history.getValue().getToStatus()).isEqualTo(Order.Status.FAILED);
     }
 
+    @Test
+    void checkoutWithoutAnAddressCreatesNoOrderAndNeverPlacesAHold() {
+        UUID userId = UUID.randomUUID();
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(UUID.randomUUID(), 1)));
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-none"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createOrder(userId, request, "checkout-none", "corr"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(walletClient, never()).placeHold(any(), any(), anyLong(), any(), any());
+        verify(orderRepository, never()).save(any());
+        verifyNoInteractions(storeClient);
+    }
+
+    @Test
+    void checkoutWithAnotherCustomersAddressCreatesNoOrderAndNeverPlacesAHold() {
+        UUID userId = UUID.randomUUID();
+        CreateOrderRequest request = checkout(UUID.randomUUID(), 1);
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-other"))
+                .thenReturn(Optional.empty());
+        when(addressBookClient.findOwned(userId, ADDRESS_ID))
+                .thenThrow(new ResourceNotFoundException("Address not found"));
+
+        assertThatThrownBy(() -> service.createOrder(userId, request, "checkout-other", "corr"))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(walletClient, never()).placeHold(any(), any(), anyLong(), any(), any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void aCountryOtherThanIrIsRejectedBeforeTheHold() {
+        UUID userId = UUID.randomUUID();
+        CreateOrderRequest request = checkout(UUID.randomUUID(), 1);
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-country"))
+                .thenReturn(Optional.empty());
+        when(addressBookClient.findOwned(userId, ADDRESS_ID)).thenReturn(new AddressBookClient.ShipToAddress(
+                "Ada", "12 Enghelab", null, "Tehran", "Tehran", "1136912345", "02112345678", "DE"));
+
+        assertThatThrownBy(() -> service.createOrder(userId, request, "checkout-country", "corr"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(walletClient, never()).placeHold(any(), any(), anyLong(), any(), any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void editingAndDeletingTheAddressBookLeavesTheOrderSnapshotAndShipReturnsIt() {
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        when(orderTransactions.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-snap"))
+                .thenReturn(Optional.empty());
+        when(storeClient.quote(any())).thenReturn(new StoreQuoteResponse(List.of(
+                new StoreQuoteItemResponse(productId, "Lamp", new BigDecimal("10.00"), true, 1, 5, true))));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderResponse created = service.createOrder(userId, checkout(productId, 1), "checkout-snap", "corr");
+
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(saved.capture());
+        Order order = saved.getValue();
+        assertThat(created.getShipRecipient()).isEqualTo("Ada Lovelace");
+        assertThat(order.getShipLine1()).isEqualTo("12 Enghelab");
+
+        clearInvocations(addressBookClient);
+        order.setStatus(Order.Status.PACKAGED);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        OrderResponse shipped = service.shipOrder(order.getId(), UUID.randomUUID(), "ship-corr", "TRACK-1");
+
+        assertThat(shipped.getShipRecipient()).isEqualTo("Ada Lovelace");
+        assertThat(shipped.getShipLine1()).isEqualTo("12 Enghelab");
+        assertThat(shipped.getShipLine2()).isEqualTo("Unit 4");
+        assertThat(shipped.getShipCity()).isEqualTo("Tehran");
+        assertThat(shipped.getShipRegion()).isEqualTo("Tehran");
+        assertThat(shipped.getShipPostalCode()).isEqualTo("1136912345");
+        assertThat(shipped.getShipPhone()).isEqualTo("02112345678");
+        assertThat(shipped.getShipCountry()).isEqualTo("IR");
+        assertThat(order.getShipRecipient()).isEqualTo("Ada Lovelace");
+        verifyNoInteractions(addressBookClient);
+    }
+
+    private CreateOrderRequest checkout(UUID productId, int quantity) {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, quantity)));
+        request.setAddressId(ADDRESS_ID);
+        return request;
+    }
+
+    private AddressBookClient.ShipToAddress shipTo() {
+        return new AddressBookClient.ShipToAddress(
+                "Ada Lovelace", "12 Enghelab", "Unit 4", "Tehran", "Tehran", "1136912345", "02112345678", "IR");
+    }
+
     private Order order(UUID owner, Order.Status status) {
         Order order = new Order();
         order.setId(UUID.randomUUID());
@@ -501,7 +612,7 @@ class OrderServiceTest {
     void acceptsTheLongestCorrelationIdTheEdgeForwardsAndTruncatesItForStorage() {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        CreateOrderRequest request = checkout(productId, 2);
         when(orderTransactions.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
@@ -528,7 +639,7 @@ class OrderServiceTest {
     void aFailedStoreQuoteKeepsTheUpstreamCauseOnTheRejection() {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        CreateOrderRequest request = new CreateOrderRequest(List.of(new OrderItemRequest(productId, 2)));
+        CreateOrderRequest request = checkout(productId, 2);
         when(orderRepository.findByUserIdAndIdempotencyKeyWithItems(userId, "checkout-down"))
                 .thenReturn(Optional.empty());
         Request feignRequest = Request.create(Request.HttpMethod.POST, "/api/store/internal/products/quote",
@@ -554,8 +665,7 @@ class OrderServiceTest {
         when(walletClient.placeHold(any(), any(), anyLong(), any(), any()))
                 .thenThrow(new InsufficientWalletBalanceException("INSUFFICIENT_FUNDS", "short"));
 
-        assertThatThrownBy(() -> service.createOrder(userId,
-                new CreateOrderRequest(List.of(new OrderItemRequest(productId, 1))), "checkout-short", "corr"))
+        assertThatThrownBy(() -> service.createOrder(userId, checkout(productId, 1), "checkout-short", "corr"))
                 .isInstanceOf(InsufficientWalletBalanceException.class);
         verify(orderRepository, never()).save(any());
     }

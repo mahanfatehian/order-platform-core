@@ -40,9 +40,23 @@
                 </div>
                 <p th:if="${walletShort}" id="wallet-short" class="small">This balance cannot cover the order. Confirm stays disabled. An open hold is reserved, not spent.</p>
                 <p class="small muted">The order begins pending while inventory is reserved. You can cancel until warehouse packing starts.</p>
+                <div th:if="${addresses.isEmpty()}" class="alert alert-warning" role="alert">
+                    <span>Add an Iran address before placing the order.</span>
+                    <a th:href="@{/app/addresses/new}">Add address</a>
+                </div>
                 <form th:action="@{/app/checkout}" method="post" aria-label="Place order">
+                    <fieldset class="mb-3" th:if="${!addresses.isEmpty()}">
+                        <legend class="form-label">Ship to</legend>
+                        <div class="form-check" th:each="address : ${addresses}">
+                            <input class="form-check-input" type="radio" name="addressId"
+                                   th:id="|address-${address.id()}|" th:value="${address.id()}"
+                                   th:checked="${address.id().equals(selectedAddressId)}" required>
+                            <label class="form-check-label" th:for="|address-${address.id()}|" th:text="${address.summary()}">Address</label>
+                        </div>
+                    </fieldset>
                     <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}">
-                    <button class="btn btn-primary btn-lg w-100" type="submit" th:disabled="${!cart.checkoutReady() or walletShort}">Place order</button>
+                    <button class="btn btn-primary btn-lg w-100" type="submit"
+                            th:disabled="${!cart.checkoutReady() or walletShort or addresses.isEmpty()}">Place order</button>
                 </form>
                 <a class="btn btn-link w-100 mt-2" th:href="@{/app/cart}">Back to cart</a>
             </aside>

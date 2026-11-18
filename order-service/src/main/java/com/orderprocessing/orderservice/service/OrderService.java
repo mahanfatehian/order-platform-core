@@ -14,6 +14,7 @@ import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
+import com.orderprocessing.orderservice.client.AddressBookClient;
 import com.orderprocessing.orderservice.client.StoreServiceClient;
 import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.CreateOrderRequest;
@@ -75,6 +76,7 @@ public class OrderService {
     private final OrderStatusHistoryRepository historyRepository;
     private final StoreServiceClient storeServiceClient;
     private final WalletLedgerClient walletLedgerClient;
+    private final AddressBookClient addressBookClient;
     private final ObjectMapper objectMapper;
     private final TransactionOperations orderTransactions;
     private final KafkaTopicNames kafkaTopicNames;
@@ -85,6 +87,7 @@ public class OrderService {
                         OrderStatusHistoryRepository historyRepository,
                         StoreServiceClient storeServiceClient,
                         WalletLedgerClient walletLedgerClient,
+                        AddressBookClient addressBookClient,
                         ObjectMapper objectMapper,
                         TransactionOperations orderTransactions,
                         KafkaTopicNames kafkaTopicNames) {
@@ -94,6 +97,7 @@ public class OrderService {
         this.historyRepository = historyRepository;
         this.storeServiceClient = storeServiceClient;
         this.walletLedgerClient = walletLedgerClient;
+        this.addressBookClient = addressBookClient;
         this.objectMapper = objectMapper;
         this.orderTransactions = orderTransactions;
         this.kafkaTopicNames = kafkaTopicNames;
@@ -108,6 +112,7 @@ public class OrderService {
         if (existing.isPresent()) {
             return replayOrConflict(existing.get(), quantities);
         }
+        AddressBookClient.ShipToAddress shipTo = requireShipTo(userId, request.getAddressId());
 
         StoreQuoteResponse quote = loadAuthoritativeQuote(quantities);
         Map<UUID, StoreQuoteItemResponse> quoteByProduct = validateQuote(quantities, quote);
@@ -119,7 +124,24 @@ public class OrderService {
                 userId, orderId, minor, holdKey, normalizedCorrelationId);
         return Objects.requireNonNull(orderTransactions.execute(status ->
                 persistQuotedOrder(userId, quantities, quoteByProduct, normalizedKey, normalizedCorrelationId,
-                        orderId, hold)));
+                        orderId, hold, shipTo)));
+    }
+
+    private AddressBookClient.ShipToAddress requireShipTo(UUID userId, UUID addressId) {
+        if (addressId == null) {
+            throw new IllegalArgumentException("A ship-to address is required");
+        }
+        AddressBookClient.ShipToAddress address = addressBookClient.findOwned(userId, addressId);
+        if (address == null || !"IR".equals(address.country())
+                || blank(address.recipient()) || blank(address.line1()) || blank(address.city())
+                || blank(address.region()) || blank(address.postalCode()) || blank(address.phone())) {
+            throw new IllegalArgumentException("Only a complete IR address can be used");
+        }
+        return address;
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     private OrderResponse persistQuotedOrder(UUID userId,
@@ -127,8 +149,9 @@ public class OrderService {
                                              Map<UUID, StoreQuoteItemResponse> quoteByProduct,
                                              String normalizedKey,
                                              String normalizedCorrelationId,
-                                             UUID orderId,
-                                             WalletLedgerClient.HoldPlaced hold) {
+                                              UUID orderId,
+                                              WalletLedgerClient.HoldPlaced hold,
+                                              AddressBookClient.ShipToAddress shipTo) {
         if (normalizedKey != null) {
             orderRepository.acquireIdempotencyLock(userId + ":" + normalizedKey);
             Optional<Order> existing = findIdempotentOrder(userId, normalizedKey);
@@ -146,6 +169,7 @@ public class OrderService {
         order.setIdempotencyKey(normalizedKey);
         order.setWalletHoldId(hold.holdId());
         order.setWalletAmountMinor(hold.amountMinor());
+        copyShipTo(order, shipTo);
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
 
@@ -746,7 +770,26 @@ public class OrderService {
                 .walletHoldId(order.getWalletHoldId())
                 .walletAmountMinor(order.getWalletAmountMinor())
                 .walletTender(walletTender(order))
+                .shipRecipient(order.getShipRecipient())
+                .shipLine1(order.getShipLine1())
+                .shipLine2(order.getShipLine2())
+                .shipCity(order.getShipCity())
+                .shipRegion(order.getShipRegion())
+                .shipPostalCode(order.getShipPostalCode())
+                .shipPhone(order.getShipPhone())
+                .shipCountry(order.getShipCountry())
                 .build();
+    }
+
+    private void copyShipTo(Order order, AddressBookClient.ShipToAddress shipTo) {
+        order.setShipRecipient(shipTo.recipient());
+        order.setShipLine1(shipTo.line1());
+        order.setShipLine2(blank(shipTo.line2()) ? null : shipTo.line2());
+        order.setShipCity(shipTo.city());
+        order.setShipRegion(shipTo.region());
+        order.setShipPostalCode(shipTo.postalCode());
+        order.setShipPhone(shipTo.phone());
+        order.setShipCountry(shipTo.country());
     }
 
     public int reconcileOpenWalletHolds(Instant cutoff, int batchSize) {

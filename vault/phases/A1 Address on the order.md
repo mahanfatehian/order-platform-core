@@ -1,12 +1,12 @@
 # A1 Address on the order
 
-`Order` today stores a user id, a total, and a tracking string. It does not store where the box goes. A later edit of the customer's profile must not rewrite an order already placed.
+Checkout copies a snapshot of the selected address onto the order. Pack and ship read that snapshot and do not call the profile. A later edit or delete of the address book does not change the order.
 
 ## Build
 
-- A customer address book: recipient, lines, city, region, postal code, phone. One default.
-- Checkout requires a selected address. The order stores a snapshot of those fields, not a live link.
-- Pack and ship read the snapshot. They do not call the profile.
+- A customer address book: recipient, lines, city, region, postal code, phone, country `IR`. One default.
+- Checkout requires an address id that belongs to the ordering user. It copies those fields onto the order in the same transaction as the insert, after the wallet hold. The order does not store an address id.
+- Pack and ship read the snapshot already on the order. They do not call the profile. An order written before this change can still be packed and shipped.
 - The customer can read the snapshot on the order page.
 - Country is the deployment country from [[07 Shop boundary]]. A second country is rejected.
 

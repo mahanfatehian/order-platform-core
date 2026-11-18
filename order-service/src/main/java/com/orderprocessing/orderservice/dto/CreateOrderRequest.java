@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.util.List;
+import java.util.UUID;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 @Schema(description = "Request payload for creating a new order")
@@ -19,4 +20,11 @@ public class CreateOrderRequest {
     @Valid
     @Schema(description = "List of items to include in the order")
     private List<OrderItemRequest> items;
+
+    @Schema(description = "Ship-to address owned by the ordering user")
+    private UUID addressId;
+
+    public CreateOrderRequest(List<OrderItemRequest> items) {
+        this.items = items;
+    }
 }

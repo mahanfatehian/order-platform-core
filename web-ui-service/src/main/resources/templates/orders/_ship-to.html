@@ -1,0 +1,12 @@
+<div th:fragment="snapshot(order)" xmlns:th="http://www.thymeleaf.org" class="ship-to">
+    <p class="small muted mb-1">Ship to</p>
+    <div th:if="${order.shipRecipient() != null}">
+        <strong th:text="${order.shipRecipient()}">Recipient</strong>
+        <div th:text="${order.shipLine1()}">Line 1</div>
+        <div th:if="${order.shipLine2() != null}" th:text="${order.shipLine2()}">Line 2</div>
+        <div th:text="|${order.shipCity()}, ${order.shipRegion()} ${order.shipPostalCode()}|">City</div>
+        <div th:text="${order.shipPhone()}">Phone</div>
+        <div class="mono" th:text="${order.shipCountry()}">IR</div>
+    </div>
+    <p th:if="${order.shipRecipient() == null}" class="small muted mb-0">No ship-to address was stored with this order.</p>
+</div>
