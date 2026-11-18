@@ -5,7 +5,8 @@
         <article class="metric"><span class="metric__label">Cart units</span><strong class="metric__value" th:text="${cartCount}">0</strong><span class="metric__note">Ready for review</span></article>
         <article class="metric metric--warning"><span class="metric__label">Recent processing</span><strong class="metric__value" th:text="${processingOrders ?: '—'}">0</strong><span class="metric__note">Among your latest 5 orders</span></article>
         <article class="metric metric--success"><span class="metric__label">Products in stock</span><strong class="metric__value" th:text="${availableProducts ?: '—'}">0</strong><span class="metric__note" th:text="${productsUnavailable} ? 'Store temporarily unavailable' : 'Available now'">Available now</span></article>
-        <article class="metric"><span class="metric__label">Session</span><strong class="metric__value" style="font-size:1.25rem">Protected</strong><span class="metric__note">Redis-backed · HttpOnly</span></article>
+        <article class="metric"><span class="metric__label">Available</span><strong id="wallet-available" class="metric__value" th:text="${wallet != null} ? ${wallet.available()} : '—'">0</strong><span class="metric__note" th:text="${walletUnavailable} ? 'Wallet temporarily unavailable' : (${wallet != null} ? 'Spendable now' : 'No wallet yet')">Spendable now</span></article>
+        <article class="metric metric--warning"><span class="metric__label">Open holds</span><strong id="wallet-holds" class="metric__value" th:text="${wallet != null} ? ${wallet.openHolds()} : '—'">0</strong><span class="metric__note">Reserved, not spent</span></article>
     </div>
     <div class="row g-3">
         <div class="col-xl-8"><section class="surface table-responsive"><div class="p-3 d-flex justify-content-between"><h2 class="section-title mb-0">Recent orders</h2><a th:href="@{/app/orders}">View all</a></div>

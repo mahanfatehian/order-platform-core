@@ -79,6 +79,7 @@ class WebUiMvcTest {
                 .thenReturn(PageResponse.empty(0, 12));
         when(authenticatedClient.product(any())).thenReturn(product);
         when(authenticatedClient.quote(anyMap())).thenReturn(cart);
+        when(authenticatedClient.myWalletBalance()).thenReturn(new WalletBalanceView(USER_ID, "IRR", 100000, 100000, 0));
         when(authenticatedClient.myOrders(anyInt(), anyInt())).thenReturn(new PageResponse<>(List.of(order), 0, 10, 1, 1, true, true));
         when(authenticatedClient.order(any())).thenReturn(order);
         when(authenticatedClient.profile()).thenReturn(userView);

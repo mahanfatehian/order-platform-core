@@ -1,5 +1,7 @@
 # W5 Customer surface
 
+The customer reads only the wallet named by their token. The home page and checkout show available balance and open holds. A short balance disables confirm and does not create an order. There is no top-up control.
+
 ## Build
 
 - Customer home shows available balance and open holds

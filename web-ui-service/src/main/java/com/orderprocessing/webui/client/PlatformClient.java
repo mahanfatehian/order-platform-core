@@ -318,6 +318,25 @@ public class PlatformClient {
         }
     }
 
+    public WalletBalanceView myWalletBalance(String token) {
+        try {
+            return wallets.get().uri("/api/wallets/me/balance")
+                    .headers(headers -> bearer(headers, token))
+                    .retrieve().body(WalletBalanceView.class);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) {
+                return null;
+            }
+            throw exception;
+        }
+    }
+
+    public List<WalletEntryView> myWalletEntries(String token) {
+        return wallets.get().uri("/api/wallets/me/entries")
+                .headers(headers -> bearer(headers, token))
+                .retrieve().body(new ParameterizedTypeReference<>() { });
+    }
+
     private ServiceStatusView registryHealth() {
         try {
             EurekaClient client = eurekaClient.getIfAvailable();

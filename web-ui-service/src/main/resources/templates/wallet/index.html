@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Wallet</p>
+            <h1>Your balance</h1>
+            <p>Available is what checkout can spend. An open hold is reserved, not spent. There is no top-up here.</p>
+        </div>
+    </header>
+    <div class="metric-grid" th:if="${balance != null}">
+        <article class="metric">
+            <span class="metric__label">Available</span>
+            <strong id="wallet-available" class="metric__value" th:text="${balance.available()}">0</strong>
+            <span class="metric__note" th:text="${balance.currency()}">IRR</span>
+        </article>
+        <article class="metric metric--warning">
+            <span class="metric__label">Open holds</span>
+            <strong id="wallet-holds" class="metric__value" th:text="${balance.openHolds()}">0</strong>
+            <span class="metric__note">Unavailable until the order confirms or the hold is released</span>
+        </article>
+    </div>
+    <p th:if="${balance == null}" id="wallet-missing">This account has no wallet yet. An administrator funds it. Checkout cannot spend a balance that does not exist.</p>
+    <section class="surface table-responsive">
+        <table class="table data-table">
+            <thead><tr><th>When</th><th>Type</th><th>Amount</th><th>Reason</th></tr></thead>
+            <tbody>
+            <tr th:each="entry : ${entries}">
+                <td th:text="${entry.createdAt()}">time</td>
+                <td th:text="${entry.type()}">CREDIT</td>
+                <td th:text="${entry.amount()}">0</td>
+                <td th:text="${entry.reason()}">reason</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</section>
+</html>

@@ -30,14 +30,19 @@
         <div class="col-xl-4">
             <aside class="surface surface--padded">
                 <h2 class="section-title">Place order</h2>
-                <div class="d-flex justify-content-between mb-3">
+                <div class="d-flex justify-content-between mb-1">
                     <span>Order total</span>
-                    <strong class="money fs-4" th:text="|$${#numbers.formatDecimal(cart.total(),1,2)}|">$0</strong>
+                    <strong id="checkout-total" class="money fs-4" th:text="|$${#numbers.formatDecimal(cart.total(),1,2)}|">$0</strong>
                 </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Available</span>
+                    <strong id="checkout-available" th:text="${wallet != null} ? ${wallet.available()} : 'none'">0</strong>
+                </div>
+                <p th:if="${walletShort}" id="wallet-short" class="small">This balance cannot cover the order. Confirm stays disabled. An open hold is reserved, not spent.</p>
                 <p class="small muted">The order begins pending while inventory is reserved. You can cancel until warehouse packing starts.</p>
                 <form th:action="@{/app/checkout}" method="post" aria-label="Place order">
                     <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}">
-                    <button class="btn btn-primary btn-lg w-100" type="submit" th:disabled="${!cart.checkoutReady()}">Place order</button>
+                    <button class="btn btn-primary btn-lg w-100" type="submit" th:disabled="${!cart.checkoutReady() or walletShort}">Place order</button>
                 </form>
                 <a class="btn btn-link w-100 mt-2" th:href="@{/app/cart}">Back to cart</a>
             </aside>
