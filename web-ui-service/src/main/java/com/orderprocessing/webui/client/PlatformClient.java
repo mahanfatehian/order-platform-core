@@ -10,6 +10,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -166,6 +167,50 @@ public class PlatformClient {
                 .queryParam("size", size).queryParam("q", nullToEmpty(search)).build().encode().toUriString();
         return store.get().uri(uri).headers(headers -> bearer(headers, token)).retrieve()
                 .body(new ParameterizedTypeReference<>() { });
+    }
+
+    public ProductView adminProduct(String token, UUID id) {
+        return store.get().uri("/api/store/admin/products/{id}", id).headers(headers -> bearer(headers, token))
+                .retrieve().body(ProductView.class);
+    }
+
+    public java.util.List<CategoryView> categories(String token) {
+        java.util.List<CategoryView> categories = store.get().uri("/api/store/admin/categories")
+                .headers(headers -> bearer(headers, token)).retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+        return categories == null ? java.util.List.of() : categories;
+    }
+
+    public CategoryView createCategory(String token, String name) {
+        return store.post().uri("/api/store/admin/categories").headers(headers -> bearer(headers, token))
+                .contentType(MediaType.APPLICATION_JSON).body(java.util.Map.of("name", name))
+                .retrieve().body(CategoryView.class);
+    }
+
+    public PictureView uploadPicture(String token, UUID productId, String contentType, byte[] bytes) {
+        return store.post().uri("/api/store/admin/products/{id}/pictures", productId)
+                .headers(headers -> bearer(headers, token))
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(bytes)
+                .retrieve().body(PictureView.class);
+    }
+
+    public PictureBytes productPicture(String token, UUID productId, UUID pictureId) {
+        ResponseEntity<byte[]> response = store.get()
+                .uri("/api/store/products/{id}/pictures/{pictureId}", productId, pictureId)
+                .headers(headers -> bearer(headers, token))
+                .retrieve().toEntity(byte[].class);
+        MediaType type = response.getHeaders().getContentType();
+        return new PictureBytes(type == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : type.toString(),
+                response.getBody());
+    }
+
+    public StockReceiptView receiveStock(String token, UUID productId, int quantity, String reason, String idempotencyKey) {
+        return store.post().uri("/api/store/admin/inventory/{id}/receipts", productId)
+                .headers(headers -> bearer(headers, token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(java.util.Map.of("quantity", quantity, "reason", reason, "idempotencyKey", idempotencyKey))
+                .retrieve().body(StockReceiptView.class);
     }
 
     public ProductView createProduct(String token, ProductForm form) {
@@ -358,7 +403,7 @@ public class PlatformClient {
     private static Map<String, Object> productBody(ProductForm form) {
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("name", form.getName()); body.put("sku", form.getSku()); body.put("description", form.getDescription());
-        body.put("price", form.getPrice()); body.put("category", form.getCategory()); body.put("active", form.isActive());
+        body.put("price", form.getPrice()); body.put("categoryId", form.getCategoryId()); body.put("active", form.isActive());
         return body;
     }
 

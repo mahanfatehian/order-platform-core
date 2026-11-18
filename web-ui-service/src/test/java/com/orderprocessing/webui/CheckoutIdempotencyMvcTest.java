@@ -66,7 +66,7 @@ class CheckoutIdempotencyMvcTest {
     void cartIsOrderable() {
         when(client.product(any())).thenReturn(new ProductView(
                 PRODUCT, "Lamp", "d", "SKU-9", new BigDecimal("10.00"), "OTHER",
-                true, 50, Instant.now(), Instant.now()));
+                true, 50, Instant.now(), Instant.now(), null, null));
         when(client.quote(anyMap())).thenReturn(new CartView(
                 List.of(new QuoteItemView(PRODUCT, "Lamp", new BigDecimal("10.00"), true, 2, 50, true)),
                 new BigDecimal("20.00"), true));

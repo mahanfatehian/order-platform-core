@@ -20,6 +20,10 @@ server:
 spring:
   application:
     name: web-ui-service
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 8MB
   lifecycle:
     timeout-per-shutdown-phase: 30s
   data:

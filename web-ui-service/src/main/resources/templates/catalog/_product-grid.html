@@ -5,11 +5,9 @@
     <div th:if="${!products.content().isEmpty()}" class="product-grid">
         <article class="product-card surface" th:each="product : ${products.content()}">
             <div class="product-card__signal"></div>
-            <div class="product-card__visual" th:switch="${product.category()}" aria-hidden="true">
-                <i th:case="'ELECTRONICS'" class="bi bi-headphones"></i>
-                <i th:case="'CLOTHING'" class="bi bi-handbag"></i>
-                <i th:case="'HOME'" class="bi bi-lamp"></i>
-                <i th:case="*" class="bi bi-box-seam"></i>
+            <div class="product-card__visual">
+                <img th:if="${product.pictureId() != null}" th:src="@{/app/catalog/{id}/pictures/{pictureId}(id=${product.id()}, pictureId=${product.pictureId()})}" th:alt="${product.name()}">
+                <i th:if="${product.pictureId() == null}" class="bi bi-box-seam" aria-hidden="true"></i>
             </div>
             <div class="product-card__body">
                 <div class="product-card__meta">

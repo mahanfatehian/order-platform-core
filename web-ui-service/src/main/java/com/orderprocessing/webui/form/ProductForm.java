@@ -16,8 +16,8 @@ public class ProductForm {
     // price passes binding, is rejected by the backend, and surfaces as a service-unavailable page that loses
     // everything the administrator typed.
     @NotNull @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) private BigDecimal price;
-    @NotBlank private String category = "OTHER";
-    private boolean active = true;
+    @NotNull private java.util.UUID categoryId;
+    private boolean active;
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getSku() { return sku; }
@@ -26,8 +26,8 @@ public class ProductForm {
     public void setDescription(String description) { this.description = description; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
+    public java.util.UUID getCategoryId() { return categoryId; }
+    public void setCategoryId(java.util.UUID categoryId) { this.categoryId = categoryId; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 }

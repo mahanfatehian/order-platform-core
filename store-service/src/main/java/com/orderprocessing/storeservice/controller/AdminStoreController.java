@@ -1,18 +1,27 @@
 package com.orderprocessing.storeservice.controller;
 
 import com.orderprocessing.storeservice.dto.ActivationRequest;
+import com.orderprocessing.storeservice.dto.CategoryRequest;
+import com.orderprocessing.storeservice.dto.CategoryResponse;
 import com.orderprocessing.storeservice.dto.InventoryDTO;
 import com.orderprocessing.storeservice.dto.PageResponse;
+import com.orderprocessing.storeservice.dto.PictureResponse;
 import com.orderprocessing.storeservice.dto.ProductDTO;
 import com.orderprocessing.storeservice.dto.ProductRequest;
+import com.orderprocessing.storeservice.dto.StockReceiptRequest;
+import com.orderprocessing.storeservice.dto.StockReceiptResponse;
 import com.orderprocessing.storeservice.dto.UpdateInventoryDTO;
+import com.orderprocessing.storeservice.service.CategoryService;
 import com.orderprocessing.storeservice.service.InventoryService;
+import com.orderprocessing.storeservice.service.ProductPictureService;
 import com.orderprocessing.storeservice.service.ProductService;
+import com.orderprocessing.storeservice.service.StockReceiptService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +30,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -36,6 +49,9 @@ import java.util.UUID;
 public class AdminStoreController {
     private final ProductService productService;
     private final InventoryService inventoryService;
+    private final CategoryService categoryService;
+    private final ProductPictureService pictureService;
+    private final StockReceiptService stockReceiptService;
 
     @GetMapping("/products")
     public PageResponse<ProductDTO> products(
@@ -68,6 +84,32 @@ public class AdminStoreController {
         return productService.setActive(id, request.active());
     }
 
+    @GetMapping("/categories")
+    public List<CategoryResponse> categories() {
+        return categoryService.list().stream().map(CategoryResponse::from).toList();
+    }
+
+    @PostMapping("/categories")
+    public CategoryResponse createCategory(@Valid @RequestBody CategoryRequest request) {
+        return CategoryResponse.from(categoryService.create(request.name()));
+    }
+
+    @PostMapping(value = "/products/{id}/pictures", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public PictureResponse uploadPicture(@PathVariable UUID id, @RequestParam("file") MultipartFile file)
+            throws IOException {
+        return PictureResponse.from(pictureService.store(id, file.getContentType(), file.getBytes()));
+    }
+
+    @PostMapping(value = "/products/{id}/pictures", consumes = {
+            "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "application/octet-stream"
+    })
+    @ResponseStatus(HttpStatus.CREATED)
+    public PictureResponse uploadPictureBytes(@PathVariable UUID id, @RequestBody byte[] body,
+                                              @RequestHeader("Content-Type") String contentType) {
+        return PictureResponse.from(pictureService.store(id, contentType, body));
+    }
+
     @GetMapping("/inventory")
     public PageResponse<InventoryDTO> inventory(
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -86,5 +128,12 @@ public class AdminStoreController {
     public InventoryDTO updateInventory(@PathVariable UUID productId,
                                         @Valid @RequestBody UpdateInventoryDTO request) {
         return inventoryService.updateInventory(productId, request.getQuantity());
+    }
+
+    @PostMapping("/inventory/{productId}/receipts")
+    public StockReceiptResponse receiveStock(@PathVariable UUID productId,
+                                             @Valid @RequestBody StockReceiptRequest request) {
+        return stockReceiptService.receiveStock(productId, request.quantity(), request.reason(),
+                request.idempotencyKey());
     }
 }

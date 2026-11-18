@@ -1,6 +1,5 @@
 package com.orderprocessing.storeservice.dto;
 
-import com.orderprocessing.storeservice.model.Product;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -30,11 +30,11 @@ public class ProductRequest {
     private BigDecimal price;
 
     @NotNull(message = "Category is required")
-    private Product.Category category;
+    private UUID categoryId;
 
     /**
-     * Nullable on purpose: a caller that does not mention the flag leaves it to the service, which activates a new
-     * product and leaves an existing one as it was. The admin form always sends it.
+     * Nullable on purpose: a caller that does not mention the flag leaves it to the service, which treats a new
+     * product as active and leaves an existing one as it was. Active is rejected until a picture is stored.
      */
     private Boolean active;
 }

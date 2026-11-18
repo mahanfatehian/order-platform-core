@@ -64,7 +64,7 @@ class WebUiMvcTest {
     void defaults() {
         Instant now = Instant.parse("2026-01-02T03:04:05Z");
         ProductView product = new ProductView(PRODUCT_ID, "Signal Lamp", "A test product", "SIG-001",
-                new BigDecimal("29.90"), "OTHER", true, 12, now, now);
+                new BigDecimal("29.90"), "OTHER", true, 12, now, now, null, null);
         QuoteItemView quoteItem = new QuoteItemView(PRODUCT_ID, product.name(), product.price(), true, 2, 12, true);
         CartView cart = new CartView(List.of(quoteItem), new BigDecimal("59.80"), true);
         OrderItemView orderItem = new OrderItemView(UUID.randomUUID(), PRODUCT_ID, product.name(), product.price(), 2,

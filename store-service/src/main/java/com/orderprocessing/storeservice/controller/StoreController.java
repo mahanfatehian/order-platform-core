@@ -2,12 +2,16 @@ package com.orderprocessing.storeservice.controller;
 
 import com.orderprocessing.storeservice.dto.PageResponse;
 import com.orderprocessing.storeservice.dto.ProductDTO;
+import com.orderprocessing.storeservice.model.ProductPicture;
+import com.orderprocessing.storeservice.service.ProductPictureService;
 import com.orderprocessing.storeservice.service.ProductService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +29,7 @@ import java.util.UUID;
 public class StoreController {
     private static final Set<String> SORT_FIELDS = Set.of("name", "price", "createdAt");
     private final ProductService productService;
+    private final ProductPictureService pictureService;
 
     @GetMapping("/products")
     public PageResponse<ProductDTO> getProducts(
@@ -39,6 +44,13 @@ public class StoreController {
     @GetMapping("/products/{id}")
     public ProductDTO getProduct(@PathVariable UUID id) {
         return productService.getCatalogProduct(id);
+    }
+
+    @GetMapping("/products/{id}/pictures/{pictureId}")
+    public ResponseEntity<byte[]> picture(@PathVariable UUID id, @PathVariable UUID pictureId) {
+        ProductPicture picture = pictureService.load(id, pictureId);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(picture.getContentType()))
+                .body(picture.getBytes());
     }
 
     static PageRequest pageRequest(int page, int size, String sortValue) {

@@ -8,7 +8,9 @@ import com.orderprocessing.storeservice.model.Inventory;
 import com.orderprocessing.storeservice.model.InventoryOrderLifecycle;
 import com.orderprocessing.storeservice.model.InventoryReservation;
 import com.orderprocessing.storeservice.model.Product;
+import com.orderprocessing.storeservice.model.ProductCategory;
 import com.orderprocessing.storeservice.repository.InventoryOrderLifecycleRepository;
+import com.orderprocessing.storeservice.repository.ProductCategoryRepository;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
 import com.orderprocessing.storeservice.repository.InventoryReservationRepository;
 import com.orderprocessing.storeservice.repository.ProcessedKafkaEventRepository;
@@ -89,6 +91,8 @@ class InventoryLifecycleConcurrencyIntegrationTest {
     private PlatformTransactionManager transactionManager;
     @Autowired
     private ProductRepository productRepository;
+    @Autowired
+    private ProductCategoryRepository categoryRepository;
     @Autowired
     private InventoryRepository inventoryRepository;
     @Autowired
@@ -184,7 +188,11 @@ class InventoryLifecycleConcurrencyIntegrationTest {
             product.setName("Lifecycle test product");
             product.setSku("lifecycle-" + productId);
             product.setPrice(BigDecimal.ONE);
-            product.setCategory(Product.Category.OTHER);
+            ProductCategory category = new ProductCategory();
+            category.setId(UUID.randomUUID());
+            category.setName("Other");
+            category.setCreatedAt(now);
+            product.setCategory(categoryRepository.save(category));
             product.setActive(true);
             product.setCreatedAt(now);
             product.setUpdatedAt(now);

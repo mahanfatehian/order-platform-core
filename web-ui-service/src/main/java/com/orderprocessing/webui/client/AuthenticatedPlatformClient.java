@@ -58,6 +58,16 @@ public class AuthenticatedPlatformClient {
     public UserView setUserStatus(UUID id, boolean enabled) { return mutate(t -> client.setUserStatus(t, id, enabled)); }
     public UserView setUserRoles(UUID id, Set<String> roles) { return mutate(t -> client.setUserRoles(t, id, roles)); }
     public PageResponse<ProductView> adminProducts(int page, int size, String search) { return get(t -> client.adminProducts(t, page, size, search)); }
+    public ProductView adminProduct(UUID id) { return get(t -> client.adminProduct(t, id)); }
+    public java.util.List<CategoryView> categories() { return get(client::categories); }
+    public CategoryView createCategory(String name) { return mutate(t -> client.createCategory(t, name)); }
+    public PictureView uploadPicture(UUID productId, String contentType, byte[] bytes) {
+        return mutate(t -> client.uploadPicture(t, productId, contentType, bytes));
+    }
+    public PictureBytes productPicture(UUID productId, UUID pictureId) { return get(t -> client.productPicture(t, productId, pictureId)); }
+    public StockReceiptView receiveStock(UUID productId, int quantity, String reason, String idempotencyKey) {
+        return mutate(t -> client.receiveStock(t, productId, quantity, reason, idempotencyKey));
+    }
     public ProductView createProduct(ProductForm form) { return mutate(t -> client.createProduct(t, form)); }
     public ProductView updateProduct(UUID id, ProductForm form) { return mutate(t -> client.updateProduct(t, id, form)); }
     public ProductView setProductActive(UUID id, boolean active) { return mutate(t -> client.setProductActive(t, id, active)); }

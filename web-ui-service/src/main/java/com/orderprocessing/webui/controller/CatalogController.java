@@ -3,8 +3,11 @@ package com.orderprocessing.webui.controller;
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
 import com.orderprocessing.webui.dto.PageResponse;
 import com.orderprocessing.webui.dto.PaginationLinks;
+import com.orderprocessing.webui.dto.PictureBytes;
 import com.orderprocessing.webui.dto.ProductView;
 import com.orderprocessing.webui.form.QuantityForm;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,5 +53,11 @@ public class CatalogController {
         model.addAttribute("product", client.product(id));
         model.addAttribute("quantityForm", new QuantityForm());
         return "catalog/detail";
+    }
+
+    @GetMapping("/{id}/pictures/{pictureId}")
+    public ResponseEntity<byte[]> picture(@PathVariable UUID id, @PathVariable UUID pictureId) {
+        PictureBytes picture = client.productPicture(id, pictureId);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(picture.contentType())).body(picture.bytes());
     }
 }
