@@ -1,5 +1,7 @@
 package com.orderprocessing.orderservice.client;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public interface WalletLedgerClient {
@@ -9,6 +11,11 @@ public interface WalletLedgerClient {
 
     void releaseHold(UUID holdId, String idempotencyKey, String correlationId);
 
+    List<OpenHold> listOpenHolds(Instant createdBefore, int limit);
+
     record HoldPlaced(UUID holdId, long amountMinor) {
+    }
+
+    record OpenHold(UUID holdId, UUID orderId, long amount, Instant createdAt) {
     }
 }

@@ -1,6 +1,6 @@
 # W3 Pay orders from the wallet
 
-Checkout places a hold before the order row and captures it on confirm. A short balance creates no order. Cancel after capture is still the next money slice.
+Checkout places a hold before the order row and captures it on confirm. A short balance creates no order. A hold left behind by a crash is released or captured by the reconciliation job. Cancel after capture is still the next money slice.
 
 ## Build
 

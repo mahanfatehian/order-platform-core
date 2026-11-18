@@ -12,6 +12,7 @@ import com.orderprocessing.walletservice.repository.LedgerEntryRepository;
 import com.orderprocessing.walletservice.repository.ProcessedCommandRepository;
 import com.orderprocessing.walletservice.repository.WalletRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -171,6 +172,13 @@ public class WalletLedger {
         }
         return post(wallet, EntryType.REFUND, capture.getAmount(), idempotencyKey, hash, "SYSTEM", "SYSTEM", "refund",
                 correlationId, capture.getOrderId(), capture.getHoldId(), capture.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Hold> openHolds(Instant createdBefore, int limit) {
+        int bounded = Math.max(1, Math.min(limit, 100));
+        return holds.findByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                HoldStatus.OPEN, createdBefore, PageRequest.of(0, bounded));
     }
 
     @Transactional(readOnly = true)

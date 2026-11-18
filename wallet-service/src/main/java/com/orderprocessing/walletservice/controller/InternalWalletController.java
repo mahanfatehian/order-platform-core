@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -58,6 +62,12 @@ public class InternalWalletController {
         return EntryResponse.from(ledger.refundCapture(captureEntryId, request.idempotencyKey(), correlationId));
     }
 
+    @GetMapping("/holds")
+    public List<OpenHoldView> openHolds(@RequestParam Instant createdBefore,
+                                        @RequestParam(defaultValue = "50") int limit) {
+        return ledger.openHolds(createdBefore, limit).stream().map(OpenHoldView::from).toList();
+    }
+
     @GetMapping("/users/{userId}/balance")
     public WalletLedger.Balance balance(@PathVariable UUID userId) {
         return ledger.balance(userId);
@@ -82,6 +92,12 @@ public class InternalWalletController {
     }
 
     public record KeyRequest(@NotBlank String idempotencyKey) {
+    }
+
+    public record OpenHoldView(UUID holdId, UUID orderId, long amount, Instant createdAt) {
+        static OpenHoldView from(com.orderprocessing.walletservice.model.Hold hold) {
+            return new OpenHoldView(hold.getId(), hold.getOrderId(), hold.getAmount(), hold.getCreatedAt());
+        }
     }
 
     public record EntryResponse(UUID id, UUID walletId, String type, long amount, String currency, UUID holdId) {

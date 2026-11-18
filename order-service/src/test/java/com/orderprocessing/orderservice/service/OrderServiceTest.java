@@ -499,4 +499,63 @@ class OrderServiceTest {
         order.getItems().add(item);
         return order;
     }
+
+    @Test
+    void anOrphanHoldOlderThanTheDeadlineIsReleasedAndAReplayDoesNotReleaseAgain() {
+        UUID holdId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        WalletLedgerClient.OpenHold hold = new WalletLedgerClient.OpenHold(holdId, orderId, 2500, Instant.now().minusSeconds(3600));
+        when(walletClient.listOpenHolds(any(), anyInt())).thenReturn(List.of(hold), List.of());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        assertThat(service.reconcileOpenWalletHolds(Instant.now(), 50)).isEqualTo(1);
+        assertThat(service.reconcileOpenWalletHolds(Instant.now(), 50)).isZero();
+
+        verify(walletClient).releaseHold(holdId, holdId + ":reconcile-release", "wallet-reconcile");
+    }
+
+    @Test
+    void aConfirmedOrderWithAnOpenHoldIsCapturedOnce() {
+        Order order = pendingWithHold();
+        order.setStatus(Order.Status.CONFIRMED);
+        UUID captureId = UUID.randomUUID();
+        WalletLedgerClient.OpenHold hold = new WalletLedgerClient.OpenHold(
+                order.getWalletHoldId(), order.getId(), 2500, Instant.now().minusSeconds(3600));
+        when(walletClient.listOpenHolds(any(), anyInt())).thenReturn(List.of(hold));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(walletClient.captureHold(order.getWalletHoldId(), order.getId() + ":capture", "wallet-reconcile"))
+                .thenReturn(captureId);
+
+        assertThat(service.reconcileOpenWalletHolds(Instant.now(), 50)).isEqualTo(1);
+
+        assertThat(order.getWalletCaptureEntryId()).isEqualTo(captureId);
+        verify(walletClient).captureHold(order.getWalletHoldId(), order.getId() + ":capture", "wallet-reconcile");
+        verify(walletClient, never()).releaseHold(any(), any(), any());
+    }
+
+    @Test
+    void aReleasedHoldOnAConfirmedOrderIsLeftUnpaid() {
+        Order order = pendingWithHold();
+        order.setStatus(Order.Status.CONFIRMED);
+        WalletLedgerClient.OpenHold hold = new WalletLedgerClient.OpenHold(
+                order.getWalletHoldId(), order.getId(), 2500, Instant.now().minusSeconds(3600));
+        when(walletClient.listOpenHolds(any(), anyInt())).thenReturn(List.of(hold));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(walletClient.captureHold(any(), any(), any())).thenThrow(new IllegalStateException("HOLD_NOT_OPEN"));
+
+        assertThat(service.reconcileOpenWalletHolds(Instant.now(), 50)).isZero();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
+        assertThat(order.getWalletCaptureEntryId()).isNull();
+    }
+
+    @Test
+    void aStalePendingOrderReleasesItsHold() {
+        Order order = pendingWithHold();
+        when(orderRepository.lockStalePendingOrders(any(), anyInt())).thenReturn(List.of(order));
+
+        service.failStalePendingOrders(Instant.now(), 25);
+
+        verify(walletClient).releaseHold(eq(order.getWalletHoldId()), eq(order.getId() + ":release"), any());
+        assertThat(order.getStatus()).isEqualTo(Order.Status.FAILED);
+    }
 }

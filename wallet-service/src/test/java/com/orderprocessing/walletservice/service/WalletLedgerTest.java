@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -225,6 +226,16 @@ class WalletLedgerTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(exception);
         }
+    }
+
+    @Test
+    void anOpenHoldOlderThanTheCutoffIsListedAndAReleasedHoldIsNot() {
+        UUID userId = UUID.randomUUID();
+        ledger.credit(userId, 1_000, "opening", key(), "admin", "ADMIN", "corr");
+        LedgerEntry hold = ledger.placeHold(userId, UUID.randomUUID(), 40, key(), "corr");
+        assertThat(ledger.openHolds(Instant.now().plusSeconds(5), 10)).extracting(row -> row.getId()).contains(hold.getHoldId());
+        ledger.releaseHold(hold.getHoldId(), key(), "corr");
+        assertThat(ledger.openHolds(Instant.now().plusSeconds(5), 10)).extracting(row -> row.getId()).doesNotContain(hold.getHoldId());
     }
 
     private static String key() {

@@ -747,6 +747,50 @@ public class OrderService {
                 .build();
     }
 
+    public int reconcileOpenWalletHolds(Instant cutoff, int batchSize) {
+        List<WalletLedgerClient.OpenHold> holds = walletLedgerClient.listOpenHolds(cutoff, batchSize);
+        if (holds == null || holds.isEmpty()) {
+            return 0;
+        }
+        int acted = 0;
+        for (WalletLedgerClient.OpenHold hold : holds) {
+            if (hold == null || hold.holdId() == null || hold.orderId() == null) {
+                continue;
+            }
+            Optional<Order> found = orderRepository.findById(hold.orderId());
+            if (found.isEmpty()) {
+                walletLedgerClient.releaseHold(hold.holdId(), reconcileReleaseKey(hold.holdId()), "wallet-reconcile");
+                acted++;
+                continue;
+            }
+            Order order = found.get();
+            if (order.getStatus() == Order.Status.PENDING) {
+                continue;
+            }
+            if (order.getStatus() == Order.Status.FAILED || order.getStatus() == Order.Status.CANCELLED) {
+                walletLedgerClient.releaseHold(hold.holdId(), reconcileReleaseKey(hold.holdId()), "wallet-reconcile");
+                acted++;
+                continue;
+            }
+            try {
+                UUID captureId = walletLedgerClient.captureHold(hold.holdId(), order.getId() + ":capture", "wallet-reconcile");
+                if (order.getWalletCaptureEntryId() == null) {
+                    order.setWalletCaptureEntryId(captureId);
+                    orderRepository.save(order);
+                }
+                acted++;
+            } catch (RuntimeException exception) {
+                log.error("Open hold {} on order {} status {} could not be captured. The order stays unpaid until capture succeeds.",
+                        hold.holdId(), order.getId(), order.getStatus(), exception);
+            }
+        }
+        return acted;
+    }
+
+    private String reconcileReleaseKey(UUID holdId) {
+        return holdId + ":reconcile-release";
+    }
+
     private void failAfterCapture(Order order, StockReservedEvent event, String reason) {
         Instant now = Instant.now();
         order.setStatus(Order.Status.FAILED);
