@@ -23,6 +23,9 @@ public interface WalletServiceFeignClient {
     @PostMapping("/api/wallets/internal/holds/{holdId}/capture")
     WalletEntryResponse capture(@PathVariable UUID holdId, @RequestBody WalletKeyRequest request);
 
+    @PostMapping("/api/wallets/internal/captures/{captureEntryId}/refund")
+    WalletEntryResponse refund(@PathVariable UUID captureEntryId, @RequestBody WalletKeyRequest request);
+
     @PostMapping("/api/wallets/internal/holds/{holdId}/release")
     WalletEntryResponse release(@PathVariable UUID holdId, @RequestBody WalletKeyRequest request);
 

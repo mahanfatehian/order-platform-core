@@ -1,6 +1,7 @@
 package com.orderprocessing.walletservice.service;
 
 import com.orderprocessing.walletservice.exception.WalletException;
+import com.orderprocessing.walletservice.model.EntryType;
 import com.orderprocessing.walletservice.model.HoldStatus;
 import com.orderprocessing.walletservice.model.LedgerEntry;
 import com.orderprocessing.walletservice.repository.HoldRepository;
@@ -195,6 +196,29 @@ class WalletLedgerTest {
         LedgerEntry second = ledger.captureHold(hold.getHoldId(), key(), "corr");
         assertThat(second.getId()).isEqualTo(first.getId());
         assertThat(ledger.balance(userId).booked()).isEqualTo(50);
+    }
+
+    @Test
+    void refundOfCaptureRestoresBookedBalanceAndRejectsASecondRefund() {
+        UUID userId = UUID.randomUUID();
+        ledger.credit(userId, 80, "opening", key(), "admin", "ADMIN", "corr");
+        long beforeHold = ledger.balance(userId).booked();
+        LedgerEntry hold = ledger.placeHold(userId, UUID.randomUUID(), 30, key(), "corr");
+        LedgerEntry capture = ledger.captureHold(hold.getHoldId(), key(), "corr");
+
+        LedgerEntry refund = ledger.refundCapture(capture.getId(), key(), "corr");
+
+        assertThat(ledger.balance(userId).booked()).isEqualTo(beforeHold);
+        assertThat(refund.getRelatedEntryId()).isEqualTo(capture.getId());
+        assertThat(ledger.entries(userId))
+                .filteredOn(entry -> entry.getEntryType() == EntryType.REFUND)
+                .singleElement()
+                .extracting(LedgerEntry::getRelatedEntryId)
+                .isEqualTo(capture.getId());
+        assertThatThrownBy(() -> ledger.refundCapture(capture.getId(), key(), "corr"))
+                .isInstanceOf(WalletException.class)
+                .extracting("code")
+                .isEqualTo("ALREADY_REFUNDED");
     }
 
     @Test
