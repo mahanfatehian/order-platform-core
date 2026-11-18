@@ -39,6 +39,30 @@ public class Order {
     @Column(name = "tracking_reference", length = 100)
     private String trackingReference;
 
+    @Column(name = "ship_recipient", length = 200)
+    private String shipRecipient;
+
+    @Column(name = "ship_line1", length = 200)
+    private String shipLine1;
+
+    @Column(name = "ship_line2", length = 200)
+    private String shipLine2;
+
+    @Column(name = "ship_city", length = 100)
+    private String shipCity;
+
+    @Column(name = "ship_region", length = 100)
+    private String shipRegion;
+
+    @Column(name = "ship_postal_code", length = 20)
+    private String shipPostalCode;
+
+    @Column(name = "ship_phone", length = 32)
+    private String shipPhone;
+
+    @Column(name = "ship_country", length = 2)
+    private String shipCountry;
+
     @Column(name = "wallet_hold_id")
     private UUID walletHoldId;
 

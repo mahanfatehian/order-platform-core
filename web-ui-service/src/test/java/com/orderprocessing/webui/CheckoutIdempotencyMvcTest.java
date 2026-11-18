@@ -2,6 +2,7 @@ package com.orderprocessing.webui;
 
 import com.orderprocessing.webui.client.AuthenticatedPlatformClient;
 import com.orderprocessing.webui.client.PlatformClient;
+import com.orderprocessing.webui.dto.AddressView;
 import com.orderprocessing.webui.dto.CartView;
 import com.orderprocessing.webui.dto.ProductView;
 import com.orderprocessing.webui.dto.QuoteItemView;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class CheckoutIdempotencyMvcTest {
     private static final UUID PRODUCT = UUID.fromString("bbbbbbbb-3333-3333-3333-333333333333");
+    private static final UUID ADDRESS = UUID.fromString("cccccccc-3333-3333-3333-333333333333");
 
     @Autowired MockMvc mvc;
     @MockBean AuthenticatedPlatformClient client;
@@ -71,6 +74,9 @@ class CheckoutIdempotencyMvcTest {
                 List.of(new QuoteItemView(PRODUCT, "Lamp", new BigDecimal("10.00"), true, 2, 50, true)),
                 new BigDecimal("20.00"), true));
         when(client.myWalletBalance()).thenReturn(new WalletBalanceView(UUID.randomUUID(), "IRR", 100000, 100000, 0));
+        when(client.addresses()).thenReturn(List.of(new AddressView(
+                ADDRESS, UUID.randomUUID(), "Ada Lovelace", "12 Enghelab", null, "Tehran", "Tehran",
+                "1136912345", "02112345678", "IR", true)));
     }
 
     private MockHttpSession sessionWithCart() throws Exception {
@@ -104,11 +110,11 @@ class CheckoutIdempotencyMvcTest {
         String key = renderReviewAndReadKey(session);
         // order-service commits, then the response is lost. Only a 409 is handled, so this propagates and the
         // cart and key are both left in place.
-        when(client.createOrder(anyMap(), anyString()))
+        when(client.createOrder(anyMap(), eq(ADDRESS), anyString()))
                 .thenThrow(new ResourceAccessException("read timed out"));
 
         mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session)
-                        .param("idempotencyKey", key))
+                        .param("idempotencyKey", key).param("addressId", ADDRESS.toString()))
                 .andExpect(status().isServiceUnavailable());
 
         // The shopper reloads the review page and orders again. It must carry the ORIGINAL key, or order-service
@@ -134,10 +140,11 @@ class CheckoutIdempotencyMvcTest {
         String key = renderReviewAndReadKey(session);
         when(client.myWalletBalance()).thenReturn(new WalletBalanceView(UUID.randomUUID(), "IRR", 5000, 1000, 4000));
 
-        mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session).param("idempotencyKey", key))
+        mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session)
+                        .param("idempotencyKey", key).param("addressId", ADDRESS.toString()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/app/cart"));
 
-        verify(client, never()).createOrder(anyMap(), anyString());
+        verify(client, never()).createOrder(anyMap(), any(), anyString());
     }
 }

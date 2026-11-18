@@ -46,4 +46,20 @@ public class OrderResponse {
     private Long walletAmountMinor;
 
     private String walletTender;
+
+    private String shipRecipient;
+
+    private String shipLine1;
+
+    private String shipLine2;
+
+    private String shipCity;
+
+    private String shipRegion;
+
+    private String shipPostalCode;
+
+    private String shipPhone;
+
+    private String shipCountry;
 }

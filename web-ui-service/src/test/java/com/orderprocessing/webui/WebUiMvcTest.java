@@ -80,6 +80,9 @@ class WebUiMvcTest {
         when(authenticatedClient.product(any())).thenReturn(product);
         when(authenticatedClient.quote(anyMap())).thenReturn(cart);
         when(authenticatedClient.myWalletBalance()).thenReturn(new WalletBalanceView(USER_ID, "IRR", 100000, 100000, 0));
+        when(authenticatedClient.addresses()).thenReturn(List.of(new AddressView(
+                UUID.fromString("dddddddd-1111-1111-1111-111111111111"), USER_ID, "Ada Lovelace",
+                "12 Enghelab", null, "Tehran", "Tehran", "1136912345", "02112345678", "IR", true)));
         when(authenticatedClient.myOrders(anyInt(), anyInt())).thenReturn(new PageResponse<>(List.of(order), 0, 10, 1, 1, true, true));
         when(authenticatedClient.order(any())).thenReturn(order);
         when(authenticatedClient.profile()).thenReturn(userView);
@@ -378,7 +381,7 @@ class WebUiMvcTest {
         OrderView created = new OrderView(ORDER_ID, USER_ID, "PENDING", new BigDecimal("59.80"), null,
                 List.of(), now, now, true);
         when(authenticatedClient.quote(anyMap())).thenReturn(staleQuote, validQuote, validQuote);
-        when(authenticatedClient.createOrder(anyMap(), anyString())).thenReturn(created);
+        when(authenticatedClient.createOrder(anyMap(), any(), anyString())).thenReturn(created);
         var customer = user("customer").roles("USER");
 
         mvc.perform(post("/app/cart/items").with(customer).with(csrf()).session(session)
@@ -394,11 +397,13 @@ class WebUiMvcTest {
 
         String key = (String) session.getAttribute(CheckoutController.class.getName() + ".IDEMPOTENCY_KEY");
         mvc.perform(post("/app/checkout").with(customer).with(csrf()).session(session)
-                        .param("idempotencyKey", key))
+                        .param("idempotencyKey", key)
+                        .param("addressId", "dddddddd-1111-1111-1111-111111111111"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/app/orders/" + ORDER_ID));
 
-        verify(authenticatedClient).createOrder(Map.of(PRODUCT_ID, 2), key);
+        verify(authenticatedClient).createOrder(Map.of(PRODUCT_ID, 2),
+                UUID.fromString("dddddddd-1111-1111-1111-111111111111"), key);
     }
 
     @Test
@@ -422,7 +427,7 @@ class WebUiMvcTest {
                 .andExpect(flash().attribute("warning",
                         "Your cart changed after review. Confirm the refreshed total before ordering."));
 
-        verify(authenticatedClient, never()).createOrder(anyMap(), anyString());
+        verify(authenticatedClient, never()).createOrder(anyMap(), any(), anyString());
     }
 
     @Test

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Address book</p>
+            <h1 th:text="${editing} ? 'Edit address' : 'Add address'">Add address</h1>
+            <p>Country is Iran (IR). A second country is not accepted.</p>
+        </div>
+    </header>
+    <section class="surface surface--padded">
+        <form th:action="${editing} ? @{/app/addresses/{id}(id=${addressId})} : @{/app/addresses}"
+              th:object="${addressForm}" method="post" novalidate>
+            <div th:replace="~{fragments/form-errors :: errors(${addressForm})}"></div>
+            <div class="mb-3">
+                <label class="form-label" for="recipient">Recipient</label>
+                <input id="recipient" class="form-control" th:field="*{recipient}" autocomplete="name">
+                <div class="field-error" th:errors="*{recipient}"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="line1">Address line 1</label>
+                <input id="line1" class="form-control" th:field="*{line1}" autocomplete="address-line1">
+                <div class="field-error" th:errors="*{line1}"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="line2">Address line 2</label>
+                <input id="line2" class="form-control" th:field="*{line2}" autocomplete="address-line2">
+                <div class="field-error" th:errors="*{line2}"></div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="city">City</label>
+                    <input id="city" class="form-control" th:field="*{city}" autocomplete="address-level2">
+                    <div class="field-error" th:errors="*{city}"></div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="region">Region</label>
+                    <input id="region" class="form-control" th:field="*{region}" autocomplete="address-level1">
+                    <div class="field-error" th:errors="*{region}"></div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="postalCode">Postal code</label>
+                    <input id="postalCode" class="form-control" th:field="*{postalCode}" autocomplete="postal-code">
+                    <div class="field-error" th:errors="*{postalCode}"></div>
+                </div>
+            </div>
+            <div class="mb-3 mt-3">
+                <label class="form-label" for="phone">Phone</label>
+                <input id="phone" class="form-control" th:field="*{phone}" autocomplete="tel">
+                <div class="field-error" th:errors="*{phone}"></div>
+            </div>
+            <div class="form-check mb-3">
+                <input id="defaultAddress" class="form-check-input" type="checkbox" th:field="*{defaultAddress}">
+                <label class="form-check-label" for="defaultAddress">Default address</label>
+            </div>
+            <button class="btn btn-primary" type="submit">Save address</button>
+            <a class="btn btn-link" th:href="@{/app/addresses}">Cancel</a>
+        </form>
+    </section>
+</section>
+</html>

@@ -37,9 +37,14 @@ public class AuthenticatedPlatformClient {
     }
     public ProductView product(UUID id) { return get(token -> client.product(token, id)); }
     public CartView quote(Map<UUID, Integer> quantities) { return get(token -> client.quote(token, quantities)); }
-    public OrderView createOrder(Map<UUID, Integer> quantities, String key) {
-        return mutate(token -> client.createOrder(token, quantities, key));
+    public OrderView createOrder(Map<UUID, Integer> quantities, UUID addressId, String key) {
+        return mutate(token -> client.createOrder(token, quantities, addressId, key));
     }
+    public List<AddressView> addresses() { return get(client::addresses); }
+    public AddressView address(UUID id) { return get(token -> client.address(token, id)); }
+    public AddressView createAddress(AddressForm form) { return mutate(token -> client.createAddress(token, form)); }
+    public AddressView updateAddress(UUID id, AddressForm form) { return mutate(token -> client.updateAddress(token, id, form)); }
+    public Void deleteAddress(UUID id) { return mutate(token -> { client.deleteAddress(token, id); return null; }); }
     public PageResponse<OrderView> myOrders(int page, int size) { return get(token -> client.myOrders(token, page, size)); }
     public OrderView order(UUID id) { return get(token -> client.order(token, id)); }
     public OrderView cancelOrder(UUID id) { return mutate(token -> client.cancelOrder(token, id)); }

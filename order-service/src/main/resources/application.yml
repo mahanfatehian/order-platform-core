@@ -78,6 +78,10 @@ spring:
             connect-timeout: 2000
             read-timeout: 3000
             logger-level: basic
+          user-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+            logger-level: basic
 
 services:
   store-service:
@@ -85,6 +89,8 @@ services:
     internal-api-key: ${STORE_SERVICE_INTERNAL_API_KEY}
   wallet-service:
     internal-api-key: ${WALLET_SERVICE_INTERNAL_API_KEY}
+  user-service:
+    internal-api-key: ${USER_SERVICE_INTERNAL_API_KEY}
 
 outbox:
   polling:
