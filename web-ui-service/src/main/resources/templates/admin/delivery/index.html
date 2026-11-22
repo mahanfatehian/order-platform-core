@@ -43,7 +43,7 @@
                     <div>
                         <label class="visually-hidden" th:for="|tracking-${order.id()}|">Tracking reference</label>
                         <input class="form-control form-control-sm mono" th:id="|tracking-${order.id()}|"
-                               name="trackingReference" maxlength="100" placeholder="Tracking reference (optional)">
+                               name="trackingReference" maxlength="100" required placeholder="Tracking reference">
                     </div>
                     <button class="btn btn-primary" type="submit">
                         <i class="bi bi-truck" aria-hidden="true"></i> Mark shipped
