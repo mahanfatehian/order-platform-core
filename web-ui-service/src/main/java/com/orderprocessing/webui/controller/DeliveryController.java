@@ -62,8 +62,7 @@ public class DeliveryController {
     }
 
     /**
-     * The tracking number often arrives from the carrier after the handoff, so the ship form leaves the field
-     * optional. This lets the in-transit lane fill that blank in later without pretending to ship the order again.
+     * A new ship requires the reference. This path only fills a reference on an order that was already shipped.
      */
     @PostMapping("/orders/{id}/tracking")
     public String recordTracking(@PathVariable UUID id,
