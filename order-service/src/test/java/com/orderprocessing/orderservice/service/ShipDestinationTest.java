@@ -90,6 +90,18 @@ class ShipDestinationTest {
         verify(orderRepository, never()).save(any());
     }
 
+    @Test
+    void theSameReferenceDoesNotShipAgain() {
+        Order order = packaged();
+        order.setStatus(Order.Status.SHIPPED);
+        order.setTrackingReference("TRACK-1");
+
+        assertThat(service.shipOrder(order.getId(), UUID.randomUUID(), "retry", "TRACK-1").getStatus())
+                .isEqualTo("SHIPPED");
+        verify(outboxRepository, never()).save(any());
+        verify(historyRepository, never()).save(any());
+    }
+
     private static void stamp(Order order) {
         order.setShipRecipient("Ada Lovelace");
         order.setShipLine1("12 Enghelab");
