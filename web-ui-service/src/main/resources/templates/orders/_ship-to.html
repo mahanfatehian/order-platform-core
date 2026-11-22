@@ -7,6 +7,8 @@
         <div th:text="|${order.shipCity()}, ${order.shipRegion()} ${order.shipPostalCode()}|">City</div>
         <div th:text="${order.shipPhone()}">Phone</div>
         <div class="mono" th:text="${order.shipCountry()}">IR</div>
+        <div th:if="${order.trackingReference() != null and !#strings.isEmpty(order.trackingReference())}"
+             class="mono" th:text="|Tracking ${order.trackingReference()}|">Tracking TRACK-1</div>
     </div>
     <p th:if="${order.shipRecipient() == null}" class="small muted mb-0">No ship-to address was stored with this order.</p>
 </div>

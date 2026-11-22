@@ -87,7 +87,7 @@ Use separate private browser windows for the personas, or sign out between steps
 2. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The order service places a wallet hold for the quoted total before it writes the order. A short balance keeps the cart and creates no order.
 3. Open the new order. It moves from `PENDING` to `CONFIRMED` after the Kafka inventory handshake. The page shows the wallet amount held, then captured. The status region continues polling while fulfillment is active and replaces itself completely on a terminal outcome.
 4. Sign in as `warehouse_worker`. Open **Warehouse queue** and choose **Pack order**. The authoritative HTTP command commits `PACKAGED`, history, and an `OrderPackagedEvent` outbox row atomically.
-5. Sign in as `delivery_driver`. Open **Delivery queue**, enter an optional tracking reference, choose **Mark shipped**, then **Mark delivered**. Delivery settles the reservation as `CONSUMED` and reduces on-hand stock exactly once.
+5. Sign in as `delivery_driver`. Open **Delivery queue**, enter a tracking reference, choose **Mark shipped**, then **Mark delivered**. Delivery settles the reservation as `CONSUMED` and reduces on-hand stock exactly once.
 6. Return to the customer order. The horizontal rail shows all five completed stages, the tracking reference, and the actor-aware activity history. The cancel control disappeared when fulfillment advanced beyond `CONFIRMED`.
 7. Optionally sign in as `admin` to inspect all statuses, users, roles, products, inventory, and service readiness.
 

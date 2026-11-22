@@ -258,7 +258,19 @@ class OrderLifecycleTransitionTest {
         return switch (command) {
             case CANCEL -> service.cancelOrder(order.getId(), owner, false, "corr-cancel");
             case PACK -> service.packOrder(order.getId(), UUID.randomUUID(), "corr-pack");
-            case SHIP -> service.shipOrder(order.getId(), UUID.randomUUID(), "corr-ship", null);
+            case SHIP -> {
+                if (order.getStatus() == Order.Status.PACKAGED) {
+                    order.setShipRecipient("Ada Lovelace");
+                    order.setShipLine1("12 Enghelab");
+                    order.setShipCity("Tehran");
+                    order.setShipRegion("Tehran");
+                    order.setShipPostalCode("1136912345");
+                    order.setShipPhone("02112345678");
+                    order.setShipCountry("IR");
+                    yield service.shipOrder(order.getId(), UUID.randomUUID(), "corr-ship", "TRACK-1");
+                }
+                yield service.shipOrder(order.getId(), UUID.randomUUID(), "corr-ship", null);
+            }
             case DELIVER -> service.deliverOrder(order.getId(), UUID.randomUUID(), "corr-deliver");
         };
     }
