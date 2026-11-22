@@ -78,6 +78,16 @@ class ShipDestinationTest {
         verify(historyRepository, never()).save(any());
     }
 
+    private static void stamp(Order order) {
+        order.setShipRecipient("Ada Lovelace");
+        order.setShipLine1("12 Enghelab");
+        order.setShipCity("Tehran");
+        order.setShipRegion("Tehran");
+        order.setShipPostalCode("1136912345");
+        order.setShipPhone("02112345678");
+        order.setShipCountry("IR");
+    }
+
     private Order packaged() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
