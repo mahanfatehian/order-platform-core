@@ -65,6 +65,19 @@ class ShipDestinationTest {
         verify(historyRepository, never()).save(any());
     }
 
+    @Test
+    void aBlankTrackingReferenceStaysPackaged() {
+        Order order = packaged();
+        stamp(order);
+
+        assertThatThrownBy(() -> service.shipOrder(order.getId(), UUID.randomUUID(), "corr", "  "))
+                .isInstanceOf(BlankTrackingReferenceException.class);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PACKAGED);
+        verify(outboxRepository, never()).save(any());
+        verify(historyRepository, never()).save(any());
+    }
+
     private Order packaged() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
