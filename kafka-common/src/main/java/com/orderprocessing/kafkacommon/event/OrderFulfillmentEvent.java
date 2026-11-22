@@ -15,6 +15,7 @@ import java.util.UUID;
 @Setter
 public abstract class OrderFulfillmentEvent extends DomainEvent {
     private UUID orderId;
+    private UUID userId;
     private UUID actorUserId;
     private String actorRole;
     private String fromStatus;

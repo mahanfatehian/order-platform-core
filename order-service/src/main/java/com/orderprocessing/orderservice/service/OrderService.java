@@ -6,12 +6,14 @@ import com.orderprocessing.kafkacommon.KafkaEventRegistry;
 import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.DomainEvent;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderConfirmedEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFulfillmentEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
+import com.orderprocessing.kafkacommon.event.RefundPostedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.orderservice.client.AddressBookClient;
@@ -307,10 +309,11 @@ public class OrderService {
         if (order.getStatus() != Order.Status.PENDING && order.getStatus() != Order.Status.CONFIRMED) {
             throw new InvalidOrderStateException("Order cannot be cancelled in its current state");
         }
+        UUID refundEntryId = null;
         if (order.getStatus() == Order.Status.PENDING) {
             releaseOpenHold(order, correlationId);
         } else {
-            refundConfirmedCapture(order, correlationId);
+            refundEntryId = refundConfirmedCapture(order, correlationId);
         }
 
         Order.Status previousStatus = order.getStatus();
@@ -334,6 +337,15 @@ public class OrderService {
         cancelled.setCorrelationId(normalizedCorrelationId);
         recordHistory(order, cancelled, previousStatus, Order.Status.CANCELLED, actorUserId, actorRole, reason);
         addOutbox(order.getId(), kafkaTopicNames.orderEvents(), cancelled);
+        if (refundEntryId != null) {
+            RefundPostedEvent posted = new RefundPostedEvent();
+            posted.setRefundEntryId(refundEntryId);
+            posted.setOrderId(order.getId());
+            posted.setUserId(order.getUserId());
+            posted.setAmount(order.getWalletAmountMinor() == null ? 0L : order.getWalletAmountMinor());
+            posted.setCorrelationId(normalizedCorrelationId);
+            addOutbox(order.getId(), kafkaTopicNames.orderEvents(), posted);
+        }
         return toResponse(order);
     }
 
@@ -378,6 +390,7 @@ public class OrderService {
 
             OrderFailedEvent failed = new OrderFailedEvent();
             failed.setOrderId(order.getId());
+            failed.setUserId(order.getUserId());
             failed.setItems(order.getItems().stream().collect(Collectors.toMap(
                     OrderItem::getProductId, OrderItem::getQuantity, Math::addExact, LinkedHashMap::new)));
             failed.setSuccess(false);
@@ -420,6 +433,7 @@ public class OrderService {
             order.setUpdatedAt(occurredAt);
             recordHistory(order, event, Order.Status.PENDING, Order.Status.CONFIRMED, null,
                     "SYSTEM_INVENTORY", "Inventory reservation confirmed");
+            addOutbox(order.getId(), kafkaTopicNames.orderEvents(), confirmedFact(order, event.getCorrelationId()));
         }
     }
 
@@ -609,6 +623,7 @@ public class OrderService {
         event.setSchemaVersion(2);
         event.setCorrelationId(normalizedCorrelationId);
         event.setOrderId(orderId);
+        event.setUserId(order.getUserId());
         event.setActorUserId(actorUserId);
         event.setActorRole(actorRole);
         event.setFromStatus(expectedStatus.name());
@@ -843,6 +858,7 @@ public class OrderService {
         order.setUpdatedAt(now);
         OrderFailedEvent failed = new OrderFailedEvent();
         failed.setOrderId(order.getId());
+        failed.setUserId(order.getUserId());
         failed.setItems(order.getItems().stream().collect(Collectors.toMap(
                 OrderItem::getProductId, OrderItem::getQuantity, Math::addExact, LinkedHashMap::new)));
         failed.setSuccess(false);
@@ -854,14 +870,42 @@ public class OrderService {
         addOutbox(order.getId(), kafkaTopicNames.orderEvents(), failed);
     }
 
-    private void refundConfirmedCapture(Order order, String correlationId) {
+    private UUID refundConfirmedCapture(Order order, String correlationId) {
         if (order.getWalletCaptureEntryId() != null) {
-            walletLedgerClient.refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", correlationId);
-            return;
+            return walletLedgerClient.refundCapture(
+                    order.getWalletCaptureEntryId(), order.getId() + ":refund", correlationId);
         }
         if (order.getWalletHoldId() != null) {
             throw new InvalidOrderStateException("Order cannot be cancelled while wallet money stays captured");
         }
+        return null;
+    }
+
+    private OrderConfirmedEvent confirmedFact(Order order, String correlationId) {
+        OrderConfirmedEvent confirmed = new OrderConfirmedEvent();
+        confirmed.setOrderId(order.getId());
+        confirmed.setUserId(order.getUserId());
+        confirmed.setSuccess(true);
+        confirmed.setCapturedMinor(order.getWalletAmountMinor());
+        confirmed.setWalletCaptureEntryId(order.getWalletCaptureEntryId());
+        confirmed.setLines(order.getItems().stream().map(item -> {
+            OrderConfirmedEvent.Line line = new OrderConfirmedEvent.Line();
+            line.setProductId(item.getProductId());
+            line.setQuantity(item.getQuantity());
+            return line;
+        }).toList());
+        confirmed.setShipRecipient(order.getShipRecipient());
+        confirmed.setShipLine1(order.getShipLine1());
+        confirmed.setShipLine2(order.getShipLine2());
+        confirmed.setShipCity(order.getShipCity());
+        confirmed.setShipRegion(order.getShipRegion());
+        confirmed.setShipPostalCode(order.getShipPostalCode());
+        confirmed.setShipPhone(order.getShipPhone());
+        confirmed.setShipCountry(order.getShipCountry());
+        confirmed.setSchemaVersion(2);
+        confirmed.setCorrelationId(correlationId);
+        confirmed.setOccurredAt(order.getUpdatedAt());
+        return confirmed;
     }
 
     private void releaseOpenHold(Order order, String correlationId) {

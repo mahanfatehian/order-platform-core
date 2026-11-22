@@ -188,7 +188,7 @@ Because the inbox insert shares the transaction, a handler exception rolls back 
 
 | Topic | Current producer | Current interested consumers | Current event types |
 | --- | --- | --- | --- |
-| `order.events` | `order-service` outbox | `store-service`; `order-service` observes fulfillment facts | `OrderPlacedEvent`, `OrderCancelledEvent`, `OrderFailedEvent`, `OrderPackagedEvent`, `OrderShippedEvent`, `OrderDeliveredEvent` |
+| `order.events` | `order-service` outbox | `store-service`; `order-service` observes fulfillment facts; `notification-service` sends status mail | `OrderPlacedEvent`, `OrderCancelledEvent`, `OrderConfirmedEvent`, `OrderFailedEvent`, `OrderPackagedEvent`, `OrderShippedEvent`, `OrderDeliveredEvent`, `RefundPostedEvent` |
 | `store.events` | `store-service` outbox | `order-service` | `StockReservedEvent`, `StockInsufficientEvent` |
 | `order.events.order-service.dlt` | Kafka error recoverer, owned by `order-service` | No in-repository listener | Poison/exhausted `order.events` records from the `order-service` consumer |
 | `order.events.store-service.dlt` | Kafka error recoverer, owned by `store-service` | No in-repository listener | Poison/exhausted `order.events` records from the `store-service` consumer |
@@ -196,7 +196,7 @@ Because the inbox insert shares the transaction, a handler exception rolls back 
 | `order.events.dlt` | Legacy compatibility topic | No in-repository listener | Retained for existing records; no new failures are routed here |
 | `store.events.dlt` | Legacy compatibility topic | No in-repository listener | Retained for existing records; no new failures are routed here |
 
-`OrderFailedEvent` is emitted only by pending-order reconciliation so `store-service` can release a reservation whose stock result never completed the saga. `OrderConfirmedEvent` remains in `KafkaEventRegistry` as a deserializable compatibility contract but is not emitted or consumed by the current saga.
+`OrderFailedEvent` is emitted by pending-order reconciliation, and when wallet capture fails after a reservation, so `store-service` can release a reservation whose stock result never completed the saga. Confirm writes `OrderConfirmedEvent` with the receipt fields. A successful refund writes `RefundPostedEvent` in the same transaction as the cancel. A pending cancel that only releases a hold does not.
 
 The Kafka consumer error handler retries a failed record up to eight times with exponential back-off, starting at one second and doubling to a 30-second cap (about two minutes in all, tunable through `kafka.consumer.retry.*`), then republishes the original record to `<source-topic>.<consumer-service>.dlt` on the same partition. Records that cannot be deserialized or converted are not retried. The active routes are `order.events.order-service.dlt`, `order.events.store-service.dlt`, and `store.events.order-service.dlt`; the source-only DLTs are legacy compatibility topics and receive no new failures. No application listener automatically replays a DLT.
 
@@ -234,7 +234,7 @@ which produces ` INFO [order-service,7c1e...]` and makes `docker compose logs | 
 
 ## Planned shop
 
-The ledger module `wallet-service` owns `walletdb`. An administrator credits a wallet. Checkout places a hold for the quoted total before it writes an order, and confirm captures that hold before `CONFIRMED`. A short balance creates no order. A scheduled job releases a hold that never became an order, and captures a hold left open after confirm. The customer home and checkout show the available balance and open holds. A short balance does not create an order. Cancel from `CONFIRMED` refunds the capture once and still emits the stock-release fact. Cancel before capture only releases the hold. Cancel after `PACKAGED` stays forbidden. The order stores the ship-to address from checkout, and a later profile edit does not change it. There is still no mail or return. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it. The task map is `vault/00 Index.md`.
+The ledger module `wallet-service` owns `walletdb`. An administrator credits a wallet. Checkout places a hold for the quoted total before it writes an order, and confirm captures that hold before `CONFIRMED`. A short balance creates no order. A scheduled job releases a hold that never became an order, and captures a hold left open after confirm. The customer home and checkout show the available balance and open holds. A short balance does not create an order. Cancel from `CONFIRMED` refunds the capture once and still emits the stock-release fact. Cancel before capture only releases the hold. Cancel after `PACKAGED` stays forbidden. The order stores the ship-to address from checkout, and a later profile edit does not change it. There is still no return. Status mail is a fact consumer, a replay does not send twice, and a dead sink does not roll back the order. The direction is [ADR-0003](adr/0003-wallet-is-the-only-money-authority.md) for money and [ADR-0004](adr/0004-one-shop-then-a-gateway-port.md) for the shop around it. The task map is `vault/00 Index.md`.
 
 ## Contract evolution rules
 

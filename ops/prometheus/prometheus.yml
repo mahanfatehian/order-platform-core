@@ -14,4 +14,5 @@ scrape_configs:
           - store-service:8083
           - order-service:8084
           - wallet-service:8086
+          - notification-service:8087
           - web-ui-service:8085

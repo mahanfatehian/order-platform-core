@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orderprocessing.kafkacommon.KafkaTopics;
 import com.orderprocessing.kafkacommon.config.KafkaTopicNames;
 import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
+import com.orderprocessing.kafkacommon.event.OrderConfirmedEvent;
+import com.orderprocessing.kafkacommon.event.RefundPostedEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
@@ -249,11 +251,17 @@ class OrderServiceTest {
         verify(walletClient).refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", "corr");
         verify(walletClient, never()).releaseHold(any(), any(), any());
         ArgumentCaptor<OutboxEvent> outbox = ArgumentCaptor.forClass(OutboxEvent.class);
-        verify(outboxRepository).save(outbox.capture());
-        assertThat(outbox.getValue().getEventType()).isEqualTo("OrderCancelledEvent");
+        verify(outboxRepository, times(2)).save(outbox.capture());
+        assertThat(outbox.getAllValues()).extracting(OutboxEvent::getEventType)
+                .containsExactly("OrderCancelledEvent", "RefundPostedEvent");
         OrderCancelledEvent fact = new ObjectMapper().findAndRegisterModules()
-                .readValue(outbox.getValue().getPayload(), OrderCancelledEvent.class);
+                .readValue(outbox.getAllValues().get(0).getPayload(), OrderCancelledEvent.class);
         assertThat(fact.getItems()).containsExactlyInAnyOrderEntriesOf(Map.of(headphones, 2, hub, 3));
+        RefundPostedEvent refund = new ObjectMapper().findAndRegisterModules()
+                .readValue(outbox.getAllValues().get(1).getPayload(), RefundPostedEvent.class);
+        assertThat(refund.getOrderId()).isEqualTo(order.getId());
+        assertThat(refund.getUserId()).isEqualTo(owner);
+        assertThat(refund.getRefundEntryId()).isNotNull();
     }
 
     @Test
@@ -268,7 +276,7 @@ class OrderServiceTest {
         service.cancelOrder(order.getId(), owner, false, "corr");
 
         verify(walletClient, times(1)).refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":refund", "corr");
-        verify(outboxRepository, times(1)).save(any());
+        verify(outboxRepository, times(2)).save(any());
     }
 
     @Test
@@ -283,6 +291,10 @@ class OrderServiceTest {
         assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
         verify(walletClient).releaseHold(order.getWalletHoldId(), order.getId() + ":release", "corr");
         verify(walletClient, never()).refundCapture(any(), any(), any());
+        ArgumentCaptor<OutboxEvent> outbox = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(outbox.capture());
+        assertThat(outbox.getAllValues()).extracting(OutboxEvent::getEventType)
+                .doesNotContain("RefundPostedEvent");
     }
 
     @Test
@@ -671,12 +683,20 @@ class OrderServiceTest {
     }
 
     @Test
-    void confirmCapturesTheHoldOnceAndARepeatDoesNotCaptureAgain() {
+    void confirmCapturesTheHoldOnceAndARepeatDoesNotCaptureAgain() throws Exception {
         Order order = pendingWithHold();
         when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         when(processedRepository.insertIfAbsent(any(), anyString(), anyString(), anyInt(), anyLong())).thenReturn(1, 0);
+        UUID captureId = UUID.randomUUID();
         when(walletClient.captureHold(eq(order.getWalletHoldId()), eq(order.getId() + ":capture"), any()))
-                .thenReturn(UUID.randomUUID());
+                .thenReturn(captureId);
+        order.setShipRecipient("Ada");
+        order.setShipLine1("1 Main");
+        order.setShipCity("Tehran");
+        order.setShipRegion("Tehran");
+        order.setShipPostalCode("12345");
+        order.setShipPhone("09120000000");
+        order.setShipCountry("IR");
         StockReservedEvent reserved = new StockReservedEvent();
         reserved.setOrderId(order.getId());
         reserved.setSuccess(true);
@@ -685,8 +705,17 @@ class OrderServiceTest {
         service.processStockReserved(reserved, "stores.v2", 0, 1L);
 
         assertThat(order.getStatus()).isEqualTo(Order.Status.CONFIRMED);
-        assertThat(order.getWalletCaptureEntryId()).isNotNull();
+        assertThat(order.getWalletCaptureEntryId()).isEqualTo(captureId);
         verify(walletClient).captureHold(eq(order.getWalletHoldId()), eq(order.getId() + ":capture"), any());
+        ArgumentCaptor<OutboxEvent> outbox = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(outbox.capture());
+        OrderConfirmedEvent fact = new ObjectMapper().findAndRegisterModules()
+                .readValue(outbox.getValue().getPayload(), OrderConfirmedEvent.class);
+        assertThat(fact.getCapturedMinor()).isEqualTo(order.getWalletAmountMinor());
+        assertThat(fact.getCapturedMinor()).isEqualTo(2500L);
+        assertThat(fact.getWalletCaptureEntryId()).isEqualTo(captureId);
+        assertThat(fact.getLines()).extracting(OrderConfirmedEvent.Line::getProductId)
+                .containsExactly(order.getItems().get(0).getProductId());
     }
 
     @Test

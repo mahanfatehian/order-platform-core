@@ -140,12 +140,13 @@ class OrderLifecycleTransitionTest {
             assertThat(history.getToStatus()).isEqualTo(Order.Status.CONFIRMED);
             assertThat(history.getActorRole()).isEqualTo("SYSTEM_INVENTORY");
             assertThat(history.getEventId()).isEqualTo(reserved.getEventId());
+            assertThat(onlyOutboxRow().getEventType()).isEqualTo("OrderConfirmedEvent");
         } else {
             // A reservation arriving after a cancellation or a timeout must not bring the order back.
             assertThat(order.getStatus()).isEqualTo(from);
             verify(historyRepository, never()).save(any());
+            verify(outboxRepository, never()).save(any());
         }
-        verify(outboxRepository, never()).save(any());
     }
 
     @ParameterizedTest(name = "a shortage for a {0} order")
