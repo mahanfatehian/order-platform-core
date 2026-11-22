@@ -94,4 +94,15 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 100)
     private List<OrderItem> items = new java.util.ArrayList<>();
+
+    public boolean hasCompleteShipSnapshot() {
+        return present(shipRecipient) && present(shipLine1) && present(shipCity)
+                && present(shipRegion) && present(shipPostalCode) && present(shipPhone)
+                && "IR".equals(shipCountry);
+    }
+
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
+    }
 }
+
