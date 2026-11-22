@@ -78,6 +78,18 @@ class ShipDestinationTest {
         verify(historyRepository, never()).save(any());
     }
 
+    @Test
+    void aMissingTrackingReferenceStaysPackaged() {
+        Order order = packaged();
+        stamp(order);
+
+        assertThatThrownBy(() -> service.shipOrder(order.getId(), UUID.randomUUID(), "corr", null))
+                .isInstanceOf(BlankTrackingReferenceException.class);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PACKAGED);
+        verify(orderRepository, never()).save(any());
+    }
+
     private static void stamp(Order order) {
         order.setShipRecipient("Ada Lovelace");
         order.setShipLine1("12 Enghelab");
