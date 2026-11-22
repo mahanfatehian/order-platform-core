@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class OrderFailedEvent extends DomainEvent {
     private UUID orderId;
+    private UUID userId;
     private Map<UUID, Integer> items; // Added for compensation
     private boolean success;
     private String reason;

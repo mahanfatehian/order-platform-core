@@ -1,6 +1,6 @@
 # N1 Receipts and status mail
 
-The profile already has an email. Nothing sends to it. Mail is a fact consumer, not a second writer of orders or wallets.
+The profile already has an email. Mail is a fact consumer, not a second writer of orders or wallets. The capture sink and the five mails are on this branch.
 
 ## Build
 

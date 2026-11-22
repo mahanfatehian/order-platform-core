@@ -10,6 +10,7 @@ import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
+import com.orderprocessing.kafkacommon.event.RefundPostedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 
@@ -17,16 +18,17 @@ import java.util.Map;
 
 /** Central allow-list used when converting transactional outbox JSON back to typed events. */
 public final class KafkaEventRegistry {
-    private static final Map<String, Class<? extends DomainEvent>> EVENT_TYPES = Map.of(
-            OrderPlacedEvent.class.getSimpleName(), OrderPlacedEvent.class,
-            OrderCancelledEvent.class.getSimpleName(), OrderCancelledEvent.class,
-            OrderConfirmedEvent.class.getSimpleName(), OrderConfirmedEvent.class,
-            OrderPackagedEvent.class.getSimpleName(), OrderPackagedEvent.class,
-            OrderShippedEvent.class.getSimpleName(), OrderShippedEvent.class,
-            OrderDeliveredEvent.class.getSimpleName(), OrderDeliveredEvent.class,
-            OrderFailedEvent.class.getSimpleName(), OrderFailedEvent.class,
-            StockReservedEvent.class.getSimpleName(), StockReservedEvent.class,
-            StockInsufficientEvent.class.getSimpleName(), StockInsufficientEvent.class
+    private static final Map<String, Class<? extends DomainEvent>> EVENT_TYPES = Map.ofEntries(
+            Map.entry(OrderPlacedEvent.class.getSimpleName(), OrderPlacedEvent.class),
+            Map.entry(OrderCancelledEvent.class.getSimpleName(), OrderCancelledEvent.class),
+            Map.entry(OrderConfirmedEvent.class.getSimpleName(), OrderConfirmedEvent.class),
+            Map.entry(OrderPackagedEvent.class.getSimpleName(), OrderPackagedEvent.class),
+            Map.entry(OrderShippedEvent.class.getSimpleName(), OrderShippedEvent.class),
+            Map.entry(OrderDeliveredEvent.class.getSimpleName(), OrderDeliveredEvent.class),
+            Map.entry(OrderFailedEvent.class.getSimpleName(), OrderFailedEvent.class),
+            Map.entry(StockReservedEvent.class.getSimpleName(), StockReservedEvent.class),
+            Map.entry(StockInsufficientEvent.class.getSimpleName(), StockInsufficientEvent.class),
+            Map.entry(RefundPostedEvent.class.getSimpleName(), RefundPostedEvent.class)
     );
 
     private KafkaEventRegistry() {

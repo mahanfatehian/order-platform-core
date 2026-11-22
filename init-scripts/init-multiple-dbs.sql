@@ -13,3 +13,7 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'storedb')
 SELECT 'CREATE DATABASE walletdb'
 WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'walletdb')
 \gexec
+
+SELECT 'CREATE DATABASE notificationdb'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'notificationdb')
+\gexec
