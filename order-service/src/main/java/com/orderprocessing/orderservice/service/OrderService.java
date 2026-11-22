@@ -30,6 +30,7 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
+import com.orderprocessing.orderservice.exception.MissingShipAddressException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
 import com.orderprocessing.orderservice.exception.IdempotencyConflictException;
 import com.orderprocessing.orderservice.exception.OrderTransitionConflictException;
@@ -614,6 +615,9 @@ public class OrderService {
         }
         if (order.getStatus() != expectedStatus) {
             throw new OrderTransitionConflictException(orderId, action, expectedStatus, order.getStatus());
+        }
+        if (nextStatus == Order.Status.SHIPPED && !order.hasCompleteShipSnapshot()) {
+            throw new MissingShipAddressException();
         }
 
         String normalizedCorrelationId = normalizeCorrelationId(correlationId);
