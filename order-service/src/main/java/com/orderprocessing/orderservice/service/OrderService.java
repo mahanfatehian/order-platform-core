@@ -602,10 +602,7 @@ public class OrderService {
                     throw new IdempotencyConflictException(
                             "Order " + orderId + " was already shipped with a different tracking reference");
                 }
-                // Shipping without a reference is a supported flow - the request body is optional and the
-                // delivery UI labels the field optional - so the carrier's number often only arrives afterwards.
-                // Filling in a blank is not a second shipment and does not change shipment identity, so it is
-                // neither a conflict nor a new status transition: no fact is emitted and no history row is added.
+                // An old row can already be shipped with no reference. Filling that blank is not a new ship.
                 log.info("Recording a late tracking reference on already-shipped order {} by actor {}",
                         orderId, actorUserId);
                 order.setTrackingReference(trackingReference);
