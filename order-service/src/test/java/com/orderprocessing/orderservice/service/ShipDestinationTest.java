@@ -102,6 +102,18 @@ class ShipDestinationTest {
         verify(historyRepository, never()).save(any());
     }
 
+    @Test
+    void aDifferentReferenceOnAShippedOrderConflicts() {
+        Order order = packaged();
+        order.setStatus(Order.Status.SHIPPED);
+        order.setTrackingReference("TRACK-1");
+
+        assertThatThrownBy(() -> service.shipOrder(order.getId(), UUID.randomUUID(), "retry", "OTHER"))
+                .isInstanceOf(IdempotencyConflictException.class);
+        assertThat(order.getTrackingReference()).isEqualTo("TRACK-1");
+        verify(outboxRepository, never()).save(any());
+    }
+
     private static void stamp(Order order) {
         order.setShipRecipient("Ada Lovelace");
         order.setShipLine1("12 Enghelab");
