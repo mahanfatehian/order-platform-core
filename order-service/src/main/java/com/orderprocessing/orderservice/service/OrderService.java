@@ -29,6 +29,7 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
+import com.orderprocessing.orderservice.exception.BlankTrackingReferenceException;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.MissingShipAddressException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
@@ -618,6 +619,9 @@ public class OrderService {
         }
         if (nextStatus == Order.Status.SHIPPED && !order.hasCompleteShipSnapshot()) {
             throw new MissingShipAddressException();
+        }
+        if (nextStatus == Order.Status.SHIPPED && trackingReference == null) {
+            throw new BlankTrackingReferenceException();
         }
 
         String normalizedCorrelationId = normalizeCorrelationId(correlationId);
