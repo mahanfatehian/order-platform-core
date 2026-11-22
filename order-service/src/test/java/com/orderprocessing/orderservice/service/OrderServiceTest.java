@@ -354,6 +354,13 @@ class OrderServiceTest {
 
         service.packOrder(order.getId(), warehouseWorker, "corr-pack");
         assertThat(order.getStatus()).isEqualTo(Order.Status.PACKAGED);
+        order.setShipRecipient("Ada Lovelace");
+        order.setShipLine1("12 Enghelab");
+        order.setShipCity("Tehran");
+        order.setShipRegion("Tehran");
+        order.setShipPostalCode("1136912345");
+        order.setShipPhone("02112345678");
+        order.setShipCountry("IR");
 
         service.shipOrder(order.getId(), deliveryDriver, "corr-ship", "TRACK-123");
         assertThat(order.getStatus()).isEqualTo(Order.Status.SHIPPED);
