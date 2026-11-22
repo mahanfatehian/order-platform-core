@@ -1,6 +1,6 @@
 # S1 Ship to an address
 
-Ship already requires `ROLE_DELIVERY` and stores a tracking string. That string can be empty of meaning, and nothing checks that the order has anywhere to go.
+Ship requires `ROLE_DELIVERY`, the address stored on the order, and a non-empty tracking reference. A customer token cannot ship. The same reference can be repeated. A different reference conflicts.
 
 ## Build
 
