@@ -11,6 +11,7 @@ import com.orderprocessing.kafkacommon.event.OrderPackagedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
 import com.orderprocessing.kafkacommon.event.OrderShippedEvent;
 import com.orderprocessing.kafkacommon.event.RefundPostedEvent;
+import com.orderprocessing.kafkacommon.event.ReturnAcceptedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 
@@ -28,7 +29,8 @@ public final class KafkaEventRegistry {
             Map.entry(OrderFailedEvent.class.getSimpleName(), OrderFailedEvent.class),
             Map.entry(StockReservedEvent.class.getSimpleName(), StockReservedEvent.class),
             Map.entry(StockInsufficientEvent.class.getSimpleName(), StockInsufficientEvent.class),
-            Map.entry(RefundPostedEvent.class.getSimpleName(), RefundPostedEvent.class)
+            Map.entry(RefundPostedEvent.class.getSimpleName(), RefundPostedEvent.class),
+            Map.entry(ReturnAcceptedEvent.class.getSimpleName(), ReturnAcceptedEvent.class)
     );
 
     private KafkaEventRegistry() {
