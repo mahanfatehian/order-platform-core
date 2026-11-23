@@ -61,6 +61,17 @@ class ReturnServiceTest {
         verify(wallet, never()).refundCapture(any(), any(), any());
     }
 
+    @Test
+    void aShippedOrderCannotBeReturned() {
+        Order order = delivered();
+        order.setStatus(Order.Status.SHIPPED);
+
+        assertThatThrownBy(() -> service.request(order.getId(), owner))
+                .isInstanceOf(ReturnNotAllowedException.class);
+        assertThat(order.getStatus()).isEqualTo(Order.Status.SHIPPED);
+        verify(returns, never()).save(any());
+    }
+
     private Order delivered() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
