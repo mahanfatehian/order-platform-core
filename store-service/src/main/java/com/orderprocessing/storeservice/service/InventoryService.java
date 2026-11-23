@@ -9,6 +9,7 @@ import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.ReturnAcceptedEvent;
 import com.orderprocessing.kafkacommon.event.StockInsufficientEvent;
 import com.orderprocessing.kafkacommon.event.StockReservedEvent;
 import com.orderprocessing.storeservice.dto.InventoryDTO;
@@ -327,6 +328,29 @@ public class InventoryService {
         }
         inventoryRepository.saveAll(inventory.values());
         reservationRepository.saveAll(active);
+    }
+
+    @Transactional
+    public void processReturnAccepted(ReturnAcceptedEvent event, String topic, int partition, long offset) {
+        if (!markProcessed(event, topic, partition, offset) || event.getItems() == null) {
+            return;
+        }
+        Instant now = Instant.now();
+        for (Map.Entry<UUID, Integer> item : event.getItems().entrySet()) {
+            if (item.getValue() == null || item.getValue() <= 0) {
+                continue;
+            }
+            List<Inventory> locked = inventoryRepository.findAllForUpdate(List.of(item.getKey()));
+            Inventory stock = locked.isEmpty() ? new Inventory() : locked.getFirst();
+            if (locked.isEmpty()) {
+                stock.setProductId(item.getKey());
+                stock.setQuantity(0);
+                stock.setReservedQuantity(0);
+            }
+            stock.setQuantity(Math.addExact(stock.getQuantity(), item.getValue()));
+            stock.setLastUpdated(now);
+            inventoryRepository.save(stock);
+        }
     }
 
     private boolean markProcessed(DomainEvent event, String topic, int partition, long offset) {
