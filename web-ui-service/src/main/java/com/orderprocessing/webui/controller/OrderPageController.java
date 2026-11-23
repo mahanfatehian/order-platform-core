@@ -54,6 +54,18 @@ public class OrderPageController {
         return "redirect:/app/orders/" + id;
     }
 
+    @PostMapping("/{id}/return")
+    public String requestReturn(@PathVariable UUID id, RedirectAttributes redirect) {
+        try {
+            client.requestReturn(id);
+            redirect.addFlashAttribute("success", "Return requested. The order stays delivered until the warehouse decides.");
+        } catch (BackendClientException exception) {
+            if (exception.getStatus().value() != 409) throw exception;
+            redirect.addFlashAttribute("warning", "This order cannot be returned.");
+        }
+        return "redirect:/app/orders/" + id;
+    }
+
     private void populateStatusModel(UUID id, Model model) {
         model.addAttribute("order", client.order(id));
         model.addAttribute("history", client.orderHistory(id));
