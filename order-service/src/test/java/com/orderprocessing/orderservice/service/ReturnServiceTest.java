@@ -97,6 +97,29 @@ class ReturnServiceTest {
         verify(outbox, never()).save(any());
     }
 
+    @Test
+    void acceptRefundsOnceAndLeavesTheOrderDelivered() {
+        Order order = delivered();
+        order.setWalletCaptureEntryId(UUID.randomUUID());
+        OrderItem item = new OrderItem();
+        item.setProductId(UUID.randomUUID());
+        item.setQuantity(2);
+        order.getItems().add(item);
+        OrderReturn row = requested(order);
+        when(returns.findByOrderId(order.getId())).thenReturn(Optional.of(row));
+        when(returns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(wallet.refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":return-refund", "corr"))
+                .thenReturn(UUID.randomUUID());
+
+        ReturnResponse response = service.accept(order.getId(), UUID.randomUUID(), "corr");
+
+        assertThat(response.status()).isEqualTo("ACCEPTED");
+        assertThat(response.orderStatus()).isEqualTo("DELIVERED");
+        assertThat(order.getStatus()).isEqualTo(Order.Status.DELIVERED);
+        verify(wallet).refundCapture(order.getWalletCaptureEntryId(), order.getId() + ":return-refund", "corr");
+        verify(outbox).save(any());
+    }
+
     private OrderReturn requested(Order order) {
         OrderReturn row = new OrderReturn();
         row.setId(UUID.randomUUID());
