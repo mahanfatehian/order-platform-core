@@ -82,6 +82,29 @@ class ReturnServiceTest {
         verify(wallet, never()).refundCapture(any(), any(), any());
     }
 
+    @Test
+    void rejectLeavesMoneyWhereItIs() {
+        Order order = delivered();
+        OrderReturn row = requested(order);
+        when(returns.findByOrderId(order.getId())).thenReturn(Optional.of(row));
+        when(returns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReturnResponse response = service.reject(order.getId(), UUID.randomUUID());
+
+        assertThat(response.status()).isEqualTo("REJECTED");
+        assertThat(order.getStatus()).isEqualTo(Order.Status.DELIVERED);
+        verify(wallet, never()).refundCapture(any(), any(), any());
+        verify(outbox, never()).save(any());
+    }
+
+    private OrderReturn requested(Order order) {
+        OrderReturn row = new OrderReturn();
+        row.setId(UUID.randomUUID());
+        row.setOrderId(order.getId());
+        row.setStatus(ReturnStatus.REQUESTED);
+        return row;
+    }
+
     private Order delivered() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
