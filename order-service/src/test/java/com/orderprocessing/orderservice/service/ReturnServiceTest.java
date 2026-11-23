@@ -72,6 +72,16 @@ class ReturnServiceTest {
         verify(returns, never()).save(any());
     }
 
+    @Test
+    void aSecondRequestIsRejected() {
+        Order order = delivered();
+        when(returns.findByOrderId(order.getId())).thenReturn(Optional.of(new OrderReturn()));
+
+        assertThatThrownBy(() -> service.request(order.getId(), owner))
+                .isInstanceOf(ReturnNotAllowedException.class);
+        verify(wallet, never()).refundCapture(any(), any(), any());
+    }
+
     private Order delivered() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
