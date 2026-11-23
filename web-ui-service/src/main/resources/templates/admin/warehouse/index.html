@@ -51,5 +51,19 @@
     </section>
 
     <div class="mt-3" th:replace="~{fragments/pagination :: pagination(${orders}, ${warehousePagination}, 'Warehouse queue pages')}"></div>
+    <section class="surface surface--padded mt-3">
+        <h2>Requested returns</h2>
+        <p class="small muted">Paste the delivered order id. Accept puts the sold quantity back and refunds once. Reject leaves both alone.</p>
+        <form class="row g-2" method="post">
+            <div class="col-md-8">
+                <label class="form-label" for="return-order-id">Delivered order id</label>
+                <input id="return-order-id" name="id" class="form-control mono" required>
+            </div>
+            <div class="col-md-4 d-flex align-items-end gap-2">
+                <button class="btn btn-primary" type="submit" th:formaction="@{/admin/warehouse/returns/accept}">Accept</button>
+                <button class="btn btn-outline-secondary" type="submit" th:formaction="@{/admin/warehouse/returns/reject}">Reject</button>
+            </div>
+        </form>
+    </section>
 </section>
 </html>
