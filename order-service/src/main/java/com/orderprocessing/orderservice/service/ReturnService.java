@@ -47,6 +47,24 @@ public class ReturnService {
         return ReturnResponse.from(row, order.getStatus());
     }
 
+    @Transactional
+    public ReturnResponse reject(UUID orderId, UUID actorUserId) {
+        Order order = lock(orderId);
+        OrderReturn row = returns.findByOrderId(orderId)
+                .orElseThrow(() -> new ReturnNotAllowedException("This order has no return request"));
+        if (row.getStatus() == ReturnStatus.REJECTED) {
+            return ReturnResponse.from(row, order.getStatus());
+        }
+        if (row.getStatus() != ReturnStatus.REQUESTED) {
+            throw new ReturnNotAllowedException("Only a requested return can be rejected");
+        }
+        row.setStatus(ReturnStatus.REJECTED);
+        row.setDecidedAt(Instant.now());
+        row.setDecidedBy(actorUserId);
+        returns.save(row);
+        return ReturnResponse.from(row, order.getStatus());
+    }
+
     private Order lock(UUID orderId) {
         Order order = orders.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
