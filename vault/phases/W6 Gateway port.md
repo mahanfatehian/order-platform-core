@@ -1,6 +1,6 @@
 # W6 Gateway port
 
-This phase builds the socket. It does not build a درگاه.
+This phase builds the socket. It does not build a درگاه. The intent table, the applier, and a fake verify result are in place. Compose still has no public payment callback.
 
 ## Build
 
