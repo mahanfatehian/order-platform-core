@@ -120,6 +120,22 @@ class ReturnServiceTest {
         verify(outbox).save(any());
     }
 
+    @Test
+    void acceptingAgainDoesNotRefundAgain() {
+        Order order = delivered();
+        order.setWalletCaptureEntryId(UUID.randomUUID());
+        OrderReturn row = requested(order);
+        row.setStatus(ReturnStatus.ACCEPTED);
+        row.setRefundEntryId(UUID.randomUUID());
+        when(returns.findByOrderId(order.getId())).thenReturn(Optional.of(row));
+
+        ReturnResponse response = service.accept(order.getId(), UUID.randomUUID(), "corr");
+
+        assertThat(response.refundEntryId()).isEqualTo(row.getRefundEntryId());
+        verify(wallet, never()).refundCapture(any(), any(), any());
+        verify(outbox, never()).save(any());
+    }
+
     private OrderReturn requested(Order order) {
         OrderReturn row = new OrderReturn();
         row.setId(UUID.randomUUID());
