@@ -5,6 +5,7 @@ import com.orderprocessing.kafkacommon.event.OrderCancelledEvent;
 import com.orderprocessing.kafkacommon.event.OrderDeliveredEvent;
 import com.orderprocessing.kafkacommon.event.OrderFailedEvent;
 import com.orderprocessing.kafkacommon.event.OrderPlacedEvent;
+import com.orderprocessing.kafkacommon.event.ReturnAcceptedEvent;
 import com.orderprocessing.storeservice.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,10 @@ public class StoreKafkaConsumer {
         }
         if (event instanceof OrderDeliveredEvent delivered) {
             inventoryService.processOrderDelivered(delivered, record.topic(), record.partition(), record.offset());
+            return;
+        }
+        if (event instanceof ReturnAcceptedEvent returned) {
+            inventoryService.processReturnAccepted(returned, record.topic(), record.partition(), record.offset());
             return;
         }
         if (event instanceof OrderFailedEvent failed) {
