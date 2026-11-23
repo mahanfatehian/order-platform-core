@@ -1,5 +1,6 @@
 package com.orderprocessing.orderservice.service;
 
+import com.orderprocessing.orderservice.client.WalletLedgerClient;
 import com.orderprocessing.orderservice.dto.ReturnResponse;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.ResourceNotFoundException;
@@ -19,10 +20,12 @@ import java.util.UUID;
 public class ReturnService {
     private final OrderRepository orders;
     private final OrderReturnRepository returns;
+    private final WalletLedgerClient wallet;
 
-    public ReturnService(OrderRepository orders, OrderReturnRepository returns) {
+    public ReturnService(OrderRepository orders, OrderReturnRepository returns, WalletLedgerClient wallet) {
         this.orders = orders;
         this.returns = returns;
+        this.wallet = wallet;
     }
 
     @Transactional
@@ -59,6 +62,29 @@ public class ReturnService {
             throw new ReturnNotAllowedException("Only a requested return can be rejected");
         }
         row.setStatus(ReturnStatus.REJECTED);
+        row.setDecidedAt(Instant.now());
+        row.setDecidedBy(actorUserId);
+        returns.save(row);
+        return ReturnResponse.from(row, order.getStatus());
+    }
+
+    @Transactional
+    public ReturnResponse accept(UUID orderId, UUID actorUserId, String correlationId) {
+        Order order = lock(orderId);
+        OrderReturn row = returns.findByOrderId(orderId)
+                .orElseThrow(() -> new ReturnNotAllowedException("This order has no return request"));
+        if (row.getStatus() == ReturnStatus.ACCEPTED) {
+            return ReturnResponse.from(row, order.getStatus());
+        }
+        if (row.getStatus() != ReturnStatus.REQUESTED || order.getStatus() != Order.Status.DELIVERED) {
+            throw new ReturnNotAllowedException("Only a requested return of a delivered order can be accepted");
+        }
+        if (order.getWalletCaptureEntryId() != null) {
+            UUID refundId = wallet.refundCapture(order.getWalletCaptureEntryId(),
+                    order.getId() + ":return-refund", correlationId);
+            row.setRefundEntryId(refundId);
+        }
+        row.setStatus(ReturnStatus.ACCEPTED);
         row.setDecidedAt(Instant.now());
         row.setDecidedBy(actorUserId);
         returns.save(row);
