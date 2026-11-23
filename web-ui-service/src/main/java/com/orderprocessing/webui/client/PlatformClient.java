@@ -296,6 +296,21 @@ public class PlatformClient {
                 .headers(headers -> bearer(headers, token)).retrieve().body(new ParameterizedTypeReference<>() { });
     }
 
+    public void requestReturn(String token, UUID id) {
+        orders.post().uri("/api/orders/{id}/return", id).headers(headers -> bearer(headers, token))
+                .retrieve().toBodilessEntity();
+    }
+
+    public void acceptReturn(String token, UUID id) {
+        orders.post().uri("/api/orders/{id}/return/accept", id).headers(headers -> bearer(headers, token))
+                .retrieve().toBodilessEntity();
+    }
+
+    public void rejectReturn(String token, UUID id) {
+        orders.post().uri("/api/orders/{id}/return/reject", id).headers(headers -> bearer(headers, token))
+                .retrieve().toBodilessEntity();
+    }
+
     public OrderView packOrder(String token, UUID id) {
         return orders.post().uri("/api/orders/{id}/pack", id).headers(headers -> bearer(headers, token))
                 .retrieve().body(OrderView.class);

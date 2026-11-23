@@ -84,6 +84,9 @@ public class AuthenticatedPlatformClient {
     public PageResponse<OrderView> fulfillmentOrders(int page, int size, String status) {
         return get(t -> client.fulfillmentOrders(t, page, size, status));
     }
+    public void requestReturn(UUID id) { mutate(t -> { client.requestReturn(t, id); return null; }); }
+    public void acceptReturn(UUID id) { mutate(t -> { client.acceptReturn(t, id); return null; }); }
+    public void rejectReturn(UUID id) { mutate(t -> { client.rejectReturn(t, id); return null; }); }
     public OrderView packOrder(UUID id) { return mutate(t -> client.packOrder(t, id)); }
     public OrderView shipOrder(UUID id, String trackingReference) {
         return mutate(t -> client.shipOrder(t, id, trackingReference));

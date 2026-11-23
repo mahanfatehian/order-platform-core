@@ -148,7 +148,7 @@ Create-order idempotency is scoped by `(userId, Idempotency-Key)`. A PostgreSQL 
 
 ## Inventory lifecycle
 
-`inventory.quantity` is total on-hand stock and `inventory.reserved_quantity` is the portion held by active orders. Availability is `quantity - reserved_quantity`. A product is active only with a stored picture, categories are merchant-named, and stock is received by command. Ship is rejected without the address stored on the order and a non-empty tracking reference.
+`inventory.quantity` is total on-hand stock and `inventory.reserved_quantity` is the portion held by active orders. Availability is `quantity - reserved_quantity`. A product is active only with a stored picture, categories are merchant-named, and stock is received by command. Ship is rejected without the address stored on the order and a non-empty tracking reference. A delivered order can be returned once. Accept puts the sold quantity back and refunds the capture once. The order status stays delivered.
 
 | Reservation state | Inventory effect | Terminal timestamp |
 | --- | --- | --- |

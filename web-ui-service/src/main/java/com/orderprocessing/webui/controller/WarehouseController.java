@@ -51,5 +51,19 @@ public class WarehouseController {
         return "redirect:/admin/warehouse";
     }
 
+    @PostMapping("/returns/accept")
+    public String acceptReturn(@RequestParam UUID id, RedirectAttributes redirect) {
+        client.acceptReturn(id);
+        redirect.addFlashAttribute("success", "Return accepted. Stock comes back and the capture is refunded once.");
+        return "redirect:/admin/warehouse";
+    }
+
+    @PostMapping("/returns/reject")
+    public String rejectReturn(@RequestParam UUID id, RedirectAttributes redirect) {
+        client.rejectReturn(id);
+        redirect.addFlashAttribute("warning", "Return rejected. Stock and money stay where they are.");
+        return "redirect:/admin/warehouse";
+    }
+
     private int boundedPage(int page) { return Math.max(page, 0); }
 }

@@ -1,6 +1,6 @@
 # R1 Return after delivery
 
-Cancel is the undo for `PENDING` and `CONFIRMED`. It stays forbidden after pack. A delivered order needs its own command. Reusing cancel would break ADR-0001.
+Cancel stays forbidden after pack. A delivered order has its own return record: requested, accepted, or rejected. Accept puts stock back and refunds the capture once. The order status stays `DELIVERED`.
 
 ## Build
 

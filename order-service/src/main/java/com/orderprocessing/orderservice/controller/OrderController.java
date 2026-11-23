@@ -6,7 +6,9 @@ import com.orderprocessing.orderservice.dto.OrderStatusHistoryResponse;
 import com.orderprocessing.orderservice.dto.PageResponse;
 import com.orderprocessing.orderservice.dto.ShipOrderRequest;
 import com.orderprocessing.orderservice.model.Order;
+import com.orderprocessing.orderservice.dto.ReturnResponse;
 import com.orderprocessing.orderservice.service.OrderService;
+import com.orderprocessing.orderservice.service.ReturnService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 public class OrderController {
     private static final Set<String> SORT_FIELDS = Set.of("createdAt", "updatedAt", "status", "totalAmount");
     private final OrderService orderService;
+    private final ReturnService returns;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -141,6 +144,24 @@ public class OrderController {
                                       @RequestHeader(value = "X-Correlation-Id", required = false)
                                       String correlationId) {
         return orderService.deliverOrder(id, userId(jwt), correlationId(correlationId));
+    }
+
+    @PostMapping("/{id}/return")
+    public ReturnResponse requestReturn(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return returns.request(id, userId(jwt));
+    }
+
+    @PostMapping("/{id}/return/accept")
+    @PreAuthorize("hasRole('WAREHOUSE')")
+    public ReturnResponse acceptReturn(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                       @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        return returns.accept(id, userId(jwt), correlationId(correlationId));
+    }
+
+    @PostMapping("/{id}/return/reject")
+    @PreAuthorize("hasRole('WAREHOUSE')")
+    public ReturnResponse rejectReturn(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return returns.reject(id, userId(jwt));
     }
 
     @GetMapping("/{id}/history")
