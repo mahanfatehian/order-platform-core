@@ -151,6 +151,13 @@ public class OrderController {
         return returns.request(id, userId(jwt));
     }
 
+    @PostMapping("/{id}/return/accept")
+    @PreAuthorize("hasRole('WAREHOUSE')")
+    public ReturnResponse acceptReturn(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                       @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        return returns.accept(id, userId(jwt), correlationId(correlationId));
+    }
+
     @GetMapping("/{id}/history")
     public List<OrderStatusHistoryResponse> getOrderHistory(@PathVariable UUID id,
                                                             @AuthenticationPrincipal Jwt jwt,
