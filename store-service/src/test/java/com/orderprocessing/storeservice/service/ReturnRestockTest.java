@@ -61,4 +61,23 @@ class ReturnRestockTest {
         assertThat(stock.getQuantity()).isEqualTo(6);
         assertThat(stock.getReservedQuantity()).isEqualTo(1);
     }
+
+    @Test
+    void aReplayDoesNotAddStockAgain() {
+        UUID productId = UUID.randomUUID();
+        Inventory stock = new Inventory();
+        stock.setProductId(productId);
+        stock.setQuantity(4);
+        stock.setReservedQuantity(0);
+        when(processedRepository.insertIfAbsent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyLong())).thenReturn(0);
+        ReturnAcceptedEvent event = new ReturnAcceptedEvent();
+        event.setOrderId(UUID.randomUUID());
+        event.setItems(Map.of(productId, 2));
+
+        service.processReturnAccepted(event, "order.events", 0, 1L);
+
+        assertThat(stock.getQuantity()).isEqualTo(4);
+    }
 }
