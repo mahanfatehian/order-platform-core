@@ -49,4 +49,8 @@ public class ShopOpeningSaga {
         capturedKey = key;
         mails += 1;
     }
+
+    public void deliver(int quantity) {
+        stock -= quantity;
+    }
 }
