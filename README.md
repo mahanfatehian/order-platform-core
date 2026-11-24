@@ -83,7 +83,7 @@ These are local showcase credentials, not production defaults. Set `DEMO_MODE=fa
 
 Use separate private browser windows for the personas, or sign out between steps. The customer pays only from wallet balance, and that balance comes from the admin credit in step 1.
 
-1. Sign in as `admin`, open **Wallets**, and credit `johndoe`. That credit is the only money the walkthrough spends.
+1. Sign in as `admin`, open **Wallets**, and credit `johndoe`. That credit is the only money the walkthrough spends. A shop run sets `DEMO_MODE=false`. That hides the persona passwords and skips the demo catalog and persona seed. The operator fills `/terms`, `/privacy`, and `/contact`. `scripts/restore-drill.sh` restores a scratch ledger row and must not be pointed at a production host.
 2. Sign in as `johndoe`, open **Catalog**, add an in-stock product, review the cart, and check out. The order service places a wallet hold for the quoted total before it writes the order. A short balance keeps the cart and creates no order.
 3. Open the new order. It moves from `PENDING` to `CONFIRMED` after the Kafka inventory handshake. The page shows the wallet amount held, then captured. The status region continues polling while fulfillment is active and replaces itself completely on a terminal outcome.
 4. Sign in as `warehouse_worker`. Open **Warehouse queue** and choose **Pack order**. The authoritative HTTP command commits `PACKAGED`, history, and an `OrderPackagedEvent` outbox row atomically.
