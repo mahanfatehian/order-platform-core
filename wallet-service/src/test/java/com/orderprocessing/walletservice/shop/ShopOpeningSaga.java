@@ -53,4 +53,14 @@ public class ShopOpeningSaga {
     public void deliver(int quantity) {
         stock -= quantity;
     }
+
+    public void acceptReturn(int quantity, long amount) {
+        if (returned) {
+            return;
+        }
+        stock += quantity;
+        booked += amount;
+        captured -= amount;
+        returned = true;
+    }
 }
