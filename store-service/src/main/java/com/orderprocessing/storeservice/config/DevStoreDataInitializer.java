@@ -127,6 +127,9 @@ public class DevStoreDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (!demoMode) {
+            return;
+        }
         if (SHOWCASE_CATALOG.size() != SHOWCASE_PRODUCT_COUNT) {
             throw new IllegalStateException("The development catalog must contain exactly 15 products");
         }
