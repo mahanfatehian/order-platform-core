@@ -18,4 +18,11 @@ public class ShopOpeningSaga {
     public int mails() {
         return mails;
     }
+
+    public void createProduct() {
+    }
+
+    public void receiveStock(int quantity) {
+        stock += quantity;
+    }
 }
