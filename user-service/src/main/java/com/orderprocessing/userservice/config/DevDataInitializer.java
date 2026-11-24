@@ -5,7 +5,8 @@ import com.orderprocessing.userservice.entity.UserEntity;
 import com.orderprocessing.userservice.exception.ResourceNotFoundException;
 import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -18,7 +19,6 @@ import java.util.Set;
 
 @Component
 @Profile("dev")
-@RequiredArgsConstructor
 public class DevDataInitializer implements ApplicationRunner {
 
     // These credentials exist only when the dev profile is active. Keep them
