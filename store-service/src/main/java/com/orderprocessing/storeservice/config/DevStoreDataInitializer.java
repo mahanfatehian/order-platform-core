@@ -6,6 +6,8 @@ import com.orderprocessing.storeservice.model.ProductCategory;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
 import com.orderprocessing.storeservice.repository.ProductCategoryRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
