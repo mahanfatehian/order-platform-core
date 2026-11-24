@@ -32,6 +32,21 @@ public class DevDataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final boolean demoMode;
+
+    public DevDataInitializer(UserRepository userRepository, RoleRepository roleRepository,
+                              PasswordEncoder passwordEncoder) {
+        this(userRepository, roleRepository, passwordEncoder, true);
+    }
+
+    @Autowired
+    public DevDataInitializer(UserRepository userRepository, RoleRepository roleRepository,
+                              PasswordEncoder passwordEncoder, @Value("${DEMO_MODE:true}") boolean demoMode) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.demoMode = demoMode;
+    }
 
     @Override
     @Transactional
