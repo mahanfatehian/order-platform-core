@@ -11,7 +11,7 @@ Do the tracks in this order. A later track may start only when the previous trac
 | 5 | [[S1 Ship to an address]] | Ship is rejected without a snapshotted address and a non-empty tracking reference. |
 | 6 | [[R1 Return after delivery]] | A delivered order can be returned once. Stock comes back. The wallet is refunded once. |
 | 7 | [[W6 Gateway port]] | A fake adapter can prove a top-up and an order payment. A mismatched amount posts nothing. |
-| 8 | [[P1 Open the door]] | `DEMO_MODE=false`, backups restored once, and the saga completes on wallet money with mail and a return. |
+| 8 | [[P1 Open the door]] | `DEMO_MODE=false` skips seed, the scratch restore reads the ledger row, and the saga returns stock and balance. Not a launch. |
 
 ## Already written inside the money track
 
