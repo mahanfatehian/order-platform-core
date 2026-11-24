@@ -107,12 +107,21 @@ public class DevStoreDataInitializer implements ApplicationRunner {
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
     private final ProductCategoryRepository categoryRepository;
+    private final boolean demoMode;
 
     public DevStoreDataInitializer(ProductRepository productRepository, InventoryRepository inventoryRepository,
                                    ProductCategoryRepository categoryRepository) {
+        this(productRepository, inventoryRepository, categoryRepository, true);
+    }
+
+    @Autowired
+    public DevStoreDataInitializer(ProductRepository productRepository, InventoryRepository inventoryRepository,
+                                   ProductCategoryRepository categoryRepository,
+                                   @Value("${DEMO_MODE:true}") boolean demoMode) {
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.categoryRepository = categoryRepository;
+        this.demoMode = demoMode;
     }
 
     @Override
