@@ -25,4 +25,14 @@ public class ShopOpeningSaga {
     public void receiveStock(int quantity) {
         stock += quantity;
     }
+
+    public void credit(long amount, String key) {
+        if (key.equals(creditedKey)) {
+            return;
+        }
+        booked += amount;
+        creditedKey = key;
+    }
+
+    private String creditedKey;
 }
