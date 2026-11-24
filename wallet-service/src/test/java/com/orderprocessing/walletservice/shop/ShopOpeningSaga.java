@@ -35,4 +35,18 @@ public class ShopOpeningSaga {
     }
 
     private String creditedKey;
+    private String capturedKey;
+
+    public void buy(long amount, String key) {
+        if (key.equals(capturedKey)) {
+            return;
+        }
+        if (booked < amount) {
+            throw new IllegalStateException("short balance");
+        }
+        booked -= amount;
+        captured += amount;
+        capturedKey = key;
+        mails += 1;
+    }
 }
