@@ -12,6 +12,8 @@ Do the tracks in this order. A later track may start only when the previous trac
 | 6 | [[R1 Return after delivery]] | A delivered order can be returned once. Stock comes back. The wallet is refunded once. |
 | 7 | [[W6 Gateway port]] | A fake adapter can prove a top-up and an order payment. A mismatched amount posts nothing. |
 | 8 | [[P1 Open the door]] | `DEMO_MODE=false` skips seed, the scratch restore reads the ledger row, and the saga returns stock and balance. Not a launch. |
+| 9 | [[T1 Tax table]] | Checkout holds goods plus the IR rate. The order stores that rate. No tax authority. |
+| 10 | [[K1 Carrier port]] | A carrier may reject a tracking reference. It cannot set status or write the wallet. |
 
 ## Already written inside the money track
 
