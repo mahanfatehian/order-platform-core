@@ -51,6 +51,9 @@ public class DevDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (!demoMode) {
+            return;
+        }
         RoleEntity userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new ResourceNotFoundException("ROLE_USER is required for dev data"));
         RoleEntity adminRole = roleRepository.findByName("ROLE_ADMIN")
