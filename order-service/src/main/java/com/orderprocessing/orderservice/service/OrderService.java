@@ -29,9 +29,11 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
+import com.orderprocessing.orderservice.carrier.CarrierPort;
 import com.orderprocessing.orderservice.tax.TaxRateService;
 import com.orderprocessing.orderservice.tax.TaxTable;
 import com.orderprocessing.orderservice.exception.BlankTrackingReferenceException;
+import com.orderprocessing.orderservice.exception.CarrierRejectedException;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.MissingShipAddressException;
 import com.orderprocessing.orderservice.exception.InvalidOrderStateException;
@@ -88,6 +90,7 @@ public class OrderService {
     private final TransactionOperations orderTransactions;
     private final KafkaTopicNames kafkaTopicNames;
     private final TaxRateService taxRates;
+    private final CarrierPort carrierPort;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
@@ -101,7 +104,23 @@ public class OrderService {
                         KafkaTopicNames kafkaTopicNames) {
         this(orderRepository, outboxEventRepository, processedEventRepository, historyRepository,
                 storeServiceClient, walletLedgerClient, addressBookClient, objectMapper,
-                orderTransactions, kafkaTopicNames, null);
+                orderTransactions, kafkaTopicNames, null, null);
+    }
+
+    public OrderService(OrderRepository orderRepository,
+                        OutboxEventRepository outboxEventRepository,
+                        ProcessedKafkaEventRepository processedEventRepository,
+                        OrderStatusHistoryRepository historyRepository,
+                        StoreServiceClient storeServiceClient,
+                        WalletLedgerClient walletLedgerClient,
+                        AddressBookClient addressBookClient,
+                        ObjectMapper objectMapper,
+                        TransactionOperations orderTransactions,
+                        KafkaTopicNames kafkaTopicNames,
+                        TaxRateService taxRates) {
+        this(orderRepository, outboxEventRepository, processedEventRepository, historyRepository,
+                storeServiceClient, walletLedgerClient, addressBookClient, objectMapper,
+                orderTransactions, kafkaTopicNames, taxRates, null);
     }
 
     @Autowired
@@ -115,7 +134,8 @@ public class OrderService {
                         ObjectMapper objectMapper,
                         TransactionOperations orderTransactions,
                         KafkaTopicNames kafkaTopicNames,
-                        TaxRateService taxRates) {
+                        TaxRateService taxRates,
+                        @Autowired(required = false) CarrierPort carrierPort) {
         this.orderRepository = orderRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.processedEventRepository = processedEventRepository;
@@ -127,6 +147,7 @@ public class OrderService {
         this.orderTransactions = orderTransactions;
         this.kafkaTopicNames = kafkaTopicNames;
         this.taxRates = taxRates;
+        this.carrierPort = carrierPort;
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
@@ -393,6 +414,12 @@ public class OrderService {
                                    String correlationId,
                                    String trackingReference) {
         String normalizedTrackingReference = normalizeTrackingReference(trackingReference);
+        if (carrierPort != null && normalizedTrackingReference != null) {
+            String accepted = carrierPort.accept(id, normalizedTrackingReference);
+            if (accepted == null || !accepted.equals(normalizedTrackingReference)) {
+                throw new CarrierRejectedException();
+            }
+        }
         return applyFulfillmentCommand(id, actorUserId, "ROLE_DELIVERY", "ship",
                 Order.Status.PACKAGED, Order.Status.SHIPPED, correlationId, normalizedTrackingReference,
                 new OrderShippedEvent(), normalizedTrackingReference == null
