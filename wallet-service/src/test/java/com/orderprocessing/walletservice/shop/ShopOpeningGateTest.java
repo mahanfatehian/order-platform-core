@@ -16,6 +16,18 @@ class ShopOpeningGateTest {
         assertThat(compose).doesNotContain("payment-gateway:");
     }
 
+    @Test
+    void walletMigrationsDoNotInsertCredits() throws Exception {
+        Path dir = root().resolve("wallet-service/src/main/resources/db/migration");
+        try (var files = Files.list(dir)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".sql")).toList()) {
+                String sql = Files.readString(file).toUpperCase();
+                assertThat(sql).doesNotContain("INSERT INTO LEDGER_ENTRIES");
+                assertThat(sql).doesNotContain("INSERT INTO WALLETS");
+            }
+        }
+    }
+
     private static Path root() {
         Path dir = Path.of("").toAbsolutePath();
         while (dir != null) {
