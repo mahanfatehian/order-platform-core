@@ -29,6 +29,8 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
+import com.orderprocessing.orderservice.tax.TaxRateService;
+import com.orderprocessing.orderservice.tax.TaxTable;
 import com.orderprocessing.orderservice.exception.BlankTrackingReferenceException;
 import com.orderprocessing.orderservice.exception.ForbiddenOperationException;
 import com.orderprocessing.orderservice.exception.MissingShipAddressException;
@@ -51,6 +53,7 @@ import feign.FeignException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
@@ -84,6 +87,7 @@ public class OrderService {
     private final ObjectMapper objectMapper;
     private final TransactionOperations orderTransactions;
     private final KafkaTopicNames kafkaTopicNames;
+    private final TaxRateService taxRates;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
@@ -95,6 +99,23 @@ public class OrderService {
                         ObjectMapper objectMapper,
                         TransactionOperations orderTransactions,
                         KafkaTopicNames kafkaTopicNames) {
+        this(orderRepository, outboxEventRepository, processedEventRepository, historyRepository,
+                storeServiceClient, walletLedgerClient, addressBookClient, objectMapper,
+                orderTransactions, kafkaTopicNames, null);
+    }
+
+    @Autowired
+    public OrderService(OrderRepository orderRepository,
+                        OutboxEventRepository outboxEventRepository,
+                        ProcessedKafkaEventRepository processedEventRepository,
+                        OrderStatusHistoryRepository historyRepository,
+                        StoreServiceClient storeServiceClient,
+                        WalletLedgerClient walletLedgerClient,
+                        AddressBookClient addressBookClient,
+                        ObjectMapper objectMapper,
+                        TransactionOperations orderTransactions,
+                        KafkaTopicNames kafkaTopicNames,
+                        TaxRateService taxRates) {
         this.orderRepository = orderRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.processedEventRepository = processedEventRepository;
@@ -105,6 +126,7 @@ public class OrderService {
         this.objectMapper = objectMapper;
         this.orderTransactions = orderTransactions;
         this.kafkaTopicNames = kafkaTopicNames;
+        this.taxRates = taxRates;
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
@@ -121,14 +143,17 @@ public class OrderService {
         StoreQuoteResponse quote = loadAuthoritativeQuote(quantities);
         Map<UUID, StoreQuoteItemResponse> quoteByProduct = validateQuote(quantities, quote);
         BigDecimal total = quotedTotal(quantities, quoteByProduct);
-        long minor = WalletMoney.minorUnits(total);
+        TaxTable tax = taxRates == null ? TaxTable.none() : taxRates.current();
+        long goodsMinor = WalletMoney.minorUnits(total);
+        long taxMinor = tax.taxMinor(goodsMinor);
+        long minor = goodsMinor + taxMinor;
         UUID orderId = plannedOrderId(userId, normalizedKey);
         String holdKey = normalizedKey == null ? orderId.toString() : normalizedKey;
         WalletLedgerClient.HoldPlaced hold = walletLedgerClient.placeHold(
                 userId, orderId, minor, holdKey, normalizedCorrelationId);
         return Objects.requireNonNull(orderTransactions.execute(status ->
                 persistQuotedOrder(userId, quantities, quoteByProduct, normalizedKey, normalizedCorrelationId,
-                        orderId, hold, shipTo)));
+                        orderId, hold, shipTo, tax.rateBps(), taxMinor)));
     }
 
     private AddressBookClient.ShipToAddress requireShipTo(UUID userId, UUID addressId) {
@@ -155,7 +180,9 @@ public class OrderService {
                                              String normalizedCorrelationId,
                                               UUID orderId,
                                               WalletLedgerClient.HoldPlaced hold,
-                                              AddressBookClient.ShipToAddress shipTo) {
+                                              AddressBookClient.ShipToAddress shipTo,
+                                              int taxRateBps,
+                                              long taxMinor) {
         if (normalizedKey != null) {
             orderRepository.acquireIdempotencyLock(userId + ":" + normalizedKey);
             Optional<Order> existing = findIdempotentOrder(userId, normalizedKey);
@@ -195,6 +222,8 @@ public class OrderService {
         }
         order.setItems(items);
         order.setTotalAmount(total);
+        order.setTaxRateBps(taxRateBps);
+        order.setTaxAmountMinor(taxMinor);
         orderRepository.save(order);
 
         OrderPlacedEvent placed = new OrderPlacedEvent();

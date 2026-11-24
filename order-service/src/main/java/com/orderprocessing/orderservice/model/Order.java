@@ -72,6 +72,12 @@ public class Order {
     @Column(name = "wallet_capture_entry_id")
     private UUID walletCaptureEntryId;
 
+    @Column(name = "tax_rate_bps", nullable = false)
+    private Integer taxRateBps = 0;
+
+    @Column(name = "tax_amount_minor", nullable = false)
+    private Long taxAmountMinor = 0L;
+
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 
