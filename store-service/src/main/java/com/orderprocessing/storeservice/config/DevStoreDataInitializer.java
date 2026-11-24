@@ -6,6 +6,8 @@ import com.orderprocessing.storeservice.model.ProductCategory;
 import com.orderprocessing.storeservice.repository.InventoryRepository;
 import com.orderprocessing.storeservice.repository.ProductCategoryRepository;
 import com.orderprocessing.storeservice.repository.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -105,17 +107,29 @@ public class DevStoreDataInitializer implements ApplicationRunner {
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
     private final ProductCategoryRepository categoryRepository;
+    private final boolean demoMode;
 
     public DevStoreDataInitializer(ProductRepository productRepository, InventoryRepository inventoryRepository,
                                    ProductCategoryRepository categoryRepository) {
+        this(productRepository, inventoryRepository, categoryRepository, true);
+    }
+
+    @Autowired
+    public DevStoreDataInitializer(ProductRepository productRepository, InventoryRepository inventoryRepository,
+                                   ProductCategoryRepository categoryRepository,
+                                   @Value("${DEMO_MODE:true}") boolean demoMode) {
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.categoryRepository = categoryRepository;
+        this.demoMode = demoMode;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (!demoMode) {
+            return;
+        }
         if (SHOWCASE_CATALOG.size() != SHOWCASE_PRODUCT_COUNT) {
             throw new IllegalStateException("The development catalog must contain exactly 15 products");
         }

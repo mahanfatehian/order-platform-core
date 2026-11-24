@@ -5,7 +5,8 @@ import com.orderprocessing.userservice.entity.UserEntity;
 import com.orderprocessing.userservice.exception.ResourceNotFoundException;
 import com.orderprocessing.userservice.repository.RoleRepository;
 import com.orderprocessing.userservice.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -18,7 +19,6 @@ import java.util.Set;
 
 @Component
 @Profile("dev")
-@RequiredArgsConstructor
 public class DevDataInitializer implements ApplicationRunner {
 
     // These credentials exist only when the dev profile is active. Keep them
@@ -32,10 +32,28 @@ public class DevDataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final boolean demoMode;
+
+    public DevDataInitializer(UserRepository userRepository, RoleRepository roleRepository,
+                              PasswordEncoder passwordEncoder) {
+        this(userRepository, roleRepository, passwordEncoder, true);
+    }
+
+    @Autowired
+    public DevDataInitializer(UserRepository userRepository, RoleRepository roleRepository,
+                              PasswordEncoder passwordEncoder, @Value("${DEMO_MODE:true}") boolean demoMode) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.demoMode = demoMode;
+    }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (!demoMode) {
+            return;
+        }
         RoleEntity userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new ResourceNotFoundException("ROLE_USER is required for dev data"));
         RoleEntity adminRole = roleRepository.findByName("ROLE_ADMIN")
