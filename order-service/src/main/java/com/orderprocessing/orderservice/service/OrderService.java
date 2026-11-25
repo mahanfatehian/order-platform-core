@@ -29,6 +29,7 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
+import com.orderprocessing.orderservice.carrier.CarrierHandoffService;
 import com.orderprocessing.orderservice.carrier.CarrierPort;
 import com.orderprocessing.orderservice.tax.TaxInvoiceIssuer;
 import com.orderprocessing.orderservice.tax.TaxRateService;
@@ -93,6 +94,7 @@ public class OrderService {
     private final TaxRateService taxRates;
     private final CarrierPort carrierPort;
     private TaxInvoiceIssuer invoices;
+    private CarrierHandoffService handoffs;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
