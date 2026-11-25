@@ -29,7 +29,9 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
+import com.orderprocessing.orderservice.carrier.CarrierHandoffService;
 import com.orderprocessing.orderservice.carrier.CarrierPort;
+import com.orderprocessing.orderservice.tax.TaxInvoiceIssuer;
 import com.orderprocessing.orderservice.tax.TaxRateService;
 import com.orderprocessing.orderservice.tax.TaxTable;
 import com.orderprocessing.orderservice.exception.BlankTrackingReferenceException;
@@ -91,6 +93,8 @@ public class OrderService {
     private final KafkaTopicNames kafkaTopicNames;
     private final TaxRateService taxRates;
     private final CarrierPort carrierPort;
+    private TaxInvoiceIssuer invoices;
+    private CarrierHandoffService handoffs;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
@@ -148,6 +152,16 @@ public class OrderService {
         this.kafkaTopicNames = kafkaTopicNames;
         this.taxRates = taxRates;
         this.carrierPort = carrierPort;
+    }
+
+    @Autowired(required = false)
+    public void setTaxInvoiceIssuer(TaxInvoiceIssuer invoices) {
+        this.invoices = invoices;
+    }
+
+    @Autowired(required = false)
+    public void setCarrierHandoffs(CarrierHandoffService handoffs) {
+        this.handoffs = handoffs;
     }
 
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
@@ -420,11 +434,22 @@ public class OrderService {
                 throw new CarrierRejectedException();
             }
         }
-        return applyFulfillmentCommand(id, actorUserId, "ROLE_DELIVERY", "ship",
+        OrderResponse shipped = applyFulfillmentCommand(id, actorUserId, "ROLE_DELIVERY", "ship",
                 Order.Status.PACKAGED, Order.Status.SHIPPED, correlationId, normalizedTrackingReference,
                 new OrderShippedEvent(), normalizedTrackingReference == null
                         ? "Order handed to delivery"
                         : "Order handed to delivery with tracking reference " + normalizedTrackingReference);
+        if (carrierPort != null) {
+            recordHandoff(id, normalizedTrackingReference);
+        }
+        return shipped;
+    }
+
+    public void recordHandoff(UUID id, String trackingReference) {
+        if (handoffs == null || trackingReference == null) {
+            return;
+        }
+        handoffs.record(id, trackingReference);
     }
 
     @Transactional
@@ -492,6 +517,18 @@ public class OrderService {
             recordHistory(order, event, Order.Status.PENDING, Order.Status.CONFIRMED, null,
                     "SYSTEM_INVENTORY", "Inventory reservation confirmed");
             addOutbox(order.getId(), kafkaTopicNames.orderEvents(), confirmedFact(order, event.getCorrelationId()));
+            issueConfirmedInvoice(order);
+        }
+    }
+
+    public void issueConfirmedInvoice(Order order) {
+        if (invoices == null || order == null) {
+            return;
+        }
+        try {
+            invoices.issueIfAbsent(order);
+        } catch (RuntimeException ex) {
+            log.warn("Tax invoice was not issued for {}", order.getId());
         }
     }
 

@@ -14,6 +14,9 @@ Do the tracks in this order. A later track may start only when the previous trac
 | 8 | [[P1 Open the door]] | `DEMO_MODE=false` skips seed, the scratch restore reads the ledger row, and the saga returns stock and balance. Not a launch. |
 | 9 | [[T1 Tax table]] | Checkout holds goods plus the IR rate. The order stores that rate. No tax authority. |
 | 10 | [[K1 Carrier port]] | A carrier may reject a tracking reference. It cannot set status or write the wallet. |
+| 11 | [[I1 Tax invoice]] | One invoice copies the order snapshot. A second issue writes nothing. No tax authority. |
+| 12 | [[K2 Carrier handoff]] | Delivery can read the accepted reference. The handoff has no rate and no price. |
+| 13 | [[D1 Public pages]] | Shop, terms, privacy, contact, and robots are public. No domain and no guest checkout. |
 
 ## Already written inside the money track
 
