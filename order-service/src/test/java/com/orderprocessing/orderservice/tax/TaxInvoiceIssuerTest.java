@@ -34,6 +34,20 @@ class TaxInvoiceIssuerTest {
         assertThat(issued.getUserId()).isEqualTo(order.getUserId());
     }
 
+    @Test
+    void aSecondIssueReturnsTheFirstInvoice() {
+        Order order = order();
+        TaxInvoice first = new TaxInvoice();
+        first.setId(UUID.randomUUID());
+        first.setOrderId(order.getId());
+        when(invoices.findByOrderId(order.getId())).thenReturn(Optional.of(first));
+
+        TaxInvoice again = new TaxInvoiceIssuer(invoices).issueIfAbsent(order);
+
+        assertThat(again.getId()).isEqualTo(first.getId());
+        verify(invoices, never()).save(any());
+    }
+
     private static Order order() {
         Order order = new Order();
         order.setId(UUID.randomUUID());
