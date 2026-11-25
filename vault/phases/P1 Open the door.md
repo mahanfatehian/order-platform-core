@@ -20,4 +20,4 @@ This is the check that the shop, not only the wallet, can run without the demo. 
 
 ## Not this phase
 
-A real domain, a real درگاه, a tax authority, or a carrier contract. The repo now has the demo-mode gate, the three operator pages, and a scratch restore drill. The saga in the wallet tests proves the stock and balance return. It does not boot Compose.
+A real domain, a real درگاه, a tax authority, or a carrier contract. The repo now has the demo-mode gate, the three operator pages, and a scratch restore drill for the wallet, store, and order databases. The saga in the wallet tests proves the stock and balance return. It does not boot Compose.
