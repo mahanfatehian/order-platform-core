@@ -57,4 +57,16 @@ class TaxInvoiceIssuerTest {
         order.setWalletAmountMinor(1100L);
         return order;
     }
+
+    @Test
+    void anotherCustomerCannotReadTheInvoice() {
+        UUID owner = UUID.randomUUID();
+        TaxInvoice invoice = new TaxInvoice();
+        invoice.setUserId(owner);
+        when(invoices.findByOrderId(any())).thenReturn(Optional.of(invoice));
+        TaxInvoiceIssuer issuer = new TaxInvoiceIssuer(invoices);
+
+        assertThat(issuer.findOwned(UUID.randomUUID(), UUID.randomUUID())).isEmpty();
+        assertThat(issuer.findOwned(UUID.randomUUID(), owner)).contains(invoice);
+    }
 }
