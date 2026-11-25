@@ -434,11 +434,22 @@ public class OrderService {
                 throw new CarrierRejectedException();
             }
         }
-        return applyFulfillmentCommand(id, actorUserId, "ROLE_DELIVERY", "ship",
+        OrderResponse shipped = applyFulfillmentCommand(id, actorUserId, "ROLE_DELIVERY", "ship",
                 Order.Status.PACKAGED, Order.Status.SHIPPED, correlationId, normalizedTrackingReference,
                 new OrderShippedEvent(), normalizedTrackingReference == null
                         ? "Order handed to delivery"
                         : "Order handed to delivery with tracking reference " + normalizedTrackingReference);
+        if (carrierPort != null) {
+            recordHandoff(id, normalizedTrackingReference);
+        }
+        return shipped;
+    }
+
+    public void recordHandoff(UUID id, String trackingReference) {
+        if (handoffs == null || trackingReference == null) {
+            return;
+        }
+        handoffs.record(id, trackingReference);
     }
 
     @Transactional
