@@ -30,6 +30,7 @@ import com.orderprocessing.orderservice.dto.StoreQuoteItemResponse;
 import com.orderprocessing.orderservice.dto.StoreQuoteRequest;
 import com.orderprocessing.orderservice.dto.StoreQuoteResponse;
 import com.orderprocessing.orderservice.carrier.CarrierPort;
+import com.orderprocessing.orderservice.tax.TaxInvoiceIssuer;
 import com.orderprocessing.orderservice.tax.TaxRateService;
 import com.orderprocessing.orderservice.tax.TaxTable;
 import com.orderprocessing.orderservice.exception.BlankTrackingReferenceException;
@@ -91,6 +92,7 @@ public class OrderService {
     private final KafkaTopicNames kafkaTopicNames;
     private final TaxRateService taxRates;
     private final CarrierPort carrierPort;
+    private TaxInvoiceIssuer invoices;
 
     public OrderService(OrderRepository orderRepository,
                         OutboxEventRepository outboxEventRepository,
