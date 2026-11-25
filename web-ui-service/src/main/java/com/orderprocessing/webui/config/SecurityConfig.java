@@ -26,6 +26,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/login", "/register", "/captcha/**", "/assets/**", "/webjars/**", "/error/**").permitAll()
+                        .requestMatchers("/shop", "/robots.txt", "/terms", "/privacy", "/contact").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/admin/warehouse", "/admin/warehouse/**").hasRole("WAREHOUSE")
                         .requestMatchers("/admin/delivery", "/admin/delivery/**").hasRole("DELIVERY")
