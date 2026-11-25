@@ -159,6 +159,11 @@ public class OrderService {
         this.invoices = invoices;
     }
 
+    @Autowired(required = false)
+    public void setCarrierHandoffs(CarrierHandoffService handoffs) {
+        this.handoffs = handoffs;
+    }
+
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
                                      String idempotencyKey, String correlationId) {
         String normalizedCorrelationId = normalizeCorrelationId(correlationId);
