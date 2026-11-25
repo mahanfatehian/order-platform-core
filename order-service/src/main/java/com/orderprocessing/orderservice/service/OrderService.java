@@ -499,6 +499,18 @@ public class OrderService {
             recordHistory(order, event, Order.Status.PENDING, Order.Status.CONFIRMED, null,
                     "SYSTEM_INVENTORY", "Inventory reservation confirmed");
             addOutbox(order.getId(), kafkaTopicNames.orderEvents(), confirmedFact(order, event.getCorrelationId()));
+            issueConfirmedInvoice(order);
+        }
+    }
+
+    public void issueConfirmedInvoice(Order order) {
+        if (invoices == null || order == null) {
+            return;
+        }
+        try {
+            invoices.issueIfAbsent(order);
+        } catch (RuntimeException ex) {
+            log.warn("Tax invoice was not issued for {}", order.getId());
         }
     }
 
