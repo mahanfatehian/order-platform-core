@@ -1,6 +1,6 @@
 # W6 Gateway port
 
-This phase builds the socket. It does not build a درگاه. The intent table, the applier, and a fake verify result are in place. Compose still has no public payment callback.
+This phase builds the socket. It does not build a درگاه. The base app can open a top-up intent and an order-payment intent. A verified order payment does not credit the wallet and does not set an order status. Compose still has no public payment callback.
 
 ## Build
 
