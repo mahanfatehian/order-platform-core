@@ -35,6 +35,9 @@ public class WalletPaymentApplier {
                 throw WalletException.conflict("PROVIDER_REFERENCE_CONFLICT",
                         "This intent was already verified with another reference");
             }
+            if (intent.getLedgerEntryId() == null) {
+                return null;
+            }
             return entries.findById(intent.getLedgerEntryId()).orElseThrow();
         }
         if (intent.getAmount() != payment.amount() || !intent.getCurrency().equals(payment.currency())) {
