@@ -152,6 +152,11 @@ public class OrderService {
         this.carrierPort = carrierPort;
     }
 
+    @Autowired(required = false)
+    public void setTaxInvoiceIssuer(TaxInvoiceIssuer invoices) {
+        this.invoices = invoices;
+    }
+
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request,
                                      String idempotencyKey, String correlationId) {
         String normalizedCorrelationId = normalizeCorrelationId(correlationId);
