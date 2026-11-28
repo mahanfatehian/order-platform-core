@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/app}">
+<section layout:fragment="content">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">Invoice</p>
+            <h1 class="mono" th:text="${invoice.orderId()}">Order</h1>
+            <p>This page does not name a tax authority.</p>
+        </div>
+    </header>
+    <section class="surface surface--padded" aria-label="Invoice amounts">
+        <dl>
+            <div><dt>Goods</dt><dd id="invoice-goods" th:text="|${invoice.goodsMinor()} rials|">0</dd></div>
+            <div><dt>Rate</dt><dd id="invoice-rate" th:text="|${invoice.rateBps()} basis points|">0</dd></div>
+            <div><dt>Tax</dt><dd id="invoice-tax" th:text="|${invoice.taxMinor()} rials|">0</dd></div>
+            <div><dt>Charged</dt><dd id="invoice-charged" th:text="|${invoice.chargedMinor()} rials|">0</dd></div>
+        </dl>
+        <p id="invoice-ship" th:text="${invoice.shipTo()}">Address</p>
+        <ul>
+            <li th:each="line : ${invoice.lines()}" th:text="${line}">Line</li>
+        </ul>
+        <pre id="invoice-text" th:text="${invoice.text()}">Invoice</pre>
+    </section>
+    <a th:href="@{/app/orders/{id}(id=${invoice.orderId()})}">Back to the order</a>
+</section>
+</html>

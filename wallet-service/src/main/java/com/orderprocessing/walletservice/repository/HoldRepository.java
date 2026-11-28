@@ -16,6 +16,8 @@ public interface HoldRepository extends JpaRepository<Hold, UUID> {
 
     Optional<Hold> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<Hold> findFirstByOrderId(UUID orderId);
+
     @Query("select coalesce(sum(h.amount), 0) from Hold h where h.walletId = :walletId and h.status = :status")
     long sumAmountByWalletAndStatus(@Param("walletId") UUID walletId, @Param("status") HoldStatus status);
 

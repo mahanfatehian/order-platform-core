@@ -17,6 +17,7 @@ public class WalletPaymentApplier {
     private final WalletRepository wallets;
     private final LedgerEntryRepository entries;
     private final WalletLedger ledger;
+    private OrderPaymentCapture orderPayments;
 
     public WalletPaymentApplier(PaymentIntentRepository intents, WalletRepository wallets,
                                 LedgerEntryRepository entries, WalletLedger ledger) {
@@ -24,6 +25,11 @@ public class WalletPaymentApplier {
         this.wallets = wallets;
         this.entries = entries;
         this.ledger = ledger;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOrderPaymentCapture(OrderPaymentCapture orderPayments) {
+        this.orderPayments = orderPayments;
     }
 
     @Transactional
@@ -44,6 +50,14 @@ public class WalletPaymentApplier {
             intent.setStatus(PaymentIntentStatus.REJECTED);
             intents.save(intent);
             return null;
+        }
+        if (intent.getType() == PaymentIntentType.ORDER_CHECKOUT && orderPayments != null) {
+            LedgerEntry captured = orderPayments.capture(payment, intent);
+            intent.setStatus(PaymentIntentStatus.VERIFIED);
+            intent.setProviderReference(payment.providerReference());
+            intent.setLedgerEntryId(captured.getId());
+            intents.save(intent);
+            return captured;
         }
         if (intent.getType() != PaymentIntentType.WALLET_TOPUP) {
             intent.setStatus(PaymentIntentStatus.VERIFIED);
