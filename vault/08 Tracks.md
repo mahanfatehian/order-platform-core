@@ -17,6 +17,9 @@ Do the tracks in this order. A later track may start only when the previous trac
 | 11 | [[I1 Tax invoice]] | One invoice copies the order snapshot. A second issue writes nothing. No tax authority. |
 | 12 | [[K2 Carrier handoff]] | Delivery can read the accepted reference. The handoff has no rate and no price. |
 | 13 | [[D1 Public pages]] | Shop, terms, privacy, contact, and robots are public. No domain and no guest checkout. |
+| 14 | [[N2 Receipt tax]] | The confirm mail states goods, tax, and charged rials. It does not multiply by 100. |
+| 15 | [[I2 Invoice on the order]] | The order page shows the stored tax snapshot. No tax authority. |
+| 16 | [[D2 Operator title]] | A public title cannot claim a ranking. Robots still disallow indexing. |
 
 ## Already written inside the money track
 

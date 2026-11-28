@@ -26,7 +26,9 @@ public record OrderView(
         String shipRegion,
         String shipPostalCode,
         String shipPhone,
-        String shipCountry
+        String shipCountry,
+        Integer taxRateBps,
+        Long taxAmountMinor
 ) {
     public OrderView {
         items = items == null ? List.of() : List.copyOf(items);
@@ -36,13 +38,13 @@ public record OrderView(
                      String trackingReference, UUID walletHoldId, Long walletAmountMinor, String walletTender) {
         this(id, userId, status, totalAmount, failureReason, items, createdAt, updatedAt, cancellable,
                 trackingReference, walletHoldId, walletAmountMinor, walletTender,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
     public OrderView(UUID id, UUID userId, String status, BigDecimal totalAmount, String failureReason,
                      List<OrderItemView> items, Instant createdAt, Instant updatedAt, boolean cancellable,
                      String trackingReference) {
         this(id, userId, status, totalAmount, failureReason, items, createdAt, updatedAt, cancellable,
-                trackingReference, null, null, null, null, null, null, null, null, null, null, null);
+                trackingReference, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
     public OrderView(UUID id, UUID userId, String status, BigDecimal totalAmount, String failureReason,
                      List<OrderItemView> items, Instant createdAt, Instant updatedAt, boolean cancellable) {

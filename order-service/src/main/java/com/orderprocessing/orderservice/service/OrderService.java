@@ -882,6 +882,8 @@ public class OrderService {
                 .cancellable(order.getStatus() == Order.Status.PENDING || order.getStatus() == Order.Status.CONFIRMED)
                 .walletHoldId(order.getWalletHoldId())
                 .walletAmountMinor(order.getWalletAmountMinor())
+                .taxRateBps(order.getTaxRateBps())
+                .taxAmountMinor(order.getTaxAmountMinor())
                 .walletTender(walletTender(order))
                 .shipRecipient(order.getShipRecipient())
                 .shipLine1(order.getShipLine1())
@@ -985,6 +987,11 @@ public class OrderService {
         confirmed.setUserId(order.getUserId());
         confirmed.setSuccess(true);
         confirmed.setCapturedMinor(order.getWalletAmountMinor());
+        confirmed.setTaxMinor(order.getTaxAmountMinor());
+        confirmed.setRateBps(order.getTaxRateBps());
+        if (order.getWalletAmountMinor() != null && order.getTaxAmountMinor() != null) {
+            confirmed.setGoodsMinor(order.getWalletAmountMinor() - order.getTaxAmountMinor());
+        }
         confirmed.setWalletCaptureEntryId(order.getWalletCaptureEntryId());
         confirmed.setLines(order.getItems().stream().map(item -> {
             OrderConfirmedEvent.Line line = new OrderConfirmedEvent.Line();

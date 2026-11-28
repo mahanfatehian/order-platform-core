@@ -14,6 +14,9 @@ public class OrderConfirmedEvent extends DomainEvent {
     private UUID userId;
     private boolean success;
     private Long capturedMinor;
+    private Long goodsMinor;
+    private Integer rateBps;
+    private Long taxMinor;
     private UUID walletCaptureEntryId;
     private List<Line> lines = new ArrayList<>();
     private String shipRecipient;
