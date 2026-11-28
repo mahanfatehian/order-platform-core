@@ -20,6 +20,9 @@ Do the tracks in this order. A later track may start only when the previous trac
 | 14 | [[N2 Receipt tax]] | The confirm mail states goods, tax, and charged rials. It does not multiply by 100. |
 | 15 | [[I2 Invoice on the order]] | The order page shows the stored tax snapshot. No tax authority. |
 | 16 | [[D2 Operator title]] | A public title cannot claim a ranking. Robots still disallow indexing. |
+| 17 | [[Checkout tax quote]] | Checkout shows goods, tax, and the charged amount. A short balance includes the tax. |
+| 18 | [[Customer invoice]] | The customer opens the invoice copied from the order. No tax authority. |
+| 19 | [[Order payment capture]] | A verified order payment captures the matching hold once. It does not set order status. |
 
 ## Already written inside the money track
 

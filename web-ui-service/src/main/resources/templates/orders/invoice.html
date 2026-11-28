@@ -9,7 +9,19 @@
             <p>This page does not name a tax authority.</p>
         </div>
     </header>
-    <pre id="invoice-text" th:text="${invoice.text()}">Invoice</pre>
+    <section class="surface surface--padded" aria-label="Invoice amounts">
+        <dl>
+            <div><dt>Goods</dt><dd id="invoice-goods" th:text="|${invoice.goodsMinor()} rials|">0</dd></div>
+            <div><dt>Rate</dt><dd id="invoice-rate" th:text="|${invoice.rateBps()} basis points|">0</dd></div>
+            <div><dt>Tax</dt><dd id="invoice-tax" th:text="|${invoice.taxMinor()} rials|">0</dd></div>
+            <div><dt>Charged</dt><dd id="invoice-charged" th:text="|${invoice.chargedMinor()} rials|">0</dd></div>
+        </dl>
+        <p id="invoice-ship" th:text="${invoice.shipTo()}">Address</p>
+        <ul>
+            <li th:each="line : ${invoice.lines()}" th:text="${line}">Line</li>
+        </ul>
+        <pre id="invoice-text" th:text="${invoice.text()}">Invoice</pre>
+    </section>
     <a th:href="@{/app/orders/{id}(id=${invoice.orderId()})}">Back to the order</a>
 </section>
 </html>
