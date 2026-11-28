@@ -11,7 +11,8 @@ public final class PublicCatalog {
         if (product == null || !product.active()) {
             throw new IllegalArgumentException("An inactive product is not public");
         }
-        return product.name() + "\n" + product.price() + "\nThe operator has not set a public domain.";
+        return product.name() + "\n" + product.price() + "\n" + new OperatorCopy(null, null).title()
+                + "\nThe operator has not set a public domain.";
     }
 
     public String robots() {
