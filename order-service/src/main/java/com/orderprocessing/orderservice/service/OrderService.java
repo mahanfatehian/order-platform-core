@@ -985,6 +985,11 @@ public class OrderService {
         confirmed.setUserId(order.getUserId());
         confirmed.setSuccess(true);
         confirmed.setCapturedMinor(order.getWalletAmountMinor());
+        confirmed.setTaxMinor(order.getTaxAmountMinor());
+        confirmed.setRateBps(order.getTaxRateBps());
+        if (order.getWalletAmountMinor() != null && order.getTaxAmountMinor() != null) {
+            confirmed.setGoodsMinor(order.getWalletAmountMinor() - order.getTaxAmountMinor());
+        }
         confirmed.setWalletCaptureEntryId(order.getWalletCaptureEntryId());
         confirmed.setLines(order.getItems().stream().map(item -> {
             OrderConfirmedEvent.Line line = new OrderConfirmedEvent.Line();
