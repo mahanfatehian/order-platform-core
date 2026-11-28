@@ -45,6 +45,10 @@ public class OrderResponse {
 
     private Long walletAmountMinor;
 
+    private Integer taxRateBps;
+
+    private Long taxAmountMinor;
+
     private String walletTender;
 
     private String shipRecipient;

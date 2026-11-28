@@ -882,6 +882,8 @@ public class OrderService {
                 .cancellable(order.getStatus() == Order.Status.PENDING || order.getStatus() == Order.Status.CONFIRMED)
                 .walletHoldId(order.getWalletHoldId())
                 .walletAmountMinor(order.getWalletAmountMinor())
+                .taxRateBps(order.getTaxRateBps())
+                .taxAmountMinor(order.getTaxAmountMinor())
                 .walletTender(walletTender(order))
                 .shipRecipient(order.getShipRecipient())
                 .shipLine1(order.getShipLine1())
