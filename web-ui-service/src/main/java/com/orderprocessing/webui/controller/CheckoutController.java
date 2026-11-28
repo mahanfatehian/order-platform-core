@@ -5,7 +5,9 @@ import com.orderprocessing.webui.dto.AddressView;
 import com.orderprocessing.webui.dto.CartView;
 import com.orderprocessing.webui.dto.OrderView;
 import com.orderprocessing.webui.dto.WalletBalanceView;
-import com.orderprocessing.webui.money.WalletQuote;
+import com.orderprocessing.webui.money.CheckoutCharge;
+import com.orderprocessing.webui.money.CheckoutReview;
+import org.springframework.beans.factory.annotation.Value;
 import com.orderprocessing.webui.exception.BackendClientException;
 import com.orderprocessing.webui.service.CartService;
 import jakarta.servlet.http.HttpSession;
@@ -30,8 +32,16 @@ public class CheckoutController {
     private static final String REVIEWED_ADDRESS = CheckoutController.class.getName() + ".REVIEWED_ADDRESS";
     private final CartService cartService;
     private final AuthenticatedPlatformClient client;
-    public CheckoutController(CartService cartService, AuthenticatedPlatformClient client) {
-        this.cartService = cartService; this.client = client;
+    private final int taxRateBps;
+
+    public CheckoutController(CartService cartService, AuthenticatedPlatformClient client,
+                              @Value("${shop.tax-rate-bps:0}") int taxRateBps) {
+        if (taxRateBps < 0 || taxRateBps > CheckoutCharge.MAX_BPS) {
+            throw new IllegalArgumentException("shop.tax-rate-bps must be between 0 and 10000");
+        }
+        this.cartService = cartService;
+        this.client = client;
+        this.taxRateBps = taxRateBps;
     }
 
     @GetMapping
@@ -43,6 +53,7 @@ public class CheckoutController {
         UUID selectedAddressId = selected(addresses);
         String key = checkoutKeyFor(session, quantities);
         WalletBalanceView balance = client.myWalletBalance();
+        CheckoutReview review = new CheckoutReview(CheckoutCharge.quote(quote.total(), taxRateBps), balance, quote.checkoutReady());
         session.setAttribute(KEY, key);
         session.setAttribute(REVIEWED_CART, new LinkedHashMap<>(quantities));
         if (selectedAddressId == null) {
@@ -55,7 +66,8 @@ public class CheckoutController {
         model.addAttribute("selectedAddressId", selectedAddressId);
         model.addAttribute("idempotencyKey", key);
         model.addAttribute("wallet", balance);
-        model.addAttribute("walletShort", !WalletQuote.canSpend(quote.total(), balance == null ? null : balance.available()));
+        model.addAttribute("charge", review.charge());
+        model.addAttribute("walletShort", review.shortBalance());
         return "checkout/review";
     }
 
@@ -91,7 +103,8 @@ public class CheckoutController {
             return "redirect:/app/cart";
         }
         WalletBalanceView balance = client.myWalletBalance();
-        if (!WalletQuote.canSpend(quote.total(), balance == null ? null : balance.available())) {
+        CheckoutCharge charge = CheckoutCharge.quote(quote.total(), taxRateBps);
+        if (!charge.canSpend(balance == null ? null : balance.available())) {
             redirect.addFlashAttribute("warning", "Wallet balance is not enough for this order. Your cart was kept.");
             return "redirect:/app/cart";
         }

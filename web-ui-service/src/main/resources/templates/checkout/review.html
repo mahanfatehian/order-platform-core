@@ -31,8 +31,16 @@
             <aside class="surface surface--padded">
                 <h2 class="section-title">Place order</h2>
                 <div class="d-flex justify-content-between mb-1">
-                    <span>Order total</span>
-                    <strong id="checkout-total" class="money fs-4" th:text="|$${#numbers.formatDecimal(cart.total(),1,2)}|">$0</strong>
+                    <span>Goods</span>
+                    <strong id="checkout-goods" th:text="${charge != null} ? ${charge.goodsMinor()} : ${cart.total()}">0</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-1" th:if="${charge != null}">
+                    <span>Tax</span>
+                    <strong id="checkout-tax" th:text="${charge.taxMinor()}">0</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Charged</span>
+                    <strong id="checkout-charged" class="money fs-4" th:text="${charge != null} ? ${charge.chargedMinor()} : ${cart.total()}">0</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-3">
                     <span>Available</span>
