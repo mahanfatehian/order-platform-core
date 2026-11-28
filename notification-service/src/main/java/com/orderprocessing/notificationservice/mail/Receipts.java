@@ -14,8 +14,12 @@ public final class Receipts {
                 body.append(line.getProductId()).append(' ').append(line.getQuantity()).append('\n');
             }
         }
-        long total = event.getCapturedMinor() == null ? 0L : event.getCapturedMinor();
-        body.append("Total: ").append(total).append(" rials\n");
+        long charged = event.getCapturedMinor() == null ? 0L : event.getCapturedMinor();
+        long tax = event.getTaxMinor() == null ? 0L : event.getTaxMinor();
+        long goods = event.getGoodsMinor() == null ? charged - tax : event.getGoodsMinor();
+        body.append("Goods: ").append(goods).append(" rials\n");
+        body.append("Tax: ").append(tax).append(" rials\n");
+        body.append("Total: ").append(charged).append(" rials\n");
         body.append("Ship to: ")
                 .append(text(event.getShipRecipient())).append(", ")
                 .append(text(event.getShipLine1())).append(", ")
