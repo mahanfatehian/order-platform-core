@@ -5,6 +5,7 @@ import com.orderprocessing.webui.dto.OrderView;
 import com.orderprocessing.webui.dto.PageResponse;
 import com.orderprocessing.webui.dto.PaginationLinks;
 import com.orderprocessing.webui.exception.BackendClientException;
+import com.orderprocessing.webui.shop.CustomerInvoice;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,12 @@ public class OrderPageController {
     public String status(@PathVariable UUID id, Model model) {
         populateStatusModel(id, model);
         return "orders/_status";
+    }
+
+    @GetMapping("/{id}/invoice")
+    public String invoice(@PathVariable UUID id, Model model) {
+        model.addAttribute("invoice", CustomerInvoice.from(client.order(id)));
+        return "orders/invoice";
     }
 
     @PostMapping("/{id}/cancel")
